@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { getCustomerContext } from "@/server/services/customer-context";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
+import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
 
 const orderItemSchema = z.object({
   productId: z.string().min(1),
@@ -112,26 +113,27 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       data: { status: "WAITING_FOOD" }
     });
 
-    await tx.notification.create({
-      data: {
-        restaurantId: context.restaurant.id,
-        type: "ORDER_CREATED",
-        title: `Đơn mới - Bàn ${context.table.name}`,
-        message: `${context.session.customerName} vừa gọi ${created.items.length} món - ${subtotal.toLocaleString("vi-VN")}đ`,
-        tableId: context.table.id,
-        orderId: created.id
-      }
-    });
-
     return created;
+  });
+
+  const notificationTitle = `Đơn mới - Bàn ${context.table.name}`;
+  const notificationMessage = `${context.session.customerName} vừa gọi ${order.items.length} món - ${subtotal.toLocaleString("vi-VN")}đ`;
+  await createNotificationsForRestaurantRoles({
+    restaurantId: context.restaurant.id,
+    roles: getPushTargetsForEvent("ORDER_CREATED"),
+    type: "ORDER_CREATED",
+    title: notificationTitle,
+    message: notificationMessage,
+    tableId: context.table.id,
+    orderId: order.id
   });
 
   void sendPushToRestaurantRoles({
     restaurantId: context.restaurant.id,
     roles: getPushTargetsForEvent("ORDER_CREATED"),
     payload: {
-      title: `Đơn mới - Bàn ${context.table.name}`,
-      body: `${context.session.customerName} vừa gọi ${order.items.length} món - ${subtotal.toLocaleString("vi-VN")}đ`,
+      title: notificationTitle,
+      body: notificationMessage,
       url: `/${context.restaurant.slug}/staff`,
       tag: `order-${order.id}`
     }

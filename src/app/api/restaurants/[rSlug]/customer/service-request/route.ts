@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { getCustomerContext } from "@/server/services/customer-context";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
+import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
 
 const requestSchema = z.object({
   requestType: z.enum(["CALL_STAFF", "REQUEST_WATER", "REQUEST_UTENSILS", "REQUEST_PAYMENT", "OTHER"]),
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
+  const eventType = parsed.data.requestType === "REQUEST_PAYMENT" ? "PAYMENT_REQUESTED" : "SERVICE_REQUEST_CREATED";
   const serviceRequest = await prisma.$transaction(async (tx) => {
     const created = await tx.serviceRequest.create({
       data: {
@@ -52,27 +54,27 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       });
     }
 
-    await tx.notification.create({
-      data: {
-        restaurantId: context.restaurant.id,
-        type: parsed.data.requestType === "REQUEST_PAYMENT" ? "PAYMENT_REQUESTED" : "SERVICE_REQUEST_CREATED",
-        title: `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`,
-        message: parsed.data.message || `${context.session.customerName} ${requestLabels[parsed.data.requestType]}`,
-        tableId: context.table.id,
-        serviceRequestId: created.id
-      }
-    });
-
     return created;
   });
 
-  const eventType = parsed.data.requestType === "REQUEST_PAYMENT" ? "PAYMENT_REQUESTED" : "SERVICE_REQUEST_CREATED";
+  const notificationTitle = `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`;
+  const notificationMessage = parsed.data.message || `${context.session.customerName} ${requestLabels[parsed.data.requestType]}`;
+  await createNotificationsForRestaurantRoles({
+    restaurantId: context.restaurant.id,
+    roles: getPushTargetsForEvent(eventType),
+    type: eventType,
+    title: notificationTitle,
+    message: notificationMessage,
+    tableId: context.table.id,
+    serviceRequestId: serviceRequest.id
+  });
+
   void sendPushToRestaurantRoles({
     restaurantId: context.restaurant.id,
     roles: getPushTargetsForEvent(eventType),
     payload: {
-      title: `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`,
-      body: parsed.data.message || `${context.session.customerName} ${requestLabels[parsed.data.requestType]}`,
+      title: notificationTitle,
+      body: notificationMessage,
       url: parsed.data.requestType === "REQUEST_PAYMENT" ? `/${context.restaurant.slug}/cashier` : `/${context.restaurant.slug}/staff`,
       tag: `service-${serviceRequest.id}`
     }
