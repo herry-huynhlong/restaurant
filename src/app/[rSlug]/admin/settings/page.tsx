@@ -1,6 +1,7 @@
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { InstallAppButton } from "@/components/app-shell/install-app-button";
 import { SoundUnlockButton } from "@/components/app-shell/sound-unlock-button";
+import { PushNotificationButton } from "@/components/app-shell/push-notification-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
@@ -71,6 +72,10 @@ export default async function SettingsPage({
         </SettingsSection>
 
         <SettingsSection title="Thông báo">
+          <div className="rounded-md border p-3">
+            <p className="mb-2 text-sm font-medium">Thông báo đẩy</p>
+            <PushNotificationButton slug={access.restaurant.slug} />
+          </div>
           <Check name="notificationSoundEnabled" label="Âm thanh thông báo ON/OFF" defaultChecked={settings?.notificationSoundEnabled ?? true} />
           <Check name="notifyNewOrder" label="Thông báo order mới" defaultChecked={settings?.notifyNewOrder ?? true} />
           <Check name="notifyServiceRequest" label="Thông báo khách gọi nhân viên" defaultChecked={settings?.notifyServiceRequest ?? true} />

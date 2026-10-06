@@ -4,6 +4,7 @@ import { BarChart3, Bell, CreditCard, Grid3X3, Home, ListOrdered, Menu as MenuIc
 import type { Notification } from "@prisma/client";
 import { InstallAppButton } from "@/components/app-shell/install-app-button";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
+import { PushNotificationButton } from "@/components/app-shell/push-notification-button";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
 import { restaurantRoutes } from "@/lib/routes";
 
@@ -53,6 +54,7 @@ export function RestaurantAdminShell({
           </nav>
           <div className="mt-auto space-y-2 border-t pt-3">
             <InstallAppButton />
+            <PushNotificationButton slug={slug} compact />
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm">
               <p className="font-medium">{userName ?? "User"}</p>
               <p className="text-xs text-slate-500">{role}</p>
@@ -67,6 +69,7 @@ export function RestaurantAdminShell({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <InstallAppButton compact />
+              <PushNotificationButton slug={slug} compact />
               <NotificationBell slug={slug} notifications={notifications} />
               <details className="relative">
                 <summary className="cursor-pointer list-none rounded-md border bg-white px-3 py-2 text-sm hover:bg-slate-50">
@@ -76,6 +79,9 @@ export function RestaurantAdminShell({
                   <p className="text-sm font-semibold">{userName ?? "User"}</p>
                   <p className="mb-3 text-xs text-slate-500">{role}</p>
                   <InstallAppButton />
+                  <div className="mt-2">
+                    <PushNotificationButton slug={slug} compact />
+                  </div>
                   <div className="mt-2">
                     <SignOutButton />
                   </div>
