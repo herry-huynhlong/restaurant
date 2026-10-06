@@ -1,5 +1,8 @@
 "use server";
 
+import crypto from "node:crypto";
+import path from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -17,6 +20,25 @@ function readString(formData: FormData, key: string) {
 
 function readBoolean(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
+}
+
+async function saveUploadedImage(formData: FormData, key: string) {
+  const file = formData.get(key);
+  if (!(file instanceof File) || file.size === 0) {
+    return undefined;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("INVALID_IMAGE_TYPE");
+  }
+
+  const extension = path.extname(file.name).toLowerCase() || ".jpg";
+  const safeExtension = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(extension) ? extension : ".jpg";
+  const fileName = `${crypto.randomUUID()}${safeExtension}`;
+  const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
+  return `/uploads/products/${fileName}`;
 }
 
 function redirectWithMessage(path: string, key: "error" | "success", message: string): never {
@@ -279,14 +301,15 @@ const productSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).default(0)
 });
 
-function productDataFromForm(formData: FormData) {
+async function productDataFromForm(formData: FormData) {
+  const uploadedImageUrl = await saveUploadedImage(formData, "imageFile");
   return {
     categoryId: readString(formData, "categoryId"),
     nameVi: readString(formData, "nameVi"),
     nameEn: readString(formData, "nameEn") || undefined,
     descriptionVi: readString(formData, "descriptionVi") || undefined,
     descriptionEn: readString(formData, "descriptionEn") || undefined,
-    imageUrl: readString(formData, "imageUrl") || undefined,
+    imageUrl: uploadedImageUrl ?? (readString(formData, "imageUrl") || undefined),
     price: parseVndInteger(readString(formData, "price")),
     isActive: readBoolean(formData, "isActive"),
     isSoldOut: readBoolean(formData, "isSoldOut"),
@@ -332,7 +355,7 @@ async function replaceProductOptions(restaurantId: string, productId: string, fo
 export async function createProductAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminMenu(slug);
-  const parsed = productSchema.safeParse(productDataFromForm(formData));
+  const parsed = productSchema.safeParse(await productDataFromForm(formData));
   if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu món ăn không hợp lệ.");
 
   const category = await prisma.category.findFirst({ where: { id: parsed.data.categoryId, restaurantId: access.restaurant.id } });
@@ -349,7 +372,7 @@ export async function updateProductAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminMenu(slug);
   const productId = readString(formData, "productId");
-  const parsed = productSchema.safeParse(productDataFromForm(formData));
+  const parsed = productSchema.safeParse(await productDataFromForm(formData));
   if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu món ăn không hợp lệ.");
 
   const product = await prisma.product.update({

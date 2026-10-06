@@ -1,7 +1,7 @@
 import { CustomerShell } from "@/components/app-shell/customer-shell";
+import { CustomerMenuClient } from "@/components/customer/customer-menu-client";
 import { getRestaurantBySlug } from "@/lib/tenant/restaurant";
 import { prisma } from "@/lib/db/prisma";
-import { formatVnd } from "@/lib/money";
 import { getCustomerSessionCookie } from "@/lib/customer-session";
 import { redirect } from "next/navigation";
 import { restaurantRoutes } from "@/lib/routes";
@@ -35,34 +35,19 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
   });
   return (
     <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName}>
-      <section className="space-y-3 pb-20">
-        {products.length ? products.map((product) => (
-          <article key={product.id} className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="flex gap-3">
-              <div className="h-20 w-20 shrink-0 rounded-md bg-slate-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {product.imageUrl ? <img alt={product.nameVi} className="h-full w-full rounded-md object-cover" src={product.imageUrl} /> : null}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-slate-500">{product.category.nameVi}</p>
-                <h2 className="font-semibold">{product.nameVi}</h2>
-                {product.descriptionVi ? <p className="mt-1 line-clamp-2 text-sm text-slate-600">{product.descriptionVi}</p> : null}
-                <div className="mt-2 flex items-center justify-between">
-                  <p className="font-semibold text-teal-700">{formatVnd(product.price)}</p>
-                  <button className="rounded-md px-3 py-1 text-sm font-semibold text-white disabled:bg-slate-300" style={{ backgroundColor: restaurant.settings?.primaryColor ?? "#0f766e" }} type="button" disabled={product.isSoldOut}>
-                    {product.isSoldOut ? "Hết món" : "+"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </article>
-        )) : (
-          <section className="rounded-lg border bg-white p-8 text-center shadow-sm">
-            <h2 className="text-lg font-semibold">Chưa có món ăn</h2>
-            <p className="mt-2 text-sm text-slate-600">Nhà hàng đang cập nhật menu.</p>
-          </section>
-        )}
-      </section>
+      <CustomerMenuClient
+        slug={restaurant.slug}
+        primaryColor={restaurant.settings?.primaryColor ?? "#0f766e"}
+        products={products.map((product) => ({
+          id: product.id,
+          categoryName: product.category.nameVi,
+          nameVi: product.nameVi,
+          descriptionVi: product.descriptionVi,
+          price: product.price,
+          imageUrl: product.imageUrl,
+          isSoldOut: product.isSoldOut
+        }))}
+      />
     </CustomerShell>
   );
 }

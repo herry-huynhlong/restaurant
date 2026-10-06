@@ -75,7 +75,7 @@ export default async function MenuPage({
 
 function ProductForm({ slug, categories }: { slug: string; categories: Array<{ id: string; nameVi: string }> }) {
   return (
-    <form className="rounded-lg border bg-white p-4 shadow-sm" action={createProductAction.bind(null, slug)}>
+    <form className="rounded-lg border bg-white p-4 shadow-sm" action={createProductAction.bind(null, slug)} encType="multipart/form-data">
       <h2 className="text-base font-semibold">+ Thêm món</h2>
       <ProductFields categories={categories} />
       <button className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" type="submit" disabled={categories.length === 0}>
@@ -89,7 +89,7 @@ function ProductEditForm({ slug, categories, product }: { slug: string; categori
   const firstGroup = product.optionGroups[0];
   return (
     <div className="mt-4 border-t pt-4">
-      <form action={updateProductAction.bind(null, slug)}>
+      <form action={updateProductAction.bind(null, slug)} encType="multipart/form-data">
         <input name="productId" type="hidden" value={product.id} />
         <ProductFields categories={categories} product={product} firstGroup={firstGroup} />
         <div className="mt-4 flex flex-wrap gap-2">
@@ -117,7 +117,11 @@ function ProductFields({ categories, product, firstGroup }: { categories: Array<
   return (
     <>
       <div className="mt-3 grid gap-3 md:grid-cols-3">
-        <input className="h-10 rounded-md border px-3" name="imageUrl" placeholder="Ảnh món URL" defaultValue={product?.imageUrl ?? ""} />
+        <label className="block text-sm">
+          Ảnh món
+          <input className="mt-1 h-10 w-full rounded-md border px-3 py-2" name="imageFile" type="file" accept="image/*" />
+        </label>
+        <input className="h-10 rounded-md border px-3" name="imageUrl" placeholder="Hoặc ảnh URL" defaultValue={product?.imageUrl ?? ""} />
         <input className="h-10 rounded-md border px-3" name="nameVi" placeholder="Tên món tiếng Việt *" defaultValue={product?.nameVi ?? ""} required />
         <input className="h-10 rounded-md border px-3" name="nameEn" placeholder="Tên món tiếng Anh" defaultValue={product?.nameEn ?? ""} />
         <textarea className="min-h-20 rounded-md border px-3 py-2" name="descriptionVi" placeholder="Mô tả tiếng Việt" defaultValue={product?.descriptionVi ?? ""} />
