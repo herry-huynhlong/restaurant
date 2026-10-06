@@ -19,7 +19,7 @@ export async function requirePlatformAdmin() {
   const user = await requireAuthenticatedUser();
 
   if (user.platformRole !== "PLATFORM_ADMIN") {
-    notFound();
+    redirect("/unauthorized");
   }
 
   return user;
@@ -58,11 +58,11 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
   });
 
   if (!membership?.isActive) {
-    notFound();
+    redirect("/unauthorized");
   }
 
   if (allowedRoles && !hasAnyRestaurantRole(membership.role, allowedRoles)) {
-    notFound();
+    redirect("/unauthorized");
   }
 
   return { user, restaurant, membership };

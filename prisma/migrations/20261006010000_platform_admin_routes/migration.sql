@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "RestaurantStatus" ADD VALUE IF NOT EXISTS 'SUSPENDED';
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "phone" TEXT;

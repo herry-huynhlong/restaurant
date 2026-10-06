@@ -1,53 +1,58 @@
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformOverview } from "@/server/services/platform-service";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { StatCard } from "@/components/ui/stat-card";
+import Link from "next/link";
+import { platformRoutes } from "@/lib/routes";
 
 export default async function PlatformPage() {
   await requirePlatformAdmin();
   const overview = await getPlatformOverview();
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <AppHeader title="Platform Admin" subtitle="Quản lý các nhà hàng tenant" />
-      <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 sm:grid-cols-2 lg:grid-cols-4">
+    <PlatformShell
+      title="Tổng quan"
+      action={
+        <Link className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" href={platformRoutes.newRestaurant}>
+          + Thêm nhà hàng
+        </Link>
+      }
+    >
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Tổng nhà hàng" value={overview.totalRestaurants} />
         <StatCard label="Active" value={overview.activeRestaurants} />
         <StatCard label="Inactive" value={overview.inactiveRestaurants} />
+        <StatCard label="Suspended" value={overview.suspendedRestaurants} />
+        <StatCard label="Expired" value={overview.expiredRestaurants} />
+        <StatCard label="Order hôm nay" value={overview.totalOrdersToday} />
+        <StatCard label="Nhà hàng mới tháng này" value={overview.newRestaurantsThisMonth} />
         <StatCard label="Tổng order" value={overview.totalOrders} />
       </section>
-      <section className="mx-auto w-full max-w-6xl px-4 pb-10">
-        <div className="overflow-hidden rounded-lg border bg-white">
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>
-                <th className="px-4 py-3 font-medium">Tên</th>
-                <th className="px-4 py-3 font-medium">Slug</th>
-                <th className="px-4 py-3 font-medium">Plan</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Bàn</th>
-                <th className="px-4 py-3 font-medium">Nhân viên</th>
-                <th className="px-4 py-3 font-medium">Ngày tạo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.restaurants.map((restaurant) => (
-                <tr key={restaurant.id} className="border-t">
-                  <td className="px-4 py-3 font-medium">{restaurant.name}</td>
-                  <td className="px-4 py-3">{restaurant.slug}</td>
-                  <td className="px-4 py-3">{restaurant.plan}</td>
-                  <td className="px-4 py-3">{restaurant.status}</td>
-                  <td className="px-4 py-3">{restaurant._count.tables}</td>
-                  <td className="px-4 py-3">{restaurant._count.users}</td>
-                  <td className="px-4 py-3">
-                    {new Intl.DateTimeFormat("vi-VN").format(restaurant.createdAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+      <section className="mt-6 grid gap-4 lg:grid-cols-3">
+        <SummaryList title="Nhà hàng mới nhất" items={overview.restaurants.map((item) => `${item.name} · ${item.slug}`)} />
+        <SummaryList title="Sắp hết hạn" items={overview.expiringSoon.map((item) => `${item.name} · ${formatDate(item.subscriptionEnd)}`)} />
+        <SummaryList title="Đã hết hạn" items={overview.expired.map((item) => `${item.name} · ${formatDate(item.subscriptionEnd)}`)} />
       </section>
-    </main>
+    </PlatformShell>
+  );
+}
+
+function formatDate(date: Date | null) {
+  return date ? new Intl.DateTimeFormat("vi-VN").format(date) : "Chưa đặt";
+}
+
+function SummaryList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section className="rounded-lg border bg-white p-4 shadow-sm">
+      <h2 className="text-base font-semibold">{title}</h2>
+      <div className="mt-3 space-y-2">
+        {items.length ? (
+          items.map((item) => <p key={item} className="rounded-md bg-slate-50 px-3 py-2 text-sm">{item}</p>)
+        ) : (
+          <p className="text-sm text-slate-500">Chưa có dữ liệu.</p>
+        )}
+      </div>
+    </section>
   );
 }

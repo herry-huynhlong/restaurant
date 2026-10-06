@@ -18,7 +18,7 @@ export function LoginForm() {
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
-    const callbackUrl = searchParams.get("callbackUrl") ?? "/platform";
+    const callbackUrl = searchParams.get("callbackUrl") ?? "/post-login";
 
     const result = await signIn("credentials", {
       email,

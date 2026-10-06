@@ -5,8 +5,11 @@ Server authorization is enforced through `requirePlatformAdmin`, `requireRestaur
 | Area | PLATFORM_ADMIN | OWNER | MANAGER | CASHIER | WAITER | KITCHEN |
 | --- | --- | --- | --- | --- | --- | --- |
 | Platform dashboard | Yes | No | No | No | No | No |
-| Create restaurant | Yes | No | No | No | No | No |
-| Activate/deactivate restaurant | Yes | No | No | No | No | No |
+| Create restaurant + owner | Yes | No | No | No | No | No |
+| Edit restaurant | Yes | No | No | No | No | No |
+| Activate/suspend restaurant | Yes | No | No | No | No | No |
+| Extend subscription/change plan | Yes | No | No | No | No | No |
+| Reset owner password | Yes | No | No | No | No | No |
 | Restaurant dashboard | No | Yes | Yes | Limited | Limited | Limited |
 | Settings | No | Yes | Yes | No | No | No |
 | Staff management | No | Yes | Yes | No | No | No |

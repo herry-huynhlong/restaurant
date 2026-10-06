@@ -7,5 +7,10 @@ export default withAuth({
 });
 
 export const config = {
-  matcher: ["/platform/:path*", "/((?!api|_next|.*\\..*|login$)[^/]+)/(admin|staff|kitchen|cashier)/:path*"]
+  matcher: [
+    "/platform/:path*",
+    "/post-login",
+    "/select-restaurant",
+    "/((?!api|_next|.*\\..*|login$|unauthorized$)[^/]+)/(admin|staff|kitchen|cashier)/:path*"
+  ]
 };
