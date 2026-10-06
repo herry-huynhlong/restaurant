@@ -1,0 +1,482 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { prisma } from "@/lib/db/prisma";
+import { generateQrToken } from "@/lib/qr";
+import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { restaurantRoutes } from "@/lib/routes";
+import { parseVndInteger } from "@/lib/money";
+
+const adminRoles = ["OWNER", "MANAGER"] as const;
+
+function readString(formData: FormData, key: string) {
+  return String(formData.get(key) ?? "").trim();
+}
+
+function readBoolean(formData: FormData, key: string) {
+  return formData.get(key) === "on" || formData.get(key) === "true";
+}
+
+function redirectWithMessage(path: string, key: "error" | "success", message: string): never {
+  redirect(`${path}?${key}=${encodeURIComponent(message)}`);
+}
+
+async function requireAdminContext(slug: string) {
+  return requireRestaurantAccess(slug, [...adminRoles]);
+}
+
+async function audit(restaurantId: string, userId: string, action: string, entityType: string, entityId?: string, metadataJson?: unknown) {
+  await prisma.auditLog.create({
+    data: {
+      restaurantId,
+      userId,
+      action,
+      entityType,
+      entityId,
+      metadataJson: metadataJson === undefined ? undefined : (metadataJson as object)
+    }
+  });
+}
+
+const areaSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  sortOrder: z.coerce.number().int().min(0).default(0)
+});
+
+export async function createAreaAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminTables(slug);
+  const parsed = areaSchema.safeParse({
+    name: readString(formData, "name"),
+    sortOrder: readString(formData, "sortOrder") || 0
+  });
+  if (!parsed.success) redirectWithMessage(path, "error", "Tên khu vực không hợp lệ.");
+
+  const area = await prisma.area.create({
+    data: { restaurantId: access.restaurant.id, ...parsed.data }
+  });
+  await audit(access.restaurant.id, access.user.id, "AREA_CREATED", "Area", area.id, parsed.data);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", `Tạo khu vực ${area.name} thành công.`);
+}
+
+export async function updateAreaAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminTables(slug);
+  const areaId = readString(formData, "areaId");
+  const parsed = areaSchema.safeParse({
+    name: readString(formData, "name"),
+    sortOrder: readString(formData, "sortOrder") || 0
+  });
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu khu vực không hợp lệ.");
+
+  const area = await prisma.area.update({
+    where: { id: areaId, restaurantId: access.restaurant.id },
+    data: parsed.data
+  });
+  await audit(access.restaurant.id, access.user.id, "AREA_UPDATED", "Area", area.id, parsed.data);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", `Đã cập nhật khu vực ${area.name}.`);
+}
+
+export async function deleteAreaAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminTables(slug);
+  const areaId = readString(formData, "areaId");
+  const tableCount = await prisma.restaurantTable.count({
+    where: { restaurantId: access.restaurant.id, areaId }
+  });
+  if (tableCount > 0) {
+    redirectWithMessage(path, "error", "Không thể xóa khu vực đang có bàn. Vui lòng chuyển hoặc xóa các bàn trước.");
+  }
+
+  await prisma.area.delete({ where: { id: areaId, restaurantId: access.restaurant.id } });
+  await audit(access.restaurant.id, access.user.id, "AREA_DELETED", "Area", areaId);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", "Đã xóa khu vực.");
+}
+
+const tableSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  areaId: z.string().min(1),
+  isActive: z.boolean()
+});
+
+export async function createTableAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminTables(slug);
+  const parsed = tableSchema.safeParse({
+    name: readString(formData, "name"),
+    areaId: readString(formData, "areaId"),
+    isActive: readBoolean(formData, "isActive")
+  });
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu bàn không hợp lệ.");
+
+  const area = await prisma.area.findFirst({ where: { id: parsed.data.areaId, restaurantId: access.restaurant.id } });
+  if (!area) redirectWithMessage(path, "error", "Khu vực không tồn tại.");
+
+  try {
+    const table = await prisma.restaurantTable.create({
+      data: {
+        restaurantId: access.restaurant.id,
+        areaId: parsed.data.areaId,
+        name: parsed.data.name,
+        isActive: parsed.data.isActive,
+        qrToken: generateQrToken()
+      }
+    });
+    await audit(access.restaurant.id, access.user.id, "TABLE_CREATED", "RestaurantTable", table.id, { name: table.name });
+    revalidatePath(path);
+    redirectWithMessage(path, "success", `Tạo bàn ${table.name} thành công.`);
+  } catch {
+    redirectWithMessage(path, "error", "Tên bàn đã tồn tại trong nhà hàng.");
+  }
+}
+
+export async function updateTableAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminTables(slug);
+  const tableId = readString(formData, "tableId");
+  const parsed = tableSchema.safeParse({
+    name: readString(formData, "name"),
+    areaId: readString(formData, "areaId"),
+    isActive: readBoolean(formData, "isActive")
+  });
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu bàn không hợp lệ.");
+
+  try {
+    const table = await prisma.restaurantTable.update({
+      where: { id: tableId, restaurantId: access.restaurant.id },
+      data: parsed.data
+    });
+    await audit(access.restaurant.id, access.user.id, "TABLE_UPDATED", "RestaurantTable", table.id, parsed.data);
+    revalidatePath(path);
+    redirectWithMessage(path, "success", `Đã cập nhật bàn ${table.name}.`);
+  } catch {
+    redirectWithMessage(path, "error", "Không thể cập nhật bàn. Có thể tên bàn đã tồn tại.");
+  }
+}
+
+export async function deleteOrDeactivateTableAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminTables(slug);
+  const tableId = readString(formData, "tableId");
+  const historyCount = await prisma.diningSession.count({ where: { restaurantId: access.restaurant.id, tableId } });
+  const orderCount = await prisma.order.count({ where: { restaurantId: access.restaurant.id, tableId } });
+
+  if (historyCount === 0 && orderCount === 0) {
+    await prisma.restaurantTable.delete({ where: { id: tableId, restaurantId: access.restaurant.id } });
+    await audit(access.restaurant.id, access.user.id, "TABLE_DELETED", "RestaurantTable", tableId);
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã xóa bàn.");
+  }
+
+  await prisma.restaurantTable.update({
+    where: { id: tableId, restaurantId: access.restaurant.id },
+    data: { isActive: false }
+  });
+  await audit(access.restaurant.id, access.user.id, "TABLE_DEACTIVATED", "RestaurantTable", tableId);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", "Bàn đã có lịch sử giao dịch nên đã được ngừng sử dụng thay vì xóa dữ liệu.");
+}
+
+export async function regenerateTableQrAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminTables(slug);
+  const tableId = readString(formData, "tableId");
+  await prisma.restaurantTable.update({
+    where: { id: tableId, restaurantId: access.restaurant.id },
+    data: { qrToken: generateQrToken() }
+  });
+  await audit(access.restaurant.id, access.user.id, "TABLE_QR_REGENERATED", "RestaurantTable", tableId);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", "Đã tạo lại QR token cho bàn.");
+}
+
+const categorySchema = z.object({
+  nameVi: z.string().trim().min(1).max(120),
+  nameEn: z.string().trim().max(120).optional(),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+  isActive: z.boolean()
+});
+
+export async function createCategoryAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminCategories(slug);
+  const parsed = categorySchema.safeParse({
+    nameVi: readString(formData, "nameVi"),
+    nameEn: readString(formData, "nameEn") || undefined,
+    sortOrder: readString(formData, "sortOrder") || 0,
+    isActive: readBoolean(formData, "isActive")
+  });
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu danh mục không hợp lệ.");
+  try {
+    const category = await prisma.category.create({
+      data: { restaurantId: access.restaurant.id, ...parsed.data }
+    });
+    await audit(access.restaurant.id, access.user.id, "CATEGORY_CREATED", "Category", category.id, parsed.data);
+    revalidatePath(path);
+    redirectWithMessage(path, "success", `Tạo danh mục ${category.nameVi} thành công.`);
+  } catch {
+    redirectWithMessage(path, "error", "Tên danh mục đã tồn tại.");
+  }
+}
+
+export async function updateCategoryAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminCategories(slug);
+  const categoryId = readString(formData, "categoryId");
+  const parsed = categorySchema.safeParse({
+    nameVi: readString(formData, "nameVi"),
+    nameEn: readString(formData, "nameEn") || undefined,
+    sortOrder: readString(formData, "sortOrder") || 0,
+    isActive: readBoolean(formData, "isActive")
+  });
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu danh mục không hợp lệ.");
+  try {
+    const category = await prisma.category.update({
+      where: { id: categoryId, restaurantId: access.restaurant.id },
+      data: parsed.data
+    });
+    await audit(access.restaurant.id, access.user.id, "CATEGORY_UPDATED", "Category", category.id, parsed.data);
+    revalidatePath(path);
+    redirectWithMessage(path, "success", `Đã cập nhật danh mục ${category.nameVi}.`);
+  } catch {
+    redirectWithMessage(path, "error", "Không thể cập nhật danh mục.");
+  }
+}
+
+export async function deleteOrDeactivateCategoryAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminCategories(slug);
+  const categoryId = readString(formData, "categoryId");
+  const productCount = await prisma.product.count({ where: { restaurantId: access.restaurant.id, categoryId } });
+  if (productCount === 0) {
+    await prisma.category.delete({ where: { id: categoryId, restaurantId: access.restaurant.id } });
+    await audit(access.restaurant.id, access.user.id, "CATEGORY_DELETED", "Category", categoryId);
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã xóa danh mục.");
+  }
+  await prisma.category.update({ where: { id: categoryId, restaurantId: access.restaurant.id }, data: { isActive: false } });
+  await audit(access.restaurant.id, access.user.id, "CATEGORY_DEACTIVATED", "Category", categoryId);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", "Danh mục đang có món nên đã được tắt thay vì xóa.");
+}
+
+const productSchema = z.object({
+  categoryId: z.string().min(1),
+  nameVi: z.string().trim().min(1).max(160),
+  nameEn: z.string().trim().max(160).optional(),
+  descriptionVi: z.string().trim().max(500).optional(),
+  descriptionEn: z.string().trim().max(500).optional(),
+  imageUrl: z.string().trim().max(500).optional(),
+  price: z.number().int().min(0),
+  isActive: z.boolean(),
+  isSoldOut: z.boolean(),
+  isFeatured: z.boolean(),
+  sortOrder: z.coerce.number().int().min(0).default(0)
+});
+
+function productDataFromForm(formData: FormData) {
+  return {
+    categoryId: readString(formData, "categoryId"),
+    nameVi: readString(formData, "nameVi"),
+    nameEn: readString(formData, "nameEn") || undefined,
+    descriptionVi: readString(formData, "descriptionVi") || undefined,
+    descriptionEn: readString(formData, "descriptionEn") || undefined,
+    imageUrl: readString(formData, "imageUrl") || undefined,
+    price: parseVndInteger(readString(formData, "price")),
+    isActive: readBoolean(formData, "isActive"),
+    isSoldOut: readBoolean(formData, "isSoldOut"),
+    isFeatured: readBoolean(formData, "isFeatured"),
+    sortOrder: readString(formData, "sortOrder") || 0
+  };
+}
+
+async function replaceProductOptions(restaurantId: string, productId: string, formData: FormData) {
+  const groupName = readString(formData, "optionGroupNameVi");
+  if (!groupName) return;
+
+  await prisma.productOptionGroup.deleteMany({ where: { restaurantId, productId } });
+  const group = await prisma.productOptionGroup.create({
+    data: {
+      restaurantId,
+      productId,
+      nameVi: groupName,
+      nameEn: readString(formData, "optionGroupNameEn") || null,
+      selectionType: readString(formData, "optionSelectionType") === "MULTI" ? "MULTI" : "SINGLE",
+      isRequired: readBoolean(formData, "optionIsRequired"),
+      minSelect: Number.parseInt(readString(formData, "optionMinSelect") || "0", 10),
+      maxSelect: Number.parseInt(readString(formData, "optionMaxSelect") || "1", 10)
+    }
+  });
+
+  const itemNames = [readString(formData, "optionItem1NameVi"), readString(formData, "optionItem2NameVi"), readString(formData, "optionItem3NameVi")];
+  const itemPrices = [readString(formData, "optionItem1Price"), readString(formData, "optionItem2Price"), readString(formData, "optionItem3Price")];
+  for (const [index, nameVi] of itemNames.entries()) {
+    if (!nameVi) continue;
+    await prisma.productOptionItem.create({
+      data: {
+        restaurantId,
+        optionGroupId: group.id,
+        nameVi,
+        priceDelta: parseVndInteger(itemPrices[index] ?? "0"),
+        sortOrder: index
+      }
+    });
+  }
+}
+
+export async function createProductAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminMenu(slug);
+  const parsed = productSchema.safeParse(productDataFromForm(formData));
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu món ăn không hợp lệ.");
+
+  const category = await prisma.category.findFirst({ where: { id: parsed.data.categoryId, restaurantId: access.restaurant.id } });
+  if (!category) redirectWithMessage(path, "error", "Danh mục không tồn tại.");
+
+  const product = await prisma.product.create({ data: { restaurantId: access.restaurant.id, ...parsed.data } });
+  await replaceProductOptions(access.restaurant.id, product.id, formData);
+  await audit(access.restaurant.id, access.user.id, "PRODUCT_CREATED", "Product", product.id, { nameVi: product.nameVi, price: product.price });
+  revalidatePath(path);
+  redirectWithMessage(path, "success", `Tạo món ${product.nameVi} thành công.`);
+}
+
+export async function updateProductAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminMenu(slug);
+  const productId = readString(formData, "productId");
+  const parsed = productSchema.safeParse(productDataFromForm(formData));
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu món ăn không hợp lệ.");
+
+  const product = await prisma.product.update({
+    where: { id: productId, restaurantId: access.restaurant.id },
+    data: parsed.data
+  });
+  await replaceProductOptions(access.restaurant.id, product.id, formData);
+  await audit(access.restaurant.id, access.user.id, "PRODUCT_UPDATED", "Product", product.id, { nameVi: product.nameVi, price: product.price });
+  revalidatePath(path);
+  redirectWithMessage(path, "success", `Đã cập nhật món ${product.nameVi}.`);
+}
+
+export async function deleteOrDeactivateProductAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminMenu(slug);
+  const productId = readString(formData, "productId");
+  const orderCount = await prisma.orderItem.count({ where: { restaurantId: access.restaurant.id, productId } });
+  if (orderCount === 0) {
+    await prisma.product.delete({ where: { id: productId, restaurantId: access.restaurant.id } });
+    await audit(access.restaurant.id, access.user.id, "PRODUCT_DELETED", "Product", productId);
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã xóa món.");
+  }
+  await prisma.product.update({ where: { id: productId, restaurantId: access.restaurant.id }, data: { isActive: false } });
+  await audit(access.restaurant.id, access.user.id, "PRODUCT_DEACTIVATED", "Product", productId);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", "Món đã có lịch sử order nên đã được ngừng bán thay vì xóa.");
+}
+
+export async function toggleSoldOutAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminMenu(slug);
+  const productId = readString(formData, "productId");
+  const isSoldOut = readBoolean(formData, "isSoldOut");
+  await prisma.product.update({ where: { id: productId, restaurantId: access.restaurant.id }, data: { isSoldOut } });
+  await audit(access.restaurant.id, access.user.id, "PRODUCT_SOLD_OUT_CHANGED", "Product", productId, { isSoldOut });
+  revalidatePath(path);
+}
+
+const settingsSchema = z.object({
+  restaurantName: z.string().trim().min(1).max(160),
+  logoUrl: z.string().trim().max(500).optional(),
+  address: z.string().trim().max(300).optional(),
+  phone: z.string().trim().max(50).optional(),
+  timezone: z.string().trim().min(1).max(80),
+  currency: z.string().trim().min(1).max(10),
+  primaryColor: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
+  primaryLanguage: z.enum(["vi", "en"]),
+  bankName: z.string().trim().max(120).optional(),
+  bankCode: z.string().trim().max(50).optional(),
+  accountNumber: z.string().trim().max(80).optional(),
+  accountHolder: z.string().trim().max(160).optional(),
+  paymentQrImage: z.string().trim().max(500).optional(),
+  cashEnabled: z.boolean(),
+  qrPaymentEnabled: z.boolean(),
+  notificationSoundEnabled: z.boolean(),
+  notifyNewOrder: z.boolean(),
+  notifyServiceRequest: z.boolean(),
+  notifyPaymentRequest: z.boolean()
+});
+
+export async function updateRestaurantSettingsAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminSettings(slug);
+  const parsed = settingsSchema.safeParse({
+    restaurantName: readString(formData, "restaurantName"),
+    logoUrl: readString(formData, "logoUrl") || undefined,
+    address: readString(formData, "address") || undefined,
+    phone: readString(formData, "phone") || undefined,
+    timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
+    currency: readString(formData, "currency") || "VND",
+    primaryColor: readString(formData, "primaryColor") || "#0f766e",
+    primaryLanguage: readString(formData, "primaryLanguage") || "vi",
+    bankName: readString(formData, "bankName") || undefined,
+    bankCode: readString(formData, "bankCode") || undefined,
+    accountNumber: readString(formData, "accountNumber") || undefined,
+    accountHolder: readString(formData, "accountHolder") || undefined,
+    paymentQrImage: readString(formData, "paymentQrImage") || undefined,
+    cashEnabled: readBoolean(formData, "cashEnabled"),
+    qrPaymentEnabled: readBoolean(formData, "qrPaymentEnabled"),
+    notificationSoundEnabled: readBoolean(formData, "notificationSoundEnabled"),
+    notifyNewOrder: readBoolean(formData, "notifyNewOrder"),
+    notifyServiceRequest: readBoolean(formData, "notifyServiceRequest"),
+    notifyPaymentRequest: readBoolean(formData, "notifyPaymentRequest")
+  });
+  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu cài đặt không hợp lệ.");
+
+  await prisma.$transaction([
+    prisma.restaurant.update({
+      where: { id: access.restaurant.id },
+      data: { name: parsed.data.restaurantName, logoUrl: parsed.data.logoUrl || null }
+    }),
+    prisma.restaurantSetting.upsert({
+      where: { restaurantId: access.restaurant.id },
+      update: parsed.data,
+      create: { restaurantId: access.restaurant.id, ...parsed.data }
+    }),
+    prisma.auditLog.create({
+      data: {
+        restaurantId: access.restaurant.id,
+        userId: access.user.id,
+        action: "SETTINGS_UPDATED",
+        entityType: "RestaurantSetting",
+        entityId: access.restaurant.id,
+        metadataJson: { sections: ["info", "appearance", "language", "payment", "notification"] }
+      }
+    })
+  ]);
+  revalidatePath(path);
+  redirectWithMessage(path, "success", "Đã lưu cài đặt nhà hàng.");
+}
+
+export async function markNotificationReadAction(slug: string, formData: FormData) {
+  const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"]);
+  const notificationId = readString(formData, "notificationId");
+  await prisma.notification.updateMany({
+    where: { id: notificationId, restaurantId: access.restaurant.id },
+    data: { isRead: true }
+  });
+  revalidatePath("/");
+}
+
+export async function markAllNotificationsReadAction(slug: string) {
+  const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"]);
+  await prisma.notification.updateMany({
+    where: { restaurantId: access.restaurant.id, isRead: false },
+    data: { isRead: true }
+  });
+  revalidatePath("/");
+}

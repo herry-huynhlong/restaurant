@@ -24,7 +24,7 @@ export default async function RestaurantAdminSectionPage({
 
   return (
     <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title={title}>
-      <EmptyState title={`${title} chưa có dữ liệu`} description="Route đã sẵn sàng, chức năng chi tiết sẽ được triển khai ở phase tương ứng." />
+      <EmptyState title={`${title} chưa có dữ liệu`} description="Khu vực này hiện chưa phát sinh dữ liệu để hiển thị." />
     </RestaurantAdminShell>
   );
 }

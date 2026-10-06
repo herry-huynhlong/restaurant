@@ -181,6 +181,12 @@ model RestaurantSetting {
   accountNumber   String?
   accountHolder   String?
   paymentQrImage  String?
+  cashEnabled     Boolean    @default(true)
+  qrPaymentEnabled Boolean   @default(true)
+  notificationSoundEnabled Boolean @default(true)
+  notifyNewOrder  Boolean    @default(true)
+  notifyServiceRequest Boolean @default(true)
+  notifyPaymentRequest Boolean @default(true)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -423,6 +429,7 @@ model ServiceRequest {
 model Notification {
   id               String              @id @default(cuid())
   restaurantId     String
+  recipientUserId  String?
   type             NotificationType
   title            String
   message          String
@@ -439,6 +446,7 @@ model Notification {
   @@index([restaurantId, isRead])
   @@index([restaurantId, createdAt])
   @@index([restaurantId, type])
+  @@index([recipientUserId, isRead])
 }
 
 model AuditLog {
