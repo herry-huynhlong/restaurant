@@ -5,11 +5,13 @@ export function CustomerShell({
   slug,
   restaurantName,
   tableName,
+  customerName,
   children
 }: {
   slug: string;
   restaurantName: string;
   tableName?: string;
+  customerName?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -19,6 +21,7 @@ export function CustomerShell({
           <div>
             <h1 className="text-lg font-semibold">{restaurantName}</h1>
             {tableName ? <p className="text-sm text-slate-600">Bàn {tableName}</p> : null}
+            {customerName ? <p className="text-sm text-teal-700">Xin chào, {customerName}</p> : null}
           </div>
           <div className="flex rounded-md border text-sm">
             <span className="px-2 py-1 font-medium">VI</span>

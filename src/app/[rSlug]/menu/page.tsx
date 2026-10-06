@@ -2,16 +2,39 @@ import { CustomerShell } from "@/components/app-shell/customer-shell";
 import { getRestaurantBySlug } from "@/lib/tenant/restaurant";
 import { prisma } from "@/lib/db/prisma";
 import { formatVnd } from "@/lib/money";
+import { getCustomerSessionCookie } from "@/lib/customer-session";
+import { redirect } from "next/navigation";
+import { restaurantRoutes } from "@/lib/routes";
 
 export default async function CustomerMenuPage({ params }: { params: { rSlug: string } }) {
   const restaurant = await getRestaurantBySlug(params.rSlug);
+  const customerSession = getCustomerSessionCookie();
+
+  if (!customerSession || customerSession.restaurantId !== restaurant.id || customerSession.restaurantSlug !== restaurant.slug) {
+    redirect(restaurantRoutes.welcome(restaurant.slug));
+  }
+
+  const diningSession = await prisma.diningSession.findFirst({
+    where: {
+      id: customerSession.diningSessionId,
+      restaurantId: restaurant.id,
+      tableId: customerSession.tableId,
+      status: { in: ["OPEN", "AWAITING_PAYMENT"] }
+    },
+    include: { table: true }
+  });
+
+  if (!diningSession || !diningSession.table.isActive || diningSession.table.qrToken !== customerSession.qrToken) {
+    redirect(`${restaurantRoutes.welcome(restaurant.slug)}?t=${encodeURIComponent(customerSession.qrToken)}&error=${encodeURIComponent("Phiên gọi món không hợp lệ. Vui lòng nhập lại tên.")}`);
+  }
+
   const products = await prisma.product.findMany({
     where: { restaurantId: restaurant.id, isActive: true },
     include: { category: true },
     orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }]
   });
   return (
-    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name}>
+    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName}>
       <section className="space-y-3 pb-20">
         {products.length ? products.map((product) => (
           <article key={product.id} className="rounded-lg border bg-white p-4 shadow-sm">
