@@ -5,7 +5,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 
 const credentialsSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional(),
+  username: z.string().min(1).optional(),
+  restaurantSlug: z.string().min(1).optional(),
   password: z.string().min(1)
 });
 
@@ -21,6 +23,8 @@ export const authOptions: NextAuthOptions = {
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
+        username: { label: "Tên đăng nhập", type: "text" },
+        restaurantSlug: { label: "Restaurant", type: "text" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
@@ -29,17 +33,40 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            passwordHash: true,
-            platformRole: true,
-            isActive: true
-          }
-        });
+        const user = parsed.data.restaurantSlug && parsed.data.username
+          ? (await prisma.restaurantUser.findFirst({
+              where: {
+                username: parsed.data.username.trim().toLowerCase(),
+                isActive: true,
+                restaurant: { slug: parsed.data.restaurantSlug },
+                user: { isActive: true }
+              },
+              select: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    passwordHash: true,
+                    platformRole: true,
+                    isActive: true
+                  }
+                }
+              }
+            }))?.user
+          : parsed.data.email
+            ? await prisma.user.findUnique({
+                where: { email: parsed.data.email },
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  passwordHash: true,
+                  platformRole: true,
+                  isActive: true
+                }
+              })
+            : null;
 
         if (!user?.isActive) {
           return null;

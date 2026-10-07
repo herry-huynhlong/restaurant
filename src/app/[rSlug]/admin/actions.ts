@@ -15,6 +15,7 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { parseVndInteger } from "@/lib/money";
 import { assignableRestaurantRoles } from "@/lib/restaurant-role-labels";
+import { isValidUsername, makeInternalStaffEmail, normalizeUsername, usernameValidationMessage } from "@/lib/username";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
@@ -740,16 +741,16 @@ export async function updateRestaurantSettingsAction(slug: string, formData: For
 
 const createStaffSchema = z.object({
   name: z.string().trim().min(1, "Tên là bắt buộc.").max(120),
-  email: z.string().trim().email("Email không hợp lệ.").max(180),
+  username: z.string().trim().min(1, "Tên đăng nhập là bắt buộc.").refine(isValidUsername, usernameValidationMessage()),
   phone: z.string().trim().max(30).optional(),
   role: z.enum(staffRoles),
-  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự."),
-  isActive: z.boolean().default(true)
+  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
 });
 
 const updateStaffSchema = z.object({
   membershipId: z.string().min(1),
   name: z.string().trim().min(1, "Tên là bắt buộc.").max(120),
+  username: z.string().trim().min(1, "Tên đăng nhập là bắt buộc.").refine(isValidUsername, usernameValidationMessage()),
   phone: z.string().trim().max(30).optional(),
   role: z.enum(staffRoles),
   isActive: z.boolean().default(false)
@@ -786,7 +787,7 @@ function ensureCanMutateStaff(access: Awaited<ReturnType<typeof requireAdminCont
 
 function staffActionErrorMessage(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-    return "Email này đã được sử dụng.";
+    return "Tên đăng nhập này đã tồn tại trong quán.";
   }
   if (error instanceof Error && error.message === "SELF_DISABLE_NOT_ALLOWED") {
     return "Bạn không thể tự ngừng sử dụng tài khoản của chính mình.";
@@ -813,11 +814,10 @@ export async function createStaffAction(slug: string, formData: FormData) {
   try {
     const parsed = createStaffSchema.parse({
       name: readString(formData, "name"),
-      email: readString(formData, "email").toLowerCase(),
+      username: normalizeUsername(readString(formData, "username")),
       phone: readString(formData, "phone") || undefined,
       role: readString(formData, "role"),
-      password: readString(formData, "password"),
-      isActive: readBoolean(formData, "isActive")
+      password: readString(formData, "password")
     });
 
     if (!assignableRestaurantRoles.includes(parsed.role)) {
@@ -829,10 +829,10 @@ export async function createStaffAction(slug: string, formData: FormData) {
       const user = await tx.user.create({
         data: {
           name: parsed.name,
-          email: parsed.email,
+          email: makeInternalStaffEmail(access.restaurant.id, parsed.username),
           phone: parsed.phone,
           passwordHash,
-          isActive: parsed.isActive
+          isActive: true
         }
       });
 
@@ -840,8 +840,9 @@ export async function createStaffAction(slug: string, formData: FormData) {
         data: {
           restaurantId: access.restaurant.id,
           userId: user.id,
+          username: parsed.username,
           role: parsed.role,
-          isActive: parsed.isActive
+          isActive: true
         }
       });
 
@@ -852,7 +853,7 @@ export async function createStaffAction(slug: string, formData: FormData) {
           action: "STAFF_CREATED",
           entityType: "RestaurantUser",
           entityId: membership.id,
-          metadataJson: { role: parsed.role, staffUserId: user.id }
+          metadataJson: { role: parsed.role, username: parsed.username, staffUserId: user.id }
         }
       });
 
@@ -874,6 +875,7 @@ export async function updateStaffAction(slug: string, formData: FormData) {
     const parsed = updateStaffSchema.parse({
       membershipId: readString(formData, "membershipId"),
       name: readString(formData, "name"),
+      username: normalizeUsername(readString(formData, "username")),
       phone: readString(formData, "phone") || undefined,
       role: readString(formData, "role"),
       isActive: readBoolean(formData, "isActive")
@@ -887,13 +889,13 @@ export async function updateStaffAction(slug: string, formData: FormData) {
         where: { id: membership.userId },
         data: {
           name: parsed.name,
-          phone: parsed.phone ?? null,
-          isActive: parsed.isActive
+          phone: parsed.phone ?? null
         }
       }),
       prisma.restaurantUser.update({
         where: { id: membership.id },
         data: {
+          username: parsed.username,
           role: parsed.role,
           isActive: parsed.isActive
         }
@@ -905,7 +907,7 @@ export async function updateStaffAction(slug: string, formData: FormData) {
           action: "STAFF_UPDATED",
           entityType: "RestaurantUser",
           entityId: membership.id,
-          metadataJson: { role: parsed.role, isActive: parsed.isActive }
+          metadataJson: { role: parsed.role, username: parsed.username, isActive: parsed.isActive }
         }
       })
     ]);
@@ -934,7 +936,7 @@ export async function resetStaffPasswordAction(slug: string, formData: FormData)
     await prisma.$transaction([
       prisma.user.update({
         where: { id: membership.userId },
-        data: { passwordHash, isActive: true }
+        data: { passwordHash }
       }),
       prisma.restaurantUser.update({
         where: { id: membership.id },
@@ -973,10 +975,6 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
     await prisma.$transaction([
       prisma.restaurantUser.update({
         where: { id: membership.id },
-        data: { isActive }
-      }),
-      prisma.user.update({
-        where: { id: membership.userId },
         data: { isActive }
       }),
       prisma.auditLog.create({

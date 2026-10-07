@@ -177,6 +177,7 @@ model RestaurantUser {
   id           String         @id @default(cuid())
   restaurantId String
   userId       String
+  username     String?
   role         RestaurantRole
   isActive     Boolean        @default(true)
   createdAt    DateTime       @default(now())
@@ -185,6 +186,7 @@ model RestaurantUser {
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([restaurantId, userId])
+  @@unique([restaurantId, username])
   @@index([restaurantId, role])
   @@index([userId])
   @@index([isActive])

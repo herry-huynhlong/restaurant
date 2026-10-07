@@ -6,6 +6,12 @@ import crypto from "node:crypto";
 const prisma = new PrismaClient();
 
 const demoPassword = "Password123!";
+const demoUsernames: Record<string, string> = {
+  "owner@abc.local": "owner",
+  "waiter@abc.local": "waiter",
+  "kitchen@abc.local": "kitchen",
+  "cashier@abc.local": "cashier"
+};
 
 async function upsertUser(email: string, name: string, platformRole: "PLATFORM_ADMIN" | "USER" = "USER") {
   const passwordHash = await bcrypt.hash(demoPassword, 12);
@@ -67,8 +73,8 @@ async function main() {
   for (const [userId, role] of memberships) {
     await prisma.restaurantUser.upsert({
       where: { restaurantId_userId: { restaurantId: restaurant.id, userId } },
-      update: { role, isActive: true },
-      create: { restaurantId: restaurant.id, userId, role }
+      update: { role, username: demoUsernames[[owner, waiter, kitchen, cashier].find((user) => user.id === userId)?.email ?? ""] ?? null, isActive: true },
+      create: { restaurantId: restaurant.id, userId, username: demoUsernames[[owner, waiter, kitchen, cashier].find((user) => user.id === userId)?.email ?? ""] ?? null, role }
     });
   }
 
@@ -176,10 +182,10 @@ async function main() {
   console.log("Seed completed.");
   console.table([
     ["Platform admin", "platform@demo.local", demoPassword],
-    ["Owner", "owner@abc.local", demoPassword],
-    ["Waiter", "waiter@abc.local", demoPassword],
-    ["Kitchen", "kitchen@abc.local", demoPassword],
-    ["Cashier", "cashier@abc.local", demoPassword]
+    ["Owner", "owner", demoPassword],
+    ["Waiter", "waiter", demoPassword],
+    ["Kitchen", "kitchen", demoPassword],
+    ["Cashier", "cashier", demoPassword]
   ]);
 }
 
