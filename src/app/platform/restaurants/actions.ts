@@ -53,6 +53,9 @@ async function saveUploadedImage(formData: FormData, key: string, folder: "logos
   if (!file.type.startsWith("image/")) {
     throw new Error("INVALID_IMAGE_TYPE");
   }
+  if (file.size > 8 * 1024 * 1024) {
+    throw new Error("INVALID_IMAGE_SIZE");
+  }
 
   const extension = path.extname(file.name).toLowerCase() || ".jpg";
   const safeExtension = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(extension) ? extension : ".jpg";
@@ -115,7 +118,7 @@ export async function createRestaurantAction(formData: FormData) {
   try {
     uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
   } catch {
-    redirectWithError(platformRoutes.newRestaurant, "Logo phải là file ảnh hợp lệ.");
+    redirectWithError(platformRoutes.newRestaurant, "Logo phải là file ảnh hợp lệ và tối đa 8MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = createRestaurantSchema.safeParse({
@@ -250,7 +253,7 @@ export async function updateRestaurantAction(formData: FormData) {
   try {
     uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
   } catch {
-    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo phải là file ảnh hợp lệ.");
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo phải là file ảnh hợp lệ và tối đa 8MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = updateRestaurantSchema.safeParse({

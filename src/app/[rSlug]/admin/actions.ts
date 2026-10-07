@@ -33,6 +33,9 @@ async function saveUploadedImage(formData: FormData, key: string) {
   if (!file.type.startsWith("image/")) {
     throw new Error("INVALID_IMAGE_TYPE");
   }
+  if (file.size > 8 * 1024 * 1024) {
+    throw new Error("INVALID_IMAGE_SIZE");
+  }
 
   const extension = path.extname(file.name).toLowerCase() || ".jpg";
   const safeExtension = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(extension) ? extension : ".jpg";
@@ -70,6 +73,9 @@ function prismaErrorPayload(error: unknown, fallback: string) {
 
   if (error instanceof Error && error.message === "INVALID_IMAGE_TYPE") {
     return actionError("INVALID_IMAGE_TYPE", "Ảnh món phải là file ảnh hợp lệ.");
+  }
+  if (error instanceof Error && error.message === "INVALID_IMAGE_SIZE") {
+    return actionError("INVALID_IMAGE_SIZE", "Ảnh món tối đa 8MB. Vui lòng chọn ảnh nhỏ hơn.");
   }
 
   if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
