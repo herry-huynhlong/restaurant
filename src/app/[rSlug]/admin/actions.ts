@@ -11,6 +11,7 @@ import { generateQrToken } from "@/lib/qr";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { parseVndInteger } from "@/lib/money";
+import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
 const adminRoles = ["OWNER", "MANAGER"] as const;
 
@@ -309,13 +310,182 @@ async function productDataFromForm(formData: FormData) {
     nameEn: readString(formData, "nameEn") || undefined,
     descriptionVi: readString(formData, "descriptionVi") || undefined,
     descriptionEn: readString(formData, "descriptionEn") || undefined,
-    imageUrl: uploadedImageUrl ?? (readString(formData, "imageUrl") || undefined),
+    imageUrl: uploadedImageUrl ?? (readString(formData, "imageUrl") || readString(formData, "existingImageUrl") || undefined),
     price: parseVndInteger(readString(formData, "price")),
     isActive: readBoolean(formData, "isActive"),
     isSoldOut: readBoolean(formData, "isSoldOut"),
     isFeatured: readBoolean(formData, "isFeatured"),
     sortOrder: readString(formData, "sortOrder") || 0
   };
+}
+
+const simpleProductSchema = z.object({
+  productId: z.string().optional(),
+  menuType: z.enum(["MAIN", "EXTRA", "DRINK"]),
+  nameVi: z.string().trim().min(1).max(160),
+  descriptionVi: z.string().trim().max(500).optional(),
+  imageUrl: z.string().trim().max(500).optional(),
+  price: z.number().int().min(0),
+  isActive: z.boolean(),
+  isSoldOut: z.boolean(),
+  isFeatured: z.boolean()
+});
+
+async function simpleProductDataFromForm(restaurantId: string, formData: FormData) {
+  const uploadedImageUrl = await saveUploadedImage(formData, "imageFile");
+  const menuType = (readString(formData, "menuType") || "MAIN") as SimpleMenuType;
+  return {
+    productId: readString(formData, "productId") || undefined,
+    menuType,
+    categoryId: await getCategoryIdForSimpleMenuType(restaurantId, menuType),
+    nameVi: readString(formData, "nameVi"),
+    descriptionVi: readString(formData, "descriptionVi") || undefined,
+    imageUrl: uploadedImageUrl ?? (readString(formData, "existingImageUrl") || undefined),
+    price: parseVndInteger(readString(formData, "price")),
+    isActive: readBoolean(formData, "isActive"),
+    isSoldOut: readBoolean(formData, "isSoldOut"),
+    isFeatured: readBoolean(formData, "isFeatured")
+  };
+}
+
+function simpleProductPayload(product: {
+  id: string;
+  categoryId: string;
+  nameVi: string;
+  descriptionVi: string | null;
+  imageUrl: string | null;
+  price: number;
+  isActive: boolean;
+  isSoldOut: boolean;
+  isFeatured: boolean;
+  category: { nameVi: string };
+}) {
+  return {
+    id: product.id,
+    categoryId: product.categoryId,
+    menuType: (product.category.nameVi === "Nước" ? "DRINK" : product.category.nameVi === "Món thêm" ? "EXTRA" : "MAIN") as SimpleMenuType,
+    nameVi: product.nameVi,
+    descriptionVi: product.descriptionVi,
+    imageUrl: product.imageUrl,
+    price: product.price,
+    isActive: product.isActive,
+    isSoldOut: product.isSoldOut,
+    isFeatured: product.isFeatured
+  };
+}
+
+export async function saveSimpleProductAction(slug: string, formData: FormData) {
+  try {
+    const access = await requireAdminContext(slug);
+    const path = restaurantRoutes.adminMenu(slug);
+    const data = await simpleProductDataFromForm(access.restaurant.id, formData);
+    const parsed = simpleProductSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, error: "Dữ liệu món ăn không hợp lệ." };
+    }
+
+    const product = parsed.data.productId
+      ? await prisma.product.update({
+        where: { id: parsed.data.productId, restaurantId: access.restaurant.id },
+        data: {
+          categoryId: data.categoryId,
+          nameVi: parsed.data.nameVi,
+          nameEn: null,
+          descriptionVi: parsed.data.descriptionVi,
+          descriptionEn: null,
+          imageUrl: parsed.data.imageUrl,
+          price: parsed.data.price,
+          isActive: parsed.data.isActive,
+          isSoldOut: parsed.data.isSoldOut,
+          isFeatured: parsed.data.isFeatured
+        },
+        include: { category: true }
+      })
+      : await prisma.product.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          categoryId: data.categoryId,
+          nameVi: parsed.data.nameVi,
+          descriptionVi: parsed.data.descriptionVi,
+          imageUrl: parsed.data.imageUrl,
+          price: parsed.data.price,
+          isActive: parsed.data.isActive,
+          isSoldOut: parsed.data.isSoldOut,
+          isFeatured: parsed.data.isFeatured
+        },
+        include: { category: true }
+      });
+
+    if (parsed.data.productId) {
+      await audit(access.restaurant.id, access.user.id, "PRODUCT_UPDATED", "Product", product.id, { nameVi: product.nameVi, price: product.price });
+    } else {
+      await audit(access.restaurant.id, access.user.id, "PRODUCT_CREATED", "Product", product.id, { nameVi: product.nameVi, price: product.price });
+    }
+    revalidatePath(path);
+    return {
+      ok: true,
+      product: simpleProductPayload(product),
+      message: parsed.data.productId ? `Đã cập nhật món ${product.nameVi}.` : `Đã tạo món ${product.nameVi}.`
+    };
+  } catch (error) {
+    console.error("SAVE_SIMPLE_PRODUCT_ERROR", error);
+    return { ok: false, error: error instanceof Error && error.message === "INVALID_IMAGE_TYPE" ? "Ảnh món phải là file ảnh hợp lệ." : "Không thể lưu món." };
+  }
+}
+
+export async function updateSimpleProductFlagsAction(slug: string, productId: string, flags: { isActive?: boolean; isSoldOut?: boolean; isFeatured?: boolean }) {
+  try {
+    const access = await requireAdminContext(slug);
+    const product = await prisma.product.update({
+      where: { id: productId, restaurantId: access.restaurant.id },
+      data: flags,
+      include: { category: true }
+    });
+    await audit(access.restaurant.id, access.user.id, "PRODUCT_FLAGS_UPDATED", "Product", product.id, flags);
+    revalidatePath(restaurantRoutes.adminMenu(slug));
+    const message = flags.isSoldOut === true
+      ? `${product.nameVi} đã hết món.`
+      : flags.isSoldOut === false
+        ? `${product.nameVi} đang bán trở lại.`
+        : `Đã cập nhật trạng thái ${product.nameVi}.`;
+    return { ok: true, product: simpleProductPayload(product), message };
+  } catch (error) {
+    console.error("UPDATE_SIMPLE_PRODUCT_FLAGS_ERROR", error);
+    return { ok: false, error: "Không thể cập nhật trạng thái món." };
+  }
+}
+
+export async function deleteSimpleProductAction(slug: string, productId: string) {
+  try {
+    const access = await requireAdminContext(slug);
+    const orderCount = await prisma.orderItem.count({ where: { restaurantId: access.restaurant.id, productId } });
+    const existing = await prisma.product.findFirst({ where: { id: productId, restaurantId: access.restaurant.id } });
+    if (!existing) return { ok: false, error: "Món không tồn tại." };
+
+    if (orderCount === 0) {
+      await prisma.product.delete({ where: { id: productId, restaurantId: access.restaurant.id } });
+      await audit(access.restaurant.id, access.user.id, "PRODUCT_DELETED", "Product", productId);
+      revalidatePath(restaurantRoutes.adminMenu(slug));
+      return { ok: true, deleted: true, productId, message: `Đã xóa món ${existing.nameVi}.` };
+    }
+
+    const product = await prisma.product.update({
+      where: { id: productId, restaurantId: access.restaurant.id },
+      data: { isActive: false },
+      include: { category: true }
+    });
+    await audit(access.restaurant.id, access.user.id, "PRODUCT_DEACTIVATED", "Product", productId);
+    revalidatePath(restaurantRoutes.adminMenu(slug));
+    return {
+      ok: true,
+      deleted: false,
+      product: simpleProductPayload(product),
+      message: `${product.nameVi} đã có order nên được ngừng bán thay vì xóa.`
+    };
+  } catch (error) {
+    console.error("DELETE_SIMPLE_PRODUCT_ERROR", error);
+    return { ok: false, error: "Không thể xóa món." };
+  }
 }
 
 async function replaceProductOptions(restaurantId: string, productId: string, formData: FormData) {
