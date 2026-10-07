@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCustomerSessionCookie } from "@/lib/customer-session";
 import { redirect } from "next/navigation";
 import { restaurantRoutes } from "@/lib/routes";
+import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
 export default async function CustomerMenuPage({ params }: { params: { rSlug: string } }) {
   const restaurant = await getRestaurantBySlug(params.rSlug);
@@ -19,7 +20,7 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
       id: customerSession.diningSessionId,
       restaurantId: restaurant.id,
       tableId: customerSession.tableId,
-      status: { in: ["OPEN", "AWAITING_PAYMENT"] }
+      ...activeDiningSessionWhere()
     },
     include: { table: true }
   });

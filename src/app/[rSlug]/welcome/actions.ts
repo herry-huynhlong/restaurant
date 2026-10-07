@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { restaurantRoutes } from "@/lib/routes";
 import { setCustomerSessionCookie } from "@/lib/customer-session";
 import { canRestaurantOperate } from "@/lib/tenant/restaurant";
+import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
 const startSessionSchema = z.object({
   customerName: z.string().trim().min(1).max(80),
@@ -55,7 +56,7 @@ export async function startCustomerSessionAction(slug: string, formData: FormDat
       where: {
         restaurantId: restaurant.id,
         tableId: table.id,
-        status: { in: ["OPEN", "AWAITING_PAYMENT"] }
+        ...activeDiningSessionWhere()
       },
       orderBy: { openedAt: "desc" }
     });

@@ -8,6 +8,7 @@ import { formatVnd } from "@/lib/money";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { markDiningSessionPaidAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
+import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
 function getSessionCustomerName(session: {
   serviceRequests: Array<{ customerName: string; createdAt: Date }>;
@@ -24,7 +25,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
     prisma.diningSession.findMany({
       where: {
         restaurantId: access.restaurant.id,
-        status: { in: ["OPEN", "AWAITING_PAYMENT"] }
+        ...activeDiningSessionWhere()
       },
       include: {
         table: true,
@@ -43,7 +44,8 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
       where: {
         restaurantId: access.restaurant.id,
         requestType: "REQUEST_PAYMENT",
-        status: { in: ["NEW", "ACKNOWLEDGED"] }
+        status: { in: ["NEW", "ACKNOWLEDGED"] },
+        diningSession: activeDiningSessionWhere()
       },
       include: { table: true, diningSession: true },
       orderBy: { createdAt: "desc" },

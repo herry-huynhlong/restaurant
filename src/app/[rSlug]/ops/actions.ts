@@ -7,6 +7,7 @@ import { restaurantRoutes } from "@/lib/routes";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
+import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
 export async function updateOrderStatusAction(slug: string, orderId: string, status: OrderStatus) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "KITCHEN"]);
@@ -65,44 +66,64 @@ export async function markDiningSessionPaidAction(slug: string, diningSessionId:
     where: {
       id: diningSessionId,
       restaurantId: access.restaurant.id,
-      status: { in: ["OPEN", "AWAITING_PAYMENT"] }
+      ...activeDiningSessionWhere()
     },
     include: { table: true }
   });
 
   if (!session) return;
 
-  await prisma.$transaction([
-    prisma.payment.create({
+  await prisma.$transaction(async (tx) => {
+    const closedAt = new Date();
+    const closedSession = await tx.diningSession.updateMany({
+      where: {
+        id: session.id,
+        restaurantId: access.restaurant.id,
+        ...activeDiningSessionWhere()
+      },
+      data: { status: "CLOSED", paymentStatus: "PAID", closedAt }
+    });
+
+    if (closedSession.count === 0) {
+      return;
+    }
+
+    await tx.payment.create({
       data: {
         restaurantId: access.restaurant.id,
         diningSessionId: session.id,
         amount: session.totalAmount,
         paymentMethod: "CASH",
         status: "PAID",
-        idempotencyKey: `cash-${session.id}-${Date.now()}`,
-        paidAt: new Date(),
+        idempotencyKey: `cash-${session.id}-${closedAt.getTime()}`,
+        paidAt: closedAt,
         confirmedByUserId: access.user.id
       }
-    }),
-    prisma.diningSession.update({
-      where: { id: session.id },
-      data: { status: "PAID", paymentStatus: "PAID", closedAt: new Date() }
-    }),
-    prisma.restaurantTable.update({
+    });
+
+    await tx.restaurantTable.update({
       where: { id: session.tableId },
       data: { status: "AVAILABLE" }
-    }),
-    prisma.serviceRequest.updateMany({
+    });
+
+    await tx.order.updateMany({
       where: {
         restaurantId: access.restaurant.id,
         diningSessionId: session.id,
-        requestType: "REQUEST_PAYMENT",
+        status: { in: ["NEW", "CONFIRMED", "PREPARING", "READY"] }
+      },
+      data: { status: "SERVED" }
+    });
+
+    await tx.serviceRequest.updateMany({
+      where: {
+        restaurantId: access.restaurant.id,
+        diningSessionId: session.id,
         status: { in: ["NEW", "ACKNOWLEDGED"] }
       },
-      data: { status: "COMPLETED", resolvedAt: new Date() }
-    })
-  ]);
+      data: { status: "COMPLETED", resolvedAt: closedAt }
+    });
+  });
 
   revalidatePath(restaurantRoutes.cashier(slug));
   revalidatePath(restaurantRoutes.staff(slug));

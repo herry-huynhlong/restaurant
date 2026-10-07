@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { CUSTOMER_SESSION_COOKIE, verifyCustomerSessionValue } from "@/lib/customer-session";
+import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
 export async function getCustomerContext(request: NextRequest, slug: string) {
   const session = verifyCustomerSessionValue(request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value);
@@ -11,7 +12,7 @@ export async function getCustomerContext(request: NextRequest, slug: string) {
       id: session.diningSessionId,
       restaurantId: session.restaurantId,
       tableId: session.tableId,
-      status: { in: ["OPEN", "AWAITING_PAYMENT"] }
+      ...activeDiningSessionWhere()
     },
     include: {
       table: true,
