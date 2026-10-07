@@ -8,6 +8,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
 import { parseVndInteger } from "@/lib/money";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
 const menuItemSchema = z.object({
@@ -81,7 +82,7 @@ async function saveUploadedImage(formData: FormData) {
   const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
   await mkdir(uploadDir, { recursive: true });
   await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
-  const imageUrl = `/uploads/products/${fileName}`;
+  const imageUrl = `/api/uploads/products/${fileName}`;
   console.log("SAVED MENU IMAGE PATH", imageUrl);
   return { imageUrl };
 }
@@ -105,7 +106,7 @@ function productPayload(product: {
     menuType,
     nameVi: product.nameVi,
     descriptionVi: product.descriptionVi,
-    imageUrl: product.imageUrl,
+    imageUrl: servedUploadUrl(product.imageUrl),
     price: product.price,
     isActive: product.isActive,
     isSoldOut: product.isSoldOut,

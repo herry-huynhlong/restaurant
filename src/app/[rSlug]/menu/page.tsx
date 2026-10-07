@@ -2,6 +2,7 @@ import { CustomerShell } from "@/components/app-shell/customer-shell";
 import { CustomerMenuClient } from "@/components/customer/customer-menu-client";
 import { getRestaurantBySlug } from "@/lib/tenant/restaurant";
 import { prisma } from "@/lib/db/prisma";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { getCustomerSessionCookie } from "@/lib/customer-session";
 import { redirect } from "next/navigation";
 import { restaurantRoutes } from "@/lib/routes";
@@ -45,7 +46,7 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
           nameVi: product.nameVi,
           descriptionVi: product.descriptionVi,
           price: product.price,
-          imageUrl: product.imageUrl,
+          imageUrl: servedUploadUrl(product.imageUrl),
           isSoldOut: product.isSoldOut
         }))}
       />

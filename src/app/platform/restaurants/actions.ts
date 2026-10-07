@@ -65,7 +65,7 @@ async function saveUploadedImage(formData: FormData, key: string, folder: "logos
   const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
   await mkdir(uploadDir, { recursive: true });
   await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
-  return `/uploads/${folder}/${fileName}`;
+  return `/api/uploads/${folder}/${fileName}`;
 }
 
 const createRestaurantSchema = z.object({

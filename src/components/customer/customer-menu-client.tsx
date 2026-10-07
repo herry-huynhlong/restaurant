@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { formatVnd } from "@/lib/money";
+import { servedUploadUrl } from "@/lib/upload-url";
 
 type Product = {
   id: string;
@@ -124,7 +125,7 @@ export function CustomerMenuClient({
                   <div className="flex gap-3">
                     <div className="h-20 w-20 shrink-0 rounded-md bg-slate-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {product.imageUrl ? <img alt={product.nameVi} className="h-full w-full rounded-md object-cover" src={product.imageUrl} /> : null}
+                      {product.imageUrl ? <img alt={product.nameVi} className="h-full w-full rounded-md object-cover" src={servedUploadUrl(product.imageUrl) ?? product.imageUrl} /> : null}
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-semibold">{product.nameVi}</h3>

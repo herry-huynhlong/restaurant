@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { TextField, SelectField } from "@/components/ui/form-fields";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { getPlatformRestaurantDetail } from "@/server/services/platform-service";
 import { updateRestaurantAction } from "@/app/platform/restaurants/actions";
 
@@ -30,7 +31,7 @@ export default async function EditRestaurantPage({
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <TextField label="Tên nhà hàng *" name="name" defaultValue={restaurant.name} required />
             <TextField label="Slug *" name="slug" defaultValue={restaurant.slug} required />
-            <LogoUploadField currentLogoUrl={restaurant.logoUrl} />
+            <LogoUploadField currentLogoUrl={servedUploadUrl(restaurant.logoUrl)} />
             <TextField label="Số điện thoại" name="phone" defaultValue={restaurant.settings?.phone} />
             <TextField label="Địa chỉ" name="address" defaultValue={restaurant.settings?.address} />
             <TextField label="Timezone" name="timezone" defaultValue={restaurant.settings?.timezone ?? "Asia/Ho_Chi_Minh"} required />

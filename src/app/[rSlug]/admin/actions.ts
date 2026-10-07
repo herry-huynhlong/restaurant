@@ -12,6 +12,7 @@ import { generateQrToken } from "@/lib/qr";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { parseVndInteger } from "@/lib/money";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
 const adminRoles = ["OWNER", "MANAGER"] as const;
@@ -45,7 +46,7 @@ async function saveUploadedImage(formData: FormData, key: string) {
   const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
   await mkdir(uploadDir, { recursive: true });
   await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
-  return `/uploads/products/${fileName}`;
+  return `/api/uploads/products/${fileName}`;
 }
 
 function actionError(code: string, error: string, fieldErrors?: Record<string, string[]>) {
@@ -411,7 +412,7 @@ function simpleProductPayload(product: {
     menuType: (product.category.nameVi === "Nước" ? "DRINK" : product.category.nameVi === "Món thêm" ? "EXTRA" : "MAIN") as SimpleMenuType,
     nameVi: product.nameVi,
     descriptionVi: product.descriptionVi,
-    imageUrl: product.imageUrl,
+    imageUrl: servedUploadUrl(product.imageUrl),
     price: product.price,
     isActive: product.isActive,
     isSoldOut: product.isSoldOut,

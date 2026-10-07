@@ -1,6 +1,7 @@
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { ensureSimpleMenuCategories, typeFromCategoryName } from "@/server/services/simple-menu-service";
 import { SimpleMenuManager } from "@/components/admin/simple-menu-manager";
@@ -28,7 +29,7 @@ export default async function MenuPage({ params }: { params: { rSlug: string } }
           menuType: typeFromCategoryName(product.category.nameVi),
           nameVi: product.nameVi,
           descriptionVi: product.descriptionVi,
-          imageUrl: product.imageUrl,
+          imageUrl: servedUploadUrl(product.imageUrl),
           price: product.price,
           isActive: product.isActive,
           isSoldOut: product.isSoldOut,

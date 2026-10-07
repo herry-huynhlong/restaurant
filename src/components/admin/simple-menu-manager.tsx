@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { deleteSimpleProductAction, updateSimpleProductFlagsAction } from "@/app/[rSlug]/admin/actions";
 import { formatVnd, parseVndInteger } from "@/lib/money";
+import { servedUploadUrl } from "@/lib/upload-url";
 import type { SimpleMenuType } from "@/server/services/simple-menu-service";
 
 type Product = {
@@ -52,7 +53,7 @@ function normalizeProduct(raw: unknown): Product | null {
     menuType: isMenuType(value.menuType) ? value.menuType : "MAIN",
     nameVi: String(value.nameVi),
     descriptionVi: value.descriptionVi ? String(value.descriptionVi) : null,
-    imageUrl: value.imageUrl ? String(value.imageUrl) : null,
+    imageUrl: servedUploadUrl(value.imageUrl ? String(value.imageUrl) : null),
     price: Number(value.price ?? 0),
     isActive: Boolean(value.isActive),
     isSoldOut: Boolean(value.isSoldOut),
