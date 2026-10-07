@@ -103,7 +103,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
                 <p className="font-semibold">Bàn {request.table.name}</p>
                 <p className="text-sm text-slate-600">{request.customerName}</p>
                 <p className="mt-3 text-lg font-bold text-teal-700">{formatVnd(calculateBillSummary([], settings).taxRate ? request.diningSession.totalAmount : request.diningSession.totalAmount)}</p>
-                <p className="mt-1 text-xs text-slate-500">Phương thức: chờ xác nhận</p>
+                <p className="mt-1 text-xs text-slate-500">Phương thức: tiền mặt</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {request.status === "NEW" ? (
                     <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "ACKNOWLEDGED")}>
@@ -111,12 +111,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
                     </form>
                   ) : null}
                   <form className="flex flex-wrap gap-2" action={markDiningSessionPaidAction.bind(null, access.restaurant.slug, request.diningSessionId)}>
-                    <select className="rounded-md border bg-white px-3 py-2 text-sm" name="paymentMethod" defaultValue="CASH">
-                      <option value="CASH">Tiền mặt</option>
-                      <option value="BANK_TRANSFER">Chuyển khoản</option>
-                      <option value="CARD">Thẻ</option>
-                      <option value="OTHER">Khác</option>
-                    </select>
+                    <input name="paymentMethod" type="hidden" value="CASH" />
                     <ConfirmSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" message={`Xác nhận bàn ${request.table.name} đã thanh toán?`}>
                       Đã thanh toán
                     </ConfirmSubmitButton>
@@ -203,12 +198,7 @@ function PaymentActions({ slug, session, settings, restaurantName, cashierName }
     <div className="mt-3 flex flex-wrap gap-2">
       <InvoicePrintButton label="In bill" invoice={invoice} />
       <form className="flex flex-wrap gap-2" action={markDiningSessionPaidAction.bind(null, slug, session.id)}>
-        <select className="rounded-md border bg-white px-3 py-2 text-sm" name="paymentMethod" defaultValue="CASH">
-          <option value="CASH">Tiền mặt</option>
-          <option value="BANK_TRANSFER">Chuyển khoản</option>
-          <option value="CARD">Thẻ</option>
-          <option value="OTHER">Khác</option>
-        </select>
+        <input name="paymentMethod" type="hidden" value="CASH" />
         <ConfirmSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" message={`Xác nhận bàn ${session.table.name} đã thanh toán ${formatVnd(bill.grandTotal)}?`}>
           Xác nhận đã thanh toán
         </ConfirmSubmitButton>

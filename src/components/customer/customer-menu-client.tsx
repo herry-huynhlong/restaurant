@@ -48,6 +48,7 @@ export function CustomerMenuClient({
   const [message, setMessage] = useState<string | null>(null);
   const [bill, setBill] = useState<CurrentBill>({ totalAmount: 0, items: [] });
   const [billStatus, setBillStatus] = useState<"live" | "reconnecting">("live");
+  const [paymentRequested, setPaymentRequested] = useState(false);
   const [isPending, startTransition] = useTransition();
   const cartItems = Object.values(cart);
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -145,6 +146,12 @@ export function CustomerMenuClient({
         body: JSON.stringify({ requestType })
       });
       const data = await response.json();
+      if (response.ok && requestType === "REQUEST_PAYMENT") {
+        setPaymentRequested(true);
+        setMessage(data.message ?? "Đã gửi yêu cầu thanh toán. Vui lòng ra quầy để hoàn tất thanh toán.");
+        await refreshBill();
+        return;
+      }
       setMessage(response.ok ? data.message ?? `Đã gửi yêu cầu: ${label}.` : data.error ?? "Không gửi được yêu cầu.");
     });
   }
@@ -163,11 +170,18 @@ export function CustomerMenuClient({
           <button className="rounded-md border px-3 py-2" type="button" onClick={() => sendServiceRequest("REQUEST_UTENSILS", "Thêm dụng cụ")}>
             Thêm dụng cụ
           </button>
-          <button className="rounded-md border px-3 py-2" type="button" onClick={() => sendServiceRequest("REQUEST_PAYMENT", "Thanh toán")}>
-            Thanh toán
+          <button className="rounded-md border px-3 py-2 disabled:bg-slate-100 disabled:text-slate-500" type="button" disabled={paymentRequested || isPending} onClick={() => sendServiceRequest("REQUEST_PAYMENT", "Yêu cầu thanh toán")}>
+            {paymentRequested ? "Đang chờ thanh toán" : "Yêu cầu thanh toán"}
           </button>
         </div>
         {message ? <p className="mt-3 rounded-md bg-teal-50 px-3 py-2 text-sm text-teal-800">{message}</p> : null}
+        {paymentRequested ? (
+          <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900">
+            <p className="font-semibold">Yêu cầu thanh toán đã được gửi</p>
+            <p className="mt-1">Tổng bàn: <span className="font-bold">{formatVnd(bill.grandTotal ?? bill.totalAmount)}</span></p>
+            <p className="mt-1">Vui lòng ra quầy để hoàn tất thanh toán.</p>
+          </div>
+        ) : null}
       </section>
 
       <section className="mb-5 rounded-lg border bg-white p-4 shadow-sm">

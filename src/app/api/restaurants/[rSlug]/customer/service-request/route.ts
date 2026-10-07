@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCustomerContext } from "@/server/services/customer-context";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
 import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
+import { calculateBillSummary } from "@/server/services/billing-service";
 
 const requestSchema = z.object({
   requestType: z.enum(["CALL_STAFF", "REQUEST_WATER", "REQUEST_UTENSILS", "REQUEST_PAYMENT", "OTHER"]),
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   }
 
   const eventType = parsed.data.requestType === "REQUEST_PAYMENT" ? "PAYMENT_REQUESTED" : "SERVICE_REQUEST_CREATED";
-  const { serviceRequest, isDuplicate } = await prisma.$transaction(async (tx) => {
+  const { serviceRequest, isDuplicate, totalAmount } = await prisma.$transaction(async (tx) => {
     const existingOpenRequest = await tx.serviceRequest.findFirst({
       where: {
         restaurantId: context.restaurant.id,
@@ -42,7 +43,56 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       orderBy: { createdAt: "desc" }
     });
 
-    if (existingOpenRequest) return { serviceRequest: existingOpenRequest, isDuplicate: true };
+    const orders = parsed.data.requestType === "REQUEST_PAYMENT"
+      ? await tx.order.findMany({
+          where: {
+            restaurantId: context.restaurant.id,
+            diningSessionId: context.diningSession.id
+          },
+          include: { items: true }
+        })
+      : [];
+    const settings = parsed.data.requestType === "REQUEST_PAYMENT"
+      ? await tx.restaurantSetting.findUnique({ where: { restaurantId: context.restaurant.id } })
+      : null;
+    const bill = parsed.data.requestType === "REQUEST_PAYMENT" ? calculateBillSummary(orders, settings) : null;
+
+    if (existingOpenRequest) {
+      if (parsed.data.requestType === "REQUEST_PAYMENT") {
+        await tx.payment.upsert({
+          where: {
+            restaurantId_idempotencyKey: {
+              restaurantId: context.restaurant.id,
+              idempotencyKey: `payment-request-${context.diningSession.id}`
+            }
+          },
+          update: {
+            amount: bill?.grandTotal ?? 0,
+            subtotalAmount: bill?.subtotal ?? 0,
+            taxRate: bill?.taxRate ?? 0,
+            taxAmount: bill?.taxAmount ?? 0,
+            grandTotal: bill?.grandTotal ?? 0,
+            paymentMethod: "CASH",
+            status: "PENDING"
+          },
+          create: {
+            restaurantId: context.restaurant.id,
+            diningSessionId: context.diningSession.id,
+            amount: bill?.grandTotal ?? 0,
+            subtotalAmount: bill?.subtotal ?? 0,
+            taxRate: bill?.taxRate ?? 0,
+            taxAmount: bill?.taxAmount ?? 0,
+            grandTotal: bill?.grandTotal ?? 0,
+            tableIdSnapshot: context.table.id,
+            tableNameSnapshot: context.table.name,
+            paymentMethod: "CASH",
+            status: "PENDING",
+            idempotencyKey: `payment-request-${context.diningSession.id}`
+          }
+        });
+      }
+      return { serviceRequest: existingOpenRequest, isDuplicate: true, totalAmount: bill?.grandTotal ?? 0 };
+    }
 
     const created = await tx.serviceRequest.create({
       data: {
@@ -57,6 +107,37 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     });
 
     if (parsed.data.requestType === "REQUEST_PAYMENT") {
+      await tx.payment.upsert({
+        where: {
+          restaurantId_idempotencyKey: {
+            restaurantId: context.restaurant.id,
+            idempotencyKey: `payment-request-${context.diningSession.id}`
+          }
+        },
+        update: {
+          amount: bill?.grandTotal ?? 0,
+          subtotalAmount: bill?.subtotal ?? 0,
+          taxRate: bill?.taxRate ?? 0,
+          taxAmount: bill?.taxAmount ?? 0,
+          grandTotal: bill?.grandTotal ?? 0,
+          paymentMethod: "CASH",
+          status: "PENDING"
+        },
+        create: {
+          restaurantId: context.restaurant.id,
+          diningSessionId: context.diningSession.id,
+          amount: bill?.grandTotal ?? 0,
+          subtotalAmount: bill?.subtotal ?? 0,
+          taxRate: bill?.taxRate ?? 0,
+          taxAmount: bill?.taxAmount ?? 0,
+          grandTotal: bill?.grandTotal ?? 0,
+          tableIdSnapshot: context.table.id,
+          tableNameSnapshot: context.table.name,
+          paymentMethod: "CASH",
+          status: "PENDING",
+          idempotencyKey: `payment-request-${context.diningSession.id}`
+        }
+      });
       await tx.diningSession.update({
         where: { id: context.diningSession.id },
         data: { status: "AWAITING_PAYMENT", paymentStatus: "PENDING" }
@@ -67,7 +148,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       });
     }
 
-    return { serviceRequest: created, isDuplicate: false };
+    return { serviceRequest: created, isDuplicate: false, totalAmount: bill?.grandTotal ?? 0 };
   });
 
   if (isDuplicate) {
@@ -75,12 +156,17 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       ok: true,
       serviceRequestId: serviceRequest.id,
       duplicate: true,
-      message: parsed.data.requestType === "REQUEST_PAYMENT" ? "Yêu cầu thanh toán đang được xử lý." : "Nhân viên đang được gọi."
+      totalAmount,
+      message: parsed.data.requestType === "REQUEST_PAYMENT" ? "Yêu cầu thanh toán đã được gửi. Vui lòng ra quầy để hoàn tất thanh toán." : "Nhân viên đang được gọi."
     });
   }
 
-  const notificationTitle = `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`;
-  const notificationMessage = parsed.data.message || `${context.session.customerName} ${requestLabels[parsed.data.requestType]}`;
+  const notificationTitle = parsed.data.requestType === "REQUEST_PAYMENT"
+    ? `Bàn ${context.table.name} yêu cầu thanh toán tiền mặt`
+    : `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`;
+  const notificationMessage = parsed.data.requestType === "REQUEST_PAYMENT"
+    ? `Tổng hiện tại ${totalAmount.toLocaleString("vi-VN")}đ. Khách ra quầy thanh toán tiền mặt.`
+    : parsed.data.message || `${context.session.customerName} ${requestLabels[parsed.data.requestType]}`;
   await createNotificationsForRestaurantRoles({
     restaurantId: context.restaurant.id,
     roles: getPushTargetsForEvent(eventType),
@@ -102,5 +188,12 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     }
   });
 
-  return NextResponse.json({ ok: true, serviceRequestId: serviceRequest.id });
+  return NextResponse.json({
+    ok: true,
+    serviceRequestId: serviceRequest.id,
+    totalAmount,
+    message: parsed.data.requestType === "REQUEST_PAYMENT"
+      ? "Đã gửi yêu cầu thanh toán. Vui lòng ra quầy để hoàn tất thanh toán."
+      : undefined
+  });
 }

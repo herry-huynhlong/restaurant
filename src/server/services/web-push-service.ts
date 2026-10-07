@@ -86,7 +86,7 @@ export function getPushTargetsForEvent(type: "ORDER_CREATED" | "SERVICE_REQUEST_
     case "SERVICE_REQUEST_CREATED":
       return ["WAITER", "OWNER", "MANAGER"];
     case "PAYMENT_REQUESTED":
-      return ["CASHIER", "OWNER", "MANAGER"];
+      return ["CASHIER", "WAITER", "OWNER", "MANAGER"];
     case "ORDER_READY":
       return ["WAITER", "OWNER", "MANAGER"];
   }

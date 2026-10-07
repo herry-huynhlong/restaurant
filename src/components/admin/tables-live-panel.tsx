@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PaymentMethod } from "@prisma/client";
 import { formatVnd } from "@/lib/money";
-import { paymentMethodLabels } from "@/lib/payment-method";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { QrCard } from "@/components/admin/qr-card";
 
@@ -84,8 +82,6 @@ const requestLabels: Record<string, string> = {
   OTHER: "Hỗ trợ"
 };
 
-const paymentMethods: PaymentMethod[] = ["CASH", "QR", "BANK_TRANSFER", "CARD", "OTHER"];
-
 export function TablesLivePanel({
   slug,
   restaurantName,
@@ -102,7 +98,6 @@ export function TablesLivePanel({
   const [state, setState] = useState(initialState);
   const [selectedTableId, setSelectedTableId] = useState(initialSelectedTableId ?? initialState.areas[0]?.tables[0]?.id ?? null);
   const [status, setStatus] = useState<"live" | "reconnecting">("live");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [payingSessionId, setPayingSessionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const tables = useMemo(() => state.areas.flatMap((area) => area.tables), [state.areas]);
@@ -145,7 +140,7 @@ export function TablesLivePanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           diningSessionId: table.activeSession.id,
-          paymentMethod
+          paymentMethod: "CASH"
         })
       });
 
@@ -204,8 +199,6 @@ export function TablesLivePanel({
         cashierName={cashierName}
         settings={state.settings}
         table={selectedTable}
-        paymentMethod={paymentMethod}
-        onPaymentMethodChange={setPaymentMethod}
         onConfirmPaid={confirmPaid}
         paymentPending={payingSessionId === selectedTable?.activeSession?.id}
       />
@@ -251,8 +244,6 @@ function TableDetail({
   cashierName,
   settings,
   table,
-  paymentMethod,
-  onPaymentMethodChange,
   onConfirmPaid,
   paymentPending
 }: {
@@ -260,8 +251,6 @@ function TableDetail({
   cashierName?: string | null;
   settings: TableState["settings"];
   table: LiveTable | null;
-  paymentMethod: PaymentMethod;
-  onPaymentMethodChange: (method: PaymentMethod) => void;
   onConfirmPaid: (table: LiveTable) => void;
   paymentPending: boolean;
 }) {
@@ -332,18 +321,7 @@ function TableDetail({
             <div className="flex justify-between"><span className="font-semibold">Tổng thanh toán</span><span className="text-2xl font-bold text-teal-700">{formatVnd(session.grandTotal)}</span></div>
           </div>
           <div className="mt-4 grid gap-3 border-t pt-4">
-            <label className="text-sm font-medium">
-              Phương thức thanh toán
-              <select
-                className="mt-1 w-full rounded-md border px-3 py-2"
-                value={paymentMethod}
-                onChange={(event) => onPaymentMethodChange(event.target.value as PaymentMethod)}
-              >
-                {paymentMethods.map((method) => (
-                  <option key={method} value={method}>{paymentMethodLabels[method]}</option>
-                ))}
-              </select>
-            </label>
+            <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">Phương thức hiện tại: tiền mặt</p>
             <div className="grid grid-cols-2 gap-2">
             <InvoicePrintButton label="In bill" invoice={{
               restaurantName,
