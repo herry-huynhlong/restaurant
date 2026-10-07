@@ -30,6 +30,14 @@ export type ActiveTableOrder = {
       note: string | null;
     }>;
   }>;
+  requests: Array<{
+    id: string;
+    requestType: string;
+    customerName: string;
+    message: string | null;
+    status: string;
+    createdAt: string;
+  }>;
 };
 
 export async function getActiveTableOrders(restaurantId: string): Promise<ActiveTableOrder[]> {
@@ -37,7 +45,10 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
     where: {
       restaurantId,
       ...activeDiningSessionWhere(),
-      orders: { some: {} }
+      OR: [
+        { orders: { some: {} } },
+        { serviceRequests: { some: { status: { in: ["NEW", "ACKNOWLEDGED"] } } } }
+      ]
     },
     include: {
       table: { include: { area: true } },
@@ -46,6 +57,10 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
         include: {
           items: { orderBy: { createdAt: "asc" } }
         }
+      },
+      serviceRequests: {
+        where: { status: { in: ["NEW", "ACKNOWLEDGED"] } },
+        orderBy: { createdAt: "asc" }
       }
     },
     orderBy: { openedAt: "asc" }
@@ -100,7 +115,15 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
           subtotal: item.subtotal,
           note: item.note
         }))
+      })),
+      requests: session.serviceRequests.map((request) => ({
+        id: request.id,
+        requestType: request.requestType,
+        customerName: request.customerName,
+        message: request.message,
+        status: request.status,
+        createdAt: request.createdAt.toISOString()
       }))
     };
-  });
+  }).sort((a, b) => b.requests.length - a.requests.length || new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime());
 }

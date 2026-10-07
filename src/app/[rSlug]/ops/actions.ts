@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { restaurantRoutes } from "@/lib/routes";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
+import { publishNotificationRefresh } from "@/server/services/notification-event-service";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
 import { readPaymentMethod } from "@/server/services/billing-service";
 import { confirmDiningSessionPaid } from "@/server/services/payment-service";
@@ -56,6 +57,7 @@ export async function updateServiceRequestStatusAction(slug: string, requestId: 
       resolvedAt: status === "COMPLETED" ? new Date() : undefined
     }
   });
+  publishNotificationRefresh(access.restaurant.id);
 
   revalidatePath(restaurantRoutes.staff(slug));
   revalidatePath(restaurantRoutes.cashier(slug));
