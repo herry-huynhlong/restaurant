@@ -4,18 +4,22 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { Prisma } from "@prisma/client";
+import type { RestaurantRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { generateQrToken } from "@/lib/qr";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { parseVndInteger } from "@/lib/money";
+import { assignableRestaurantRoles } from "@/lib/restaurant-role-labels";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
 const adminRoles = ["OWNER", "MANAGER"] as const;
+const staffRoles = ["MANAGER", "WAITER", "KITCHEN", "CASHIER"] as const satisfies RestaurantRole[];
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
@@ -732,6 +736,266 @@ export async function updateRestaurantSettingsAction(slug: string, formData: For
   ]);
   revalidatePath(path);
   redirectWithMessage(path, "success", "Đã lưu cài đặt nhà hàng.");
+}
+
+const createStaffSchema = z.object({
+  name: z.string().trim().min(1, "Tên là bắt buộc.").max(120),
+  email: z.string().trim().email("Email không hợp lệ.").max(180),
+  phone: z.string().trim().max(30).optional(),
+  role: z.enum(staffRoles),
+  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự."),
+  isActive: z.boolean().default(true)
+});
+
+const updateStaffSchema = z.object({
+  membershipId: z.string().min(1),
+  name: z.string().trim().min(1, "Tên là bắt buộc.").max(120),
+  phone: z.string().trim().max(30).optional(),
+  role: z.enum(staffRoles),
+  isActive: z.boolean().default(false)
+});
+
+const resetStaffPasswordSchema = z.object({
+  membershipId: z.string().min(1),
+  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
+});
+
+async function getManagedStaffMembership(restaurantId: string, membershipId: string) {
+  return prisma.restaurantUser.findFirst({
+    where: {
+      id: membershipId,
+      restaurantId
+    },
+    include: { user: true }
+  });
+}
+
+function ensureCanMutateStaff(access: Awaited<ReturnType<typeof requireAdminContext>>, target: { userId: string; role: RestaurantRole }, nextRole?: RestaurantRole, nextActive?: boolean) {
+  if (target.userId === access.user.id && nextActive === false) {
+    throw new Error("SELF_DISABLE_NOT_ALLOWED");
+  }
+
+  if (target.userId === access.user.id && nextRole && nextRole !== target.role) {
+    throw new Error("SELF_ROLE_CHANGE_NOT_ALLOWED");
+  }
+
+  if (access.membership.role !== "OWNER" && target.role === "OWNER") {
+    throw new Error("ONLY_OWNER_CAN_MANAGE_OWNER");
+  }
+}
+
+function staffActionErrorMessage(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+    return "Email này đã được sử dụng.";
+  }
+  if (error instanceof Error && error.message === "SELF_DISABLE_NOT_ALLOWED") {
+    return "Bạn không thể tự ngừng sử dụng tài khoản của chính mình.";
+  }
+  if (error instanceof Error && error.message === "SELF_ROLE_CHANGE_NOT_ALLOWED") {
+    return "Bạn không thể tự đổi vai trò của chính mình.";
+  }
+  if (error instanceof Error && error.message === "STAFF_NOT_FOUND") {
+    return "Không tìm thấy nhân viên trong nhà hàng này.";
+  }
+  if (error instanceof Error && error.message === "ONLY_OWNER_CAN_MANAGE_OWNER") {
+    return "Chỉ chủ quán mới được chỉnh tài khoản chủ quán.";
+  }
+  if (error instanceof z.ZodError) {
+    return error.issues[0]?.message ?? "Dữ liệu nhân viên không hợp lệ.";
+  }
+  return "Không lưu được nhân viên.";
+}
+
+export async function createStaffAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminStaff(slug);
+
+  try {
+    const parsed = createStaffSchema.parse({
+      name: readString(formData, "name"),
+      email: readString(formData, "email").toLowerCase(),
+      phone: readString(formData, "phone") || undefined,
+      role: readString(formData, "role"),
+      password: readString(formData, "password"),
+      isActive: readBoolean(formData, "isActive")
+    });
+
+    if (!assignableRestaurantRoles.includes(parsed.role)) {
+      throw new Error("INVALID_STAFF_ROLE");
+    }
+
+    const passwordHash = await bcrypt.hash(parsed.password, 12);
+    const staff = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          name: parsed.name,
+          email: parsed.email,
+          phone: parsed.phone,
+          passwordHash,
+          isActive: parsed.isActive
+        }
+      });
+
+      const membership = await tx.restaurantUser.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: user.id,
+          role: parsed.role,
+          isActive: parsed.isActive
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: "STAFF_CREATED",
+          entityType: "RestaurantUser",
+          entityId: membership.id,
+          metadataJson: { role: parsed.role, staffUserId: user.id }
+        }
+      });
+
+      return user;
+    });
+
+    revalidatePath(path);
+    redirectWithMessage(path, "success", `Đã tạo nhân viên ${staff.name}.`);
+  } catch (error) {
+    redirectWithMessage(path, "error", staffActionErrorMessage(error));
+  }
+}
+
+export async function updateStaffAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminStaff(slug);
+
+  try {
+    const parsed = updateStaffSchema.parse({
+      membershipId: readString(formData, "membershipId"),
+      name: readString(formData, "name"),
+      phone: readString(formData, "phone") || undefined,
+      role: readString(formData, "role"),
+      isActive: readBoolean(formData, "isActive")
+    });
+    const membership = await getManagedStaffMembership(access.restaurant.id, parsed.membershipId);
+    if (!membership) throw new Error("STAFF_NOT_FOUND");
+    ensureCanMutateStaff(access, membership, parsed.role, parsed.isActive);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: membership.userId },
+        data: {
+          name: parsed.name,
+          phone: parsed.phone ?? null,
+          isActive: parsed.isActive
+        }
+      }),
+      prisma.restaurantUser.update({
+        where: { id: membership.id },
+        data: {
+          role: parsed.role,
+          isActive: parsed.isActive
+        }
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: "STAFF_UPDATED",
+          entityType: "RestaurantUser",
+          entityId: membership.id,
+          metadataJson: { role: parsed.role, isActive: parsed.isActive }
+        }
+      })
+    ]);
+
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã lưu nhân viên.");
+  } catch (error) {
+    redirectWithMessage(path, "error", staffActionErrorMessage(error));
+  }
+}
+
+export async function resetStaffPasswordAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminStaff(slug);
+
+  try {
+    const parsed = resetStaffPasswordSchema.parse({
+      membershipId: readString(formData, "membershipId"),
+      password: readString(formData, "password")
+    });
+    const membership = await getManagedStaffMembership(access.restaurant.id, parsed.membershipId);
+    if (!membership) throw new Error("STAFF_NOT_FOUND");
+    ensureCanMutateStaff(access, membership);
+
+    const passwordHash = await bcrypt.hash(parsed.password, 12);
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: membership.userId },
+        data: { passwordHash, isActive: true }
+      }),
+      prisma.restaurantUser.update({
+        where: { id: membership.id },
+        data: { isActive: true }
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: "STAFF_PASSWORD_RESET",
+          entityType: "RestaurantUser",
+          entityId: membership.id,
+          metadataJson: { staffUserId: membership.userId }
+        }
+      })
+    ]);
+
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã đổi mật khẩu nhân viên.");
+  } catch (error) {
+    redirectWithMessage(path, "error", staffActionErrorMessage(error));
+  }
+}
+
+export async function toggleStaffActiveAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminStaff(slug);
+
+  try {
+    const membershipId = readString(formData, "membershipId");
+    const isActive = readBoolean(formData, "isActive");
+    const membership = await getManagedStaffMembership(access.restaurant.id, membershipId);
+    if (!membership) throw new Error("STAFF_NOT_FOUND");
+    ensureCanMutateStaff(access, membership, undefined, isActive);
+
+    await prisma.$transaction([
+      prisma.restaurantUser.update({
+        where: { id: membership.id },
+        data: { isActive }
+      }),
+      prisma.user.update({
+        where: { id: membership.userId },
+        data: { isActive }
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: isActive ? "STAFF_ACTIVATED" : "STAFF_DISABLED",
+          entityType: "RestaurantUser",
+          entityId: membership.id,
+          metadataJson: { staffUserId: membership.userId }
+        }
+      })
+    ]);
+
+    revalidatePath(path);
+    redirectWithMessage(path, "success", isActive ? "Đã kích hoạt nhân viên." : "Đã ngừng sử dụng nhân viên.");
+  } catch (error) {
+    redirectWithMessage(path, "error", staffActionErrorMessage(error));
+  }
 }
 
 export async function markNotificationReadAction(slug: string, formData: FormData) {

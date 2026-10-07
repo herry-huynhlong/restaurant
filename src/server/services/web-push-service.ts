@@ -82,11 +82,12 @@ export async function sendPushToRestaurantRoles({
 export function getPushTargetsForEvent(type: "ORDER_CREATED" | "SERVICE_REQUEST_CREATED" | "PAYMENT_REQUESTED" | "ORDER_READY"): RestaurantRole[] {
   switch (type) {
     case "ORDER_CREATED":
+      return ["WAITER", "KITCHEN", "OWNER", "MANAGER"];
     case "SERVICE_REQUEST_CREATED":
       return ["WAITER", "OWNER", "MANAGER"];
     case "PAYMENT_REQUESTED":
       return ["CASHIER", "OWNER", "MANAGER"];
     case "ORDER_READY":
-      return ["WAITER"];
+      return ["WAITER", "OWNER", "MANAGER"];
   }
 }

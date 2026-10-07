@@ -14,7 +14,7 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
     prisma.order.findMany({
       where: {
         restaurantId: access.restaurant.id,
-        status: { in: ["CONFIRMED", "PREPARING"] }
+        status: { in: ["NEW", "CONFIRMED", "PREPARING"] }
       },
       include: {
         table: true,
@@ -60,7 +60,7 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
                 ))}
               </ul>
               <div className="mt-3 flex flex-wrap gap-2">
-                {order.status === "CONFIRMED" ? (
+                {order.status === "NEW" || order.status === "CONFIRMED" ? (
                   <form action={updateOrderStatusAction.bind(null, access.restaurant.slug, order.id, "PREPARING")}>
                     <button className="rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Bắt đầu làm</button>
                   </form>
