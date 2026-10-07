@@ -1,53 +1,84 @@
+import Link from "next/link";
 import QRCode from "qrcode";
-import { Plus } from "lucide-react";
+import { MoreVertical, Plus } from "lucide-react";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { QrCard } from "@/components/admin/qr-card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getTableQrUrl } from "@/lib/qr";
+import { formatVnd } from "@/lib/money";
 import {
   createAreaAction,
   createTableAction,
   deleteAreaAction,
   deleteOrDeactivateTableAction,
-  regenerateTableQrAction,
   updateAreaAction,
   updateTableAction
 } from "@/app/[rSlug]/admin/actions";
 import { prisma } from "@/lib/db/prisma";
 import { getRecentNotifications } from "@/server/services/notification-service";
+import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
+
+const tableStatusLabels: Record<string, string> = {
+  AVAILABLE: "Đang trống",
+  OCCUPIED: "Đang phục vụ",
+  WAITING_FOOD: "Đang phục vụ",
+  PAYMENT_REQUESTED: "Chờ thanh toán"
+};
+
+const requestLabels: Record<string, string> = {
+  CALL_STAFF: "Gọi nhân viên",
+  REQUEST_WATER: "Xin nước",
+  REQUEST_UTENSILS: "Xin dụng cụ",
+  REQUEST_PAYMENT: "Yêu cầu thanh toán",
+  OTHER: "Hỗ trợ"
+};
 
 export default async function TablesPage({
   params,
   searchParams
 }: {
   params: { rSlug: string };
-  searchParams?: { error?: string; success?: string; area?: string; status?: string; q?: string; view?: string };
+  searchParams?: { error?: string; success?: string; table?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
   const [areas, notifications] = await Promise.all([
     prisma.area.findMany({
       where: { restaurantId: access.restaurant.id },
-      include: { tables: { orderBy: { name: "asc" } } },
+      include: {
+        tables: {
+          orderBy: { name: "asc" },
+          include: {
+            sessions: {
+              where: activeDiningSessionWhere(),
+              orderBy: { openedAt: "desc" },
+              take: 1,
+              include: {
+                orders: {
+                  orderBy: { createdAt: "asc" },
+                  include: { items: { orderBy: { createdAt: "asc" } } }
+                },
+                serviceRequests: {
+                  where: { status: { in: ["NEW", "ACKNOWLEDGED"] } },
+                  orderBy: { createdAt: "desc" }
+                }
+              }
+            }
+          }
+        }
+      },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
     }),
     getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
 
-  const tables = areas
-    .flatMap((area) => area.tables.map((table) => ({ ...table, area })))
-    .filter((table) => !searchParams?.area || table.areaId === searchParams.area)
-    .filter((table) => searchParams?.status === "active" ? table.isActive : searchParams?.status === "inactive" ? !table.isActive : true)
-    .filter((table) => searchParams?.q ? table.name.toLowerCase().includes(searchParams.q.toLowerCase()) : true);
-
+  const tables = areas.flatMap((area) => area.tables.map((table) => ({ ...table, area })));
+  const selectedTable = tables.find((table) => table.id === searchParams?.table) ?? tables[0] ?? null;
+  const selectedSession = selectedTable?.sessions[0] ?? null;
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  const qrData = await Promise.all(tables.map(async (table) => {
-    const url = getTableQrUrl(baseUrl, access.restaurant.slug, table.qrToken);
-    return [table.id, { url, dataUrl: await QRCode.toDataURL(url, { margin: 1, width: 220 }) }] as const;
-  }));
-  const qrMap = new Map(qrData);
-  const view = searchParams?.view === "list" ? "list" : "grid";
+  const selectedQrUrl = selectedTable ? getTableQrUrl(baseUrl, access.restaurant.slug, selectedTable.qrToken) : null;
+  const selectedQrDataUrl = selectedQrUrl ? await QRCode.toDataURL(selectedQrUrl, { margin: 1, width: 220 }) : null;
 
   return (
     <RestaurantAdminShell
@@ -62,149 +93,233 @@ export default async function TablesPage({
 
       <section className="mb-6 grid gap-4 lg:grid-cols-2">
         <form className="rounded-lg border bg-white p-4 shadow-sm" action={createAreaAction.bind(null, access.restaurant.slug)}>
-          <h2 className="flex items-center gap-2 text-base font-semibold"><Plus className="h-4 w-4" /> Thêm khu vực</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_120px_auto]">
-            <input className="h-10 rounded-md border px-3" name="name" placeholder="Tên khu vực *" required />
-            <input className="h-10 rounded-md border px-3" min="0" name="sortOrder" placeholder="Thứ tự" type="number" />
+          <h2 className="flex items-center gap-2 text-base font-semibold"><Plus className="h-4 w-4" /> Tạo khu vực</h2>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <input className="h-10 flex-1 rounded-md border px-3" name="name" placeholder="Tên khu vực, ví dụ Khu A" required />
             <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Tạo khu vực</button>
           </div>
         </form>
 
         <form className="rounded-lg border bg-white p-4 shadow-sm" action={createTableAction.bind(null, access.restaurant.slug)}>
-          <h2 className="flex items-center gap-2 text-base font-semibold"><Plus className="h-4 w-4" /> Thêm bàn</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto_auto]">
-            <input className="h-10 rounded-md border px-3" name="name" placeholder="Tên bàn *" required />
+          <h2 className="flex items-center gap-2 text-base font-semibold"><Plus className="h-4 w-4" /> Tạo bàn</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <input className="h-10 rounded-md border px-3" name="name" placeholder="Tên bàn, ví dụ A01" required />
             <select className="h-10 rounded-md border bg-white px-3" name="areaId" required>
               {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
             </select>
-            <label className="flex items-center gap-2 text-sm"><input defaultChecked name="isActive" type="checkbox" /> Active</label>
             <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Tạo bàn</button>
           </div>
         </form>
       </section>
 
-      <section className="mb-6 rounded-lg border bg-white p-4 shadow-sm">
-        <form className="grid gap-3 md:grid-cols-[1fr_180px_140px_120px_auto]" action="">
-          <input className="h-10 rounded-md border px-3" name="q" placeholder="Tìm theo tên bàn" defaultValue={searchParams?.q ?? ""} />
-          <select className="h-10 rounded-md border bg-white px-3" name="area" defaultValue={searchParams?.area ?? ""}>
-            <option value="">Tất cả khu vực</option>
-            {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
-          </select>
-          <select className="h-10 rounded-md border bg-white px-3" name="status" defaultValue={searchParams?.status ?? ""}>
-            <option value="">Tất cả</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <select className="h-10 rounded-md border bg-white px-3" name="view" defaultValue={view}>
-            <option value="grid">Grid</option>
-            <option value="list">List</option>
-          </select>
-          <button className="rounded-md border px-4 py-2 text-sm font-semibold" type="submit">Lọc</button>
-        </form>
-      </section>
-
-      <section className="mb-6 rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold">Khu vực</h2>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
+        <div className="space-y-5">
           {areas.map((area) => (
-            <div key={area.id} className="grid gap-2 rounded-md bg-slate-50 p-3 sm:grid-cols-[1fr_auto]">
-              <form className="grid gap-2 sm:grid-cols-[1fr_100px_auto]" action={updateAreaAction.bind(null, access.restaurant.slug)}>
-                <input name="areaId" type="hidden" value={area.id} />
-                <input className="h-9 rounded-md border px-3" name="name" defaultValue={area.name} required />
-                <input className="h-9 rounded-md border px-3" min="0" name="sortOrder" type="number" defaultValue={area.sortOrder} />
-                <button className="rounded-md border px-3 text-sm" type="submit">Lưu</button>
-              </form>
-              <form action={deleteAreaAction.bind(null, access.restaurant.slug)}>
-                <input name="areaId" type="hidden" value={area.id} />
-                <ConfirmSubmitButton className="h-9 rounded-md border border-red-200 px-3 text-sm text-red-700" message={`Xóa khu vực ${area.name}?`}>
-                  Xóa
-                </ConfirmSubmitButton>
-              </form>
-            </div>
+            <section key={area.id} className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-base font-semibold">{area.name}</h2>
+                <AreaMenu slug={access.restaurant.slug} area={area} />
+              </div>
+              {area.tables.length ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {area.tables.map((table) => {
+                    const activeSession = table.sessions[0] ?? null;
+                    return (
+                      <TableSummaryCard
+                        key={table.id}
+                        slug={access.restaurant.slug}
+                        table={{ ...table, area }}
+                        totalAmount={activeSession?.totalAmount ?? 0}
+                        selected={selectedTable?.id === table.id}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-lg border bg-white p-4 text-sm text-slate-500">Khu vực này chưa có bàn.</p>
+              )}
+            </section>
           ))}
         </div>
-      </section>
 
-      {tables.length === 0 ? (
-        <section className="rounded-lg border bg-white p-8 text-center shadow-sm">
-          <h2 className="text-lg font-semibold">Chưa có bàn</h2>
-          <p className="mt-2 text-sm text-slate-600">Tạo khu vực và bàn đầu tiên để bắt đầu in QR.</p>
-        </section>
-      ) : view === "grid" ? (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {tables.map((table) => (
-            <TableCard key={table.id} slug={access.restaurant.slug} restaurantName={access.restaurant.name} table={table} areas={areas} qr={qrMap.get(table.id)!} />
-          ))}
-        </section>
-      ) : (
-        <section className="overflow-auto rounded-lg border bg-white shadow-sm">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                {["Tên bàn", "Khu vực", "Status", "QR", "Ngày tạo", "Action"].map((item) => <th key={item} className="px-3 py-3 font-medium">{item}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {tables.map((table) => (
-                <tr key={table.id} className="border-t align-top">
-                  <td className="px-3 py-3 font-semibold">{table.name}</td>
-                  <td className="px-3 py-3">{table.area.name}</td>
-                  <td className="px-3 py-3">{table.isActive ? "Đang hoạt động" : "Inactive"}</td>
-                  <td className="px-3 py-3"><QrCard restaurantName={access.restaurant.name} tableName={table.name} qrDataUrl={qrMap.get(table.id)!.dataUrl} qrUrl={qrMap.get(table.id)!.url} /></td>
-                  <td className="px-3 py-3">{new Intl.DateTimeFormat("vi-VN").format(table.createdAt)}</td>
-                  <td className="px-3 py-3"><TableActions slug={access.restaurant.slug} table={table} areas={areas} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+        <TableDetail
+          slug={access.restaurant.slug}
+          table={selectedTable}
+          session={selectedSession}
+          areas={areas}
+          qrUrl={selectedQrUrl}
+          qrDataUrl={selectedQrDataUrl}
+          restaurantName={access.restaurant.name}
+        />
+      </section>
     </RestaurantAdminShell>
   );
 }
 
-function TableCard({ slug, restaurantName, table, areas, qr }: { slug: string; restaurantName: string; table: any; areas: any[]; qr: { url: string; dataUrl: string } }) {
+function TableSummaryCard({ slug, table, totalAmount, selected }: { slug: string; table: any; totalAmount: number; selected: boolean }) {
+  const label = !table.isActive ? "Ngừng sử dụng" : tableStatusLabels[table.status] ?? table.status;
+  const badgeClass = !table.isActive
+    ? "bg-slate-100 text-slate-600"
+    : table.status === "PAYMENT_REQUESTED"
+      ? "bg-amber-50 text-amber-700"
+      : table.status === "AVAILABLE"
+        ? "bg-slate-100 text-slate-700"
+        : "bg-teal-50 text-teal-700";
+
   return (
-    <article className="rounded-lg border bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between">
+    <article className={`rounded-lg border bg-white p-4 shadow-sm ${selected ? "ring-2 ring-teal-600" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">{table.name}</h2>
+          <h3 className="text-lg font-semibold">Bàn {table.name}</h3>
           <p className="text-sm text-slate-600">{table.area.name}</p>
-          <p className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs ${table.isActive ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}>
-            {table.isActive ? "Đang hoạt động" : "Inactive"}
-          </p>
         </div>
-        <QrCard restaurantName={restaurantName} tableName={table.name} qrDataUrl={qr.dataUrl} qrUrl={qr.url} />
+        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
       </div>
-      <TableActions slug={slug} table={table} areas={areas} />
+      {table.status !== "AVAILABLE" && table.isActive ? (
+        <p className="mt-4 text-sm text-slate-600">Tổng hiện tại: <span className="font-bold text-teal-700">{formatVnd(totalAmount)}</span></p>
+      ) : null}
+      <Link className="mt-4 inline-flex rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" href={`/${slug}/admin/tables?table=${table.id}`}>
+        Xem bàn
+      </Link>
     </article>
   );
 }
 
-function TableActions({ slug, table, areas }: { slug: string; table: any; areas: any[] }) {
+function TableDetail({ slug, table, session, areas, qrUrl, qrDataUrl, restaurantName }: { slug: string; table: any | null; session: any | null; areas: any[]; qrUrl: string | null; qrDataUrl: string | null; restaurantName: string }) {
+  if (!table) {
+    return <aside className="rounded-lg border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Chưa có bàn để xem chi tiết.</p></aside>;
+  }
+
+  const activeRequests = session?.serviceRequests ?? [];
+  const guests = session ? Array.from(new Set([
+    ...session.orders.map((order: any) => order.customerName),
+    ...activeRequests.map((request: any) => request.customerName)
+  ])).filter(Boolean) : [];
+
   return (
-    <div className="mt-4 space-y-3">
-      <form className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]" action={updateTableAction.bind(null, slug)}>
-        <input name="tableId" type="hidden" value={table.id} />
-        <input className="h-9 rounded-md border px-3" name="name" defaultValue={table.name} required />
-        <select className="h-9 rounded-md border bg-white px-3" name="areaId" defaultValue={table.areaId}>
-          {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
-        </select>
-        <label className="flex items-center gap-2 text-sm"><input name="isActive" type="checkbox" defaultChecked={table.isActive} /> Active</label>
-        <button className="rounded-md border px-3 text-sm" type="submit">Sửa</button>
-      </form>
-      <div className="flex flex-wrap gap-2">
-        <form action={regenerateTableQrAction.bind(null, slug)}>
-          <input name="tableId" type="hidden" value={table.id} />
-          <button className="rounded-md border px-3 py-2 text-sm" type="submit">Regenerate QR</button>
+    <aside className="rounded-lg border bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Bàn {table.name}</h2>
+          <p className="text-sm text-slate-600">{table.area.name}</p>
+        </div>
+        <TableMenu slug={slug} table={table} areas={areas} />
+      </div>
+
+      <div className="mt-4 rounded-md bg-slate-50 p-3">
+        <p className="text-sm text-slate-600">Trạng thái</p>
+        <p className="font-semibold">{!table.isActive ? "Ngừng sử dụng" : tableStatusLabels[table.status] ?? table.status}</p>
+      </div>
+
+      {session ? (
+        <>
+          <section className="mt-4">
+            <h3 className="font-semibold">Khách hiện tại</h3>
+            <p className="mt-2 text-sm text-slate-600">{guests.length ? guests.join(", ") : "Chưa có tên khách."}</p>
+          </section>
+
+          <section className="mt-4">
+            <h3 className="font-semibold">Món đang gọi</h3>
+            {session.orders.length ? (
+              <div className="mt-2 space-y-3">
+                {session.orders.map((order: any) => (
+                  <div key={order.id} className="rounded-md bg-slate-50 p-3">
+                    <p className="text-sm font-semibold">Order #{order.orderNumber} · {order.customerName} · {order.status}</p>
+                    <ul className="mt-2 divide-y text-sm">
+                      {order.items.map((item: any) => (
+                        <li key={item.id} className="flex justify-between gap-3 py-1.5">
+                          <span>{item.quantity} x {item.productNameViSnapshot}</span>
+                          <span>{formatVnd(item.subtotal)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Chưa có món nào.</p>
+            )}
+          </section>
+
+          <section className="mt-4">
+            <h3 className="font-semibold">Service requests</h3>
+            {activeRequests.length ? (
+              <ul className="mt-2 space-y-2 text-sm">
+                {activeRequests.map((request: any) => (
+                  <li key={request.id} className="rounded-md bg-amber-50 p-2 text-amber-800">
+                    {requestLabels[request.requestType] ?? request.requestType} · {request.customerName}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">Không có yêu cầu đang mở.</p>
+            )}
+          </section>
+
+          <div className="mt-4 flex items-center justify-between border-t pt-4">
+            <p className="font-semibold">Tổng</p>
+            <p className="text-2xl font-bold text-teal-700">{formatVnd(session.totalAmount)}</p>
+          </div>
+        </>
+      ) : (
+        <p className="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Bàn đang trống, chưa có phiên phục vụ.</p>
+      )}
+
+      {qrUrl && qrDataUrl ? (
+        <details className="mt-5">
+          <summary className="cursor-pointer rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem QR / Tải / In</summary>
+          <div className="mt-3">
+            <QrCard restaurantName={restaurantName} tableName={table.name} qrDataUrl={qrDataUrl} qrUrl={qrUrl} />
+          </div>
+        </details>
+      ) : null}
+    </aside>
+  );
+}
+
+function AreaMenu({ slug, area }: { slug: string; area: any }) {
+  return (
+    <details className="relative">
+      <summary className="cursor-pointer list-none rounded-md border bg-white p-2"><MoreVertical className="h-4 w-4" /></summary>
+      <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border bg-white p-3 shadow-lg">
+        <form className="space-y-2" action={updateAreaAction.bind(null, slug)}>
+          <input name="areaId" type="hidden" value={area.id} />
+          <input className="h-9 w-full rounded-md border px-3" name="name" defaultValue={area.name} required />
+          <input name="sortOrder" type="hidden" value={area.sortOrder} />
+          <button className="rounded-md border px-3 py-2 text-sm" type="submit">Lưu khu vực</button>
         </form>
-        <form action={deleteOrDeactivateTableAction.bind(null, slug)}>
+        <form className="mt-2" action={deleteAreaAction.bind(null, slug)}>
+          <input name="areaId" type="hidden" value={area.id} />
+          <ConfirmSubmitButton className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700" message={`Xóa khu vực ${area.name}?`}>
+            Xóa khu vực
+          </ConfirmSubmitButton>
+        </form>
+      </div>
+    </details>
+  );
+}
+
+function TableMenu({ slug, table, areas }: { slug: string; table: any; areas: any[] }) {
+  return (
+    <details className="relative">
+      <summary className="cursor-pointer list-none rounded-md border bg-white p-2"><MoreVertical className="h-4 w-4" /></summary>
+      <div className="absolute right-0 z-10 mt-2 w-80 rounded-lg border bg-white p-3 shadow-lg">
+        <form className="space-y-2" action={updateTableAction.bind(null, slug)}>
           <input name="tableId" type="hidden" value={table.id} />
-          <ConfirmSubmitButton className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700" message={`Bạn có chắc muốn xóa bàn ${table.name}?`}>
+          <input className="h-9 w-full rounded-md border px-3" name="name" defaultValue={table.name} required />
+          <select className="h-9 w-full rounded-md border bg-white px-3" name="areaId" defaultValue={table.areaId}>
+            {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
+          </select>
+          <label className="flex items-center gap-2 text-sm"><input name="isActive" type="checkbox" defaultChecked={table.isActive} /> Đang sử dụng</label>
+          <button className="rounded-md border px-3 py-2 text-sm" type="submit">Lưu bàn</button>
+        </form>
+        <form className="mt-2" action={deleteOrDeactivateTableAction.bind(null, slug)}>
+          <input name="tableId" type="hidden" value={table.id} />
+          <ConfirmSubmitButton className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700" message={`Bạn có chắc muốn xóa/ngừng sử dụng bàn ${table.name}?`}>
             Xóa / Ngừng sử dụng
           </ConfirmSubmitButton>
         </form>
       </div>
-    </div>
+    </details>
   );
 }

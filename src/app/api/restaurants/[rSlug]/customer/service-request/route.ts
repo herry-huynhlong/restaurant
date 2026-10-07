@@ -30,7 +30,20 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   }
 
   const eventType = parsed.data.requestType === "REQUEST_PAYMENT" ? "PAYMENT_REQUESTED" : "SERVICE_REQUEST_CREATED";
-  const serviceRequest = await prisma.$transaction(async (tx) => {
+  const { serviceRequest, isDuplicate } = await prisma.$transaction(async (tx) => {
+    const existingOpenRequest = await tx.serviceRequest.findFirst({
+      where: {
+        restaurantId: context.restaurant.id,
+        diningSessionId: context.diningSession.id,
+        tableId: context.table.id,
+        requestType: parsed.data.requestType,
+        status: { in: ["NEW", "ACKNOWLEDGED"] }
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (existingOpenRequest) return { serviceRequest: existingOpenRequest, isDuplicate: true };
+
     const created = await tx.serviceRequest.create({
       data: {
         restaurantId: context.restaurant.id,
@@ -54,8 +67,17 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       });
     }
 
-    return created;
+    return { serviceRequest: created, isDuplicate: false };
   });
+
+  if (isDuplicate) {
+    return NextResponse.json({
+      ok: true,
+      serviceRequestId: serviceRequest.id,
+      duplicate: true,
+      message: parsed.data.requestType === "REQUEST_PAYMENT" ? "Yêu cầu thanh toán đang được xử lý." : "Nhân viên đang được gọi."
+    });
+  }
 
   const notificationTitle = `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`;
   const notificationMessage = parsed.data.message || `${context.session.customerName} ${requestLabels[parsed.data.requestType]}`;

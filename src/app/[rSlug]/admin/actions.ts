@@ -117,9 +117,14 @@ const areaSchema = z.object({
 export async function createAreaAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminTables(slug);
+  const lastArea = await prisma.area.findFirst({
+    where: { restaurantId: access.restaurant.id },
+    orderBy: { sortOrder: "desc" },
+    select: { sortOrder: true }
+  });
   const parsed = areaSchema.safeParse({
     name: readString(formData, "name"),
-    sortOrder: readString(formData, "sortOrder") || 0
+    sortOrder: readString(formData, "sortOrder") || (lastArea?.sortOrder ?? -1) + 1
   });
   if (!parsed.success) redirectWithMessage(path, "error", "Tên khu vực không hợp lệ.");
 
@@ -179,7 +184,7 @@ export async function createTableAction(slug: string, formData: FormData) {
   const parsed = tableSchema.safeParse({
     name: readString(formData, "name"),
     areaId: readString(formData, "areaId"),
-    isActive: readBoolean(formData, "isActive")
+    isActive: readString(formData, "isActive") ? readBoolean(formData, "isActive") : true
   });
   if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu bàn không hợp lệ.");
 

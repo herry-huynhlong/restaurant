@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { formatVnd } from "@/lib/money";
 import { servedUploadUrl } from "@/lib/upload-url";
 
@@ -18,6 +18,18 @@ type CartItem = Product & {
   quantity: number;
 };
 
+type BillItem = {
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+};
+
+type CurrentBill = {
+  totalAmount: number;
+  items: BillItem[];
+};
+
 export function CustomerMenuClient({
   slug,
   products,
@@ -29,11 +41,38 @@ export function CustomerMenuClient({
 }) {
   const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [message, setMessage] = useState<string | null>(null);
+  const [bill, setBill] = useState<CurrentBill>({ totalAmount: 0, items: [] });
+  const [billStatus, setBillStatus] = useState<"live" | "reconnecting">("live");
   const [isPending, startTransition] = useTransition();
   const cartItems = Object.values(cart);
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const categories = useMemo(() => Array.from(new Set(products.map((product) => product.categoryName))), [products]);
+
+  const refreshBill = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/restaurants/${slug}/customer/bill`, { cache: "no-store" });
+      if (!response.ok) throw new Error("bill_failed");
+      const data = (await response.json()) as CurrentBill;
+      setBill({ totalAmount: data.totalAmount ?? 0, items: Array.isArray(data.items) ? data.items : [] });
+      setBillStatus("live");
+    } catch {
+      setBillStatus("reconnecting");
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function tick() {
+      if (!cancelled) await refreshBill();
+    }
+    void tick();
+    const interval = window.setInterval(() => void tick(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [refreshBill]);
 
   function add(product: Product) {
     if (product.isSoldOut) return;
@@ -77,6 +116,7 @@ export function CustomerMenuClient({
       }
       setCart({});
       setMessage(`Đã gửi order #${data.orderNumber}.`);
+      await refreshBill();
     });
   }
 
@@ -89,7 +129,7 @@ export function CustomerMenuClient({
         body: JSON.stringify({ requestType })
       });
       const data = await response.json();
-      setMessage(response.ok ? `Đã gửi yêu cầu: ${label}.` : data.error ?? "Không gửi được yêu cầu.");
+      setMessage(response.ok ? data.message ?? `Đã gửi yêu cầu: ${label}.` : data.error ?? "Không gửi được yêu cầu.");
     });
   }
 
@@ -98,7 +138,7 @@ export function CustomerMenuClient({
       <section className="mb-4 rounded-lg border bg-white p-3 shadow-sm">
         <p className="text-sm font-semibold">Gọi nhanh</p>
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <button className="rounded-md border px-3 py-2" type="button" onClick={() => sendServiceRequest("CALL_STAFF", "Gọi nhân viên")}>
+          <button className="rounded-md border px-3 py-2 disabled:opacity-60" type="button" disabled={isPending} onClick={() => sendServiceRequest("CALL_STAFF", "Gọi nhân viên")}>
             Gọi nhân viên
           </button>
           <button className="rounded-md border px-3 py-2" type="button" onClick={() => sendServiceRequest("REQUEST_WATER", "Thêm nước")}>
@@ -112,6 +152,34 @@ export function CustomerMenuClient({
           </button>
         </div>
         {message ? <p className="mt-3 rounded-md bg-teal-50 px-3 py-2 text-sm text-teal-800">{message}</p> : null}
+      </section>
+
+      <section className="mb-5 rounded-lg border bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">Đã gọi</h2>
+          <span className={`rounded-full px-2 py-1 text-xs font-medium ${billStatus === "live" ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700"}`}>
+            {billStatus === "live" ? "Live" : "Đang cập nhật"}
+          </span>
+        </div>
+        {bill.items.length ? (
+          <div className="mt-3 divide-y">
+            {bill.items.map((item) => (
+              <div key={`${item.productName}-${item.unitPrice}`} className="flex items-start justify-between gap-3 py-3">
+                <div>
+                  <p className="font-medium">{item.productName}</p>
+                  <p className="text-sm text-slate-600">{item.quantity} x {formatVnd(item.unitPrice)}</p>
+                </div>
+                <p className="font-semibold">{formatVnd(item.subtotal)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Chưa có món nào được gọi.</p>
+        )}
+        <div className="mt-3 flex items-center justify-between border-t pt-3">
+          <p className="font-semibold">Tổng bàn</p>
+          <p className="text-xl font-bold text-teal-700">{formatVnd(bill.totalAmount)}</p>
+        </div>
       </section>
 
       {categories.map((category) => (
@@ -175,7 +243,7 @@ export function CustomerMenuClient({
             disabled={totalQuantity === 0 || isPending}
             onClick={submitOrder}
           >
-            {isPending ? "Đang gửi..." : "Order"}
+            {isPending ? "Đang gửi..." : "Gọi món"}
           </button>
         </div>
       </div>

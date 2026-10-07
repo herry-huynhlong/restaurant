@@ -31,11 +31,10 @@ export function CustomerShell({
       </header>
       <section className="mx-auto w-full max-w-md px-4 py-6">{children}</section>
       <nav className="fixed inset-x-0 bottom-0 border-t bg-white">
-        <div className="mx-auto grid max-w-md grid-cols-4 text-center text-xs">
+        <div className="mx-auto grid max-w-md grid-cols-3 text-center text-xs">
           <Link className="px-2 py-3" href={restaurantRoutes.menu(slug)}>Menu</Link>
           <Link className="px-2 py-3" href={restaurantRoutes.orders(slug)}>Đã gọi</Link>
-          <Link className="px-2 py-3" href={restaurantRoutes.welcome(slug)}>Gọi NV</Link>
-          <Link className="px-2 py-3" href={restaurantRoutes.cart(slug)}>Giỏ hàng</Link>
+          <Link className="px-2 py-3" href={restaurantRoutes.payment(slug)}>Thanh toán</Link>
         </div>
       </nav>
     </main>
