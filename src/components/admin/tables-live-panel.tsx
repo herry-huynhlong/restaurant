@@ -151,9 +151,18 @@ export function TablesLivePanel({
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error === "SESSION_NOT_ACTIVE" ? "Phiên này đã được đóng hoặc không còn hiệu lực." : "Không xác nhận được thanh toán.");
+        console.error("CONFIRM PAYMENT RESPONSE", {
+          status: response.status,
+          data
+        });
+        throw new Error(data.message || data.error || `Không xác nhận được thanh toán (${response.status}).`);
       }
 
+      const data = await response.json().catch(() => ({}));
+      console.log("CONFIRM PAYMENT RESPONSE", {
+        status: response.status,
+        data
+      });
       setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
       await refreshTables();
     } catch (error) {

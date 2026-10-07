@@ -33,12 +33,66 @@ export async function confirmDiningSessionPaid({
     }
   });
 
-  if (!session) return { ok: false, reason: "SESSION_NOT_ACTIVE" };
+  console.log("PAYMENT SESSION LOOKUP", {
+    restaurantId,
+    diningSessionId,
+    activeWhere: activeDiningSessionWhere(),
+    found: Boolean(session),
+    tableId: session?.tableId ?? null,
+    tableName: session?.table.name ?? null,
+    tableIsActive: session?.table.isActive ?? null,
+    tableStatus: session?.table.status ?? null,
+    sessionStatus: session?.status ?? null,
+    paymentStatus: session?.paymentStatus ?? null
+  });
+
+  if (!session) {
+    const existingPaidPayment = await prisma.payment.findFirst({
+      where: {
+        restaurantId,
+        diningSessionId,
+        status: "PAID"
+      },
+      include: {
+        diningSession: {
+          include: { table: true }
+        }
+      },
+      orderBy: { paidAt: "desc" }
+    });
+
+    if (existingPaidPayment) {
+      return {
+        ok: true,
+        paymentId: existingPaidPayment.id,
+        invoiceNumber: existingPaidPayment.invoiceNumber,
+        grandTotal: existingPaidPayment.grandTotal || existingPaidPayment.amount,
+        tableName: existingPaidPayment.tableNameSnapshot ?? existingPaidPayment.diningSession.table.name
+      };
+    }
+
+    return { ok: false, reason: "SESSION_NOT_ACTIVE" };
+  }
 
   return prisma.$transaction(async (tx) => {
     const paidAt = new Date();
     const bill = calculateBillSummary(session.orders, session.restaurant.settings);
     const invoiceNumber = generateInvoiceNumber(paidAt);
+
+    console.log("CONFIRM PAYMENT BILL", {
+      restaurantId,
+      sessionId: session.id,
+      tableId: session.tableId,
+      tableName: session.table.name,
+      tableIsActive: session.table.isActive,
+      tableStatus: session.table.status,
+      orderCount: session.orders.length,
+      subtotal: bill.subtotal,
+      taxRate: bill.taxRate,
+      taxAmount: bill.taxAmount,
+      totalAmount: bill.grandTotal,
+      paymentMethod
+    });
 
     const closedSession = await tx.diningSession.updateMany({
       where: {
