@@ -8,6 +8,7 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
+import { calculateBillSummary, generateInvoiceNumber, readPaymentMethod } from "@/server/services/billing-service";
 
 export async function updateOrderStatusAction(slug: string, orderId: string, status: OrderStatus) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "KITCHEN"]);
@@ -60,7 +61,7 @@ export async function updateServiceRequestStatusAction(slug: string, requestId: 
   revalidatePath(restaurantRoutes.cashier(slug));
 }
 
-export async function markDiningSessionPaidAction(slug: string, diningSessionId: string) {
+export async function markDiningSessionPaidAction(slug: string, diningSessionId: string, formData?: FormData) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "CASHIER"]);
   const session = await prisma.diningSession.findFirst({
     where: {
@@ -68,20 +69,29 @@ export async function markDiningSessionPaidAction(slug: string, diningSessionId:
       restaurantId: access.restaurant.id,
       ...activeDiningSessionWhere()
     },
-    include: { table: true }
+    include: {
+      table: true,
+      restaurant: { include: { settings: true } },
+      orders: {
+        include: { items: true }
+      }
+    }
   });
 
   if (!session) return;
+  const paymentMethod = readPaymentMethod(formData?.get("paymentMethod") ?? null);
 
   await prisma.$transaction(async (tx) => {
     const closedAt = new Date();
+    const bill = calculateBillSummary(session.orders, session.restaurant.settings);
+    const invoiceNumber = generateInvoiceNumber(closedAt);
     const closedSession = await tx.diningSession.updateMany({
       where: {
         id: session.id,
         restaurantId: access.restaurant.id,
         ...activeDiningSessionWhere()
       },
-      data: { status: "CLOSED", paymentStatus: "PAID", closedAt }
+      data: { status: "CLOSED", paymentStatus: "PAID", closedAt, totalAmount: bill.subtotal }
     });
 
     if (closedSession.count === 0) {
@@ -92,8 +102,19 @@ export async function markDiningSessionPaidAction(slug: string, diningSessionId:
       data: {
         restaurantId: access.restaurant.id,
         diningSessionId: session.id,
-        amount: session.totalAmount,
-        paymentMethod: "CASH",
+        amount: bill.grandTotal,
+        invoiceNumber,
+        subtotalAmount: bill.subtotal,
+        taxRate: bill.taxRate,
+        taxAmount: bill.taxAmount,
+        grandTotal: bill.grandTotal,
+        invoiceBusinessName: session.restaurant.settings?.invoiceBusinessName ?? session.restaurant.name,
+        invoiceTaxCode: session.restaurant.settings?.invoiceTaxCode ?? null,
+        invoiceAddress: session.restaurant.settings?.address ?? null,
+        invoicePhone: session.restaurant.settings?.phone ?? null,
+        invoiceEmail: session.restaurant.settings?.invoiceEmail ?? null,
+        invoiceDisplayName: session.restaurant.settings?.invoiceDisplayName ?? session.restaurant.settings?.restaurantName ?? session.restaurant.name,
+        paymentMethod,
         status: "PAID",
         idempotencyKey: `cash-${session.id}-${closedAt.getTime()}`,
         paidAt: closedAt,

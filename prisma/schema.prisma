@@ -74,6 +74,9 @@ enum OrderStatus {
 enum PaymentMethod {
   CASH
   QR
+  BANK_TRANSFER
+  CARD
+  OTHER
 }
 
 enum ServiceRequestType {
@@ -205,6 +208,12 @@ model RestaurantSetting {
   paymentQrImage  String?
   cashEnabled     Boolean    @default(true)
   qrPaymentEnabled Boolean   @default(true)
+  invoiceBusinessName String?
+  invoiceTaxCode  String?
+  invoiceEmail    String?
+  invoiceDisplayName String?
+  taxEnabled      Boolean    @default(false)
+  taxRate         Decimal    @default(0) @db.Decimal(5, 2)
   notificationSoundEnabled Boolean @default(true)
   notifyNewOrder  Boolean    @default(true)
   notifyServiceRequest Boolean @default(true)
@@ -409,6 +418,17 @@ model Payment {
   restaurantId      String
   diningSessionId   String
   amount            Int
+  invoiceNumber     String?        @unique
+  subtotalAmount    Int            @default(0)
+  taxRate           Decimal        @default(0) @db.Decimal(5, 2)
+  taxAmount         Int            @default(0)
+  grandTotal        Int            @default(0)
+  invoiceBusinessName String?
+  invoiceTaxCode    String?
+  invoiceAddress    String?
+  invoicePhone      String?
+  invoiceEmail      String?
+  invoiceDisplayName String?
   paymentMethod     PaymentMethod
   status            PaymentStatus  @default(PENDING)
   idempotencyKey    String

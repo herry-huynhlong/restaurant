@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCustomerContext } from "@/server/services/customer-context";
+import { calculateBillSummary } from "@/server/services/billing-service";
 
 function buildBill(orders: Array<{
   id: string;
@@ -16,7 +17,7 @@ function buildBill(orders: Array<{
     quantity: number;
     subtotal: number;
   }>;
-}>, totalAmount: number) {
+}>, bill: { subtotal: number; taxRate: number; taxAmount: number; grandTotal: number }) {
   const itemMap = new Map<string, {
     productName: string;
     quantity: number;
@@ -43,7 +44,11 @@ function buildBill(orders: Array<{
   }
 
   return {
-    totalAmount,
+    totalAmount: bill.grandTotal,
+    subtotal: bill.subtotal,
+    taxRate: bill.taxRate,
+    taxAmount: bill.taxAmount,
+    grandTotal: bill.grandTotal,
     items: Array.from(itemMap.values()),
     orders: orders.map((order) => ({
       id: order.id,
@@ -76,6 +81,7 @@ export async function GET(request: NextRequest, { params }: { params: { rSlug: s
       tableId: context.table.id
     },
     include: {
+      restaurant: { include: { settings: true } },
       orders: {
         orderBy: { createdAt: "asc" },
         include: { items: { orderBy: { createdAt: "asc" } } }
@@ -87,5 +93,6 @@ export async function GET(request: NextRequest, { params }: { params: { rSlug: s
     return NextResponse.json({ error: "Không tìm thấy phiên gọi món." }, { status: 404 });
   }
 
-  return NextResponse.json(buildBill(refreshedSession.orders, refreshedSession.totalAmount));
+  const bill = calculateBillSummary(refreshedSession.orders, refreshedSession.restaurant.settings);
+  return NextResponse.json(buildBill(refreshedSession.orders, bill));
 }

@@ -27,6 +27,10 @@ type BillItem = {
 
 type CurrentBill = {
   totalAmount: number;
+  subtotal?: number;
+  taxRate?: number;
+  taxAmount?: number;
+  grandTotal?: number;
   items: BillItem[];
 };
 
@@ -54,7 +58,14 @@ export function CustomerMenuClient({
       const response = await fetch(`/api/restaurants/${slug}/customer/bill`, { cache: "no-store" });
       if (!response.ok) throw new Error("bill_failed");
       const data = (await response.json()) as CurrentBill;
-      setBill({ totalAmount: data.totalAmount ?? 0, items: Array.isArray(data.items) ? data.items : [] });
+      setBill({
+        totalAmount: data.grandTotal ?? data.totalAmount ?? 0,
+        subtotal: data.subtotal ?? data.totalAmount ?? 0,
+        taxRate: data.taxRate ?? 0,
+        taxAmount: data.taxAmount ?? 0,
+        grandTotal: data.grandTotal ?? data.totalAmount ?? 0,
+        items: Array.isArray(data.items) ? data.items : []
+      });
       setBillStatus("live");
     } catch {
       setBillStatus("reconnecting");
@@ -177,8 +188,18 @@ export function CustomerMenuClient({
           <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Chưa có món nào được gọi.</p>
         )}
         <div className="mt-3 flex items-center justify-between border-t pt-3">
+          <p className="font-semibold">Tạm tính</p>
+          <p className="font-semibold">{formatVnd(bill.subtotal ?? bill.totalAmount)}</p>
+        </div>
+        {bill.taxAmount ? (
+          <div className="mt-2 flex items-center justify-between">
+            <p className="text-sm text-slate-600">Thuế {bill.taxRate ?? 0}%</p>
+            <p className="font-semibold">{formatVnd(bill.taxAmount)}</p>
+          </div>
+        ) : null}
+        <div className="mt-2 flex items-center justify-between">
           <p className="font-semibold">Tổng bàn</p>
-          <p className="text-xl font-bold text-teal-700">{formatVnd(bill.totalAmount)}</p>
+          <p className="text-xl font-bold text-teal-700">{formatVnd(bill.grandTotal ?? bill.totalAmount)}</p>
         </div>
       </section>
 

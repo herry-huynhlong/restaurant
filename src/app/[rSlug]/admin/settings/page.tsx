@@ -71,6 +71,15 @@ export default async function SettingsPage({
           <Text name="paymentQrImage" label="QR image URL" defaultValue={settings?.paymentQrImage} />
         </SettingsSection>
 
+        <SettingsSection title="Hóa đơn & Thuế">
+          <Text name="invoiceBusinessName" label="Tên doanh nghiệp / tên quán" defaultValue={settings?.invoiceBusinessName ?? settings?.restaurantName ?? restaurant.name} />
+          <Text name="invoiceDisplayName" label="Tên hiển thị trên hóa đơn" defaultValue={settings?.invoiceDisplayName ?? settings?.restaurantName ?? restaurant.name} />
+          <Text name="invoiceTaxCode" label="Mã số thuế" defaultValue={settings?.invoiceTaxCode} />
+          <Text name="invoiceEmail" label="Email hóa đơn" type="email" defaultValue={settings?.invoiceEmail} />
+          <Check name="taxEnabled" label="Áp dụng thuế" defaultChecked={settings?.taxEnabled ?? false} />
+          <Text name="taxRate" label="Thuế suất (%)" type="number" step="0.01" min="0" max="100" defaultValue={settings?.taxRate ? String(settings.taxRate) : "0"} />
+        </SettingsSection>
+
         <SettingsSection title="Thông báo">
           <div className="rounded-md border p-3">
             <p className="mb-2 text-sm font-medium">Thông báo đẩy</p>
@@ -108,11 +117,11 @@ function SettingsSection({ title, children }: { title: string; children: React.R
   );
 }
 
-function Text({ label, name, defaultValue, type = "text", required = false }: { label: string; name: string; defaultValue?: string | null; type?: string; required?: boolean }) {
+function Text({ label, name, defaultValue, type = "text", required = false, step, min, max }: { label: string; name: string; defaultValue?: string | null; type?: string; required?: boolean; step?: string; min?: string; max?: string }) {
   return (
     <label className="block text-sm font-medium">
       {label}
-      <input className="mt-1 h-10 w-full rounded-md border px-3" name={name} type={type} defaultValue={defaultValue ?? ""} required={required} />
+      <input className="mt-1 h-10 w-full rounded-md border px-3" name={name} type={type} defaultValue={defaultValue ?? ""} required={required} step={step} min={min} max={max} />
     </label>
   );
 }

@@ -1,0 +1,31 @@
+ALTER TYPE "PaymentMethod" ADD VALUE IF NOT EXISTS 'BANK_TRANSFER';
+ALTER TYPE "PaymentMethod" ADD VALUE IF NOT EXISTS 'CARD';
+ALTER TYPE "PaymentMethod" ADD VALUE IF NOT EXISTS 'OTHER';
+
+ALTER TABLE "RestaurantSetting"
+  ADD COLUMN IF NOT EXISTS "invoiceBusinessName" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoiceTaxCode" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoiceEmail" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoiceDisplayName" TEXT,
+  ADD COLUMN IF NOT EXISTS "taxEnabled" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "taxRate" DECIMAL(5,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE "Payment"
+  ADD COLUMN IF NOT EXISTS "invoiceNumber" TEXT,
+  ADD COLUMN IF NOT EXISTS "subtotalAmount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "taxRate" DECIMAL(5,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "taxAmount" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "grandTotal" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "invoiceBusinessName" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoiceTaxCode" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoiceAddress" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoicePhone" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoiceEmail" TEXT,
+  ADD COLUMN IF NOT EXISTS "invoiceDisplayName" TEXT;
+
+UPDATE "Payment"
+SET
+  "subtotalAmount" = CASE WHEN "subtotalAmount" = 0 THEN "amount" ELSE "subtotalAmount" END,
+  "grandTotal" = CASE WHEN "grandTotal" = 0 THEN "amount" ELSE "grandTotal" END;
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Payment_invoiceNumber_key" ON "Payment"("invoiceNumber");

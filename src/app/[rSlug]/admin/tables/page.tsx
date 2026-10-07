@@ -5,6 +5,7 @@ import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-sh
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { QrCard } from "@/components/admin/qr-card";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getTableQrUrl } from "@/lib/qr";
 import { formatVnd } from "@/lib/money";
@@ -16,9 +17,11 @@ import {
   updateAreaAction,
   updateTableAction
 } from "@/app/[rSlug]/admin/actions";
+import { markDiningSessionPaidAction } from "@/app/[rSlug]/ops/actions";
 import { prisma } from "@/lib/db/prisma";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
+import { calculateBillSummary } from "@/server/services/billing-service";
 
 const tableStatusLabels: Record<string, string> = {
   AVAILABLE: "Đang trống",
@@ -43,7 +46,7 @@ export default async function TablesPage({
   searchParams?: { error?: string; success?: string; table?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
-  const [areas, notifications] = await Promise.all([
+  const [areas, notifications, settings] = await Promise.all([
     prisma.area.findMany({
       where: { restaurantId: access.restaurant.id },
       include: {
@@ -62,6 +65,11 @@ export default async function TablesPage({
                 serviceRequests: {
                   where: { status: { in: ["NEW", "ACKNOWLEDGED"] } },
                   orderBy: { createdAt: "desc" }
+                },
+                payments: {
+                  orderBy: { paidAt: "desc" },
+                  take: 1,
+                  include: { confirmedBy: true }
                 }
               }
             }
@@ -70,12 +78,25 @@ export default async function TablesPage({
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
     }),
-    getRecentNotifications(access.restaurant.id, access.user.id)
+    getRecentNotifications(access.restaurant.id, access.user.id),
+    prisma.restaurantSetting.findUnique({ where: { restaurantId: access.restaurant.id } })
   ]);
 
   const tables = areas.flatMap((area) => area.tables.map((table) => ({ ...table, area })));
   const selectedTable = tables.find((table) => table.id === searchParams?.table) ?? tables[0] ?? null;
   const selectedSession = selectedTable?.sessions[0] ?? null;
+  const lastClosedSession = selectedTable && !selectedSession ? await prisma.diningSession.findFirst({
+    where: {
+      restaurantId: access.restaurant.id,
+      tableId: selectedTable.id,
+      status: "CLOSED"
+    },
+    orderBy: { closedAt: "desc" },
+    include: {
+      orders: { orderBy: { createdAt: "asc" }, include: { items: { orderBy: { createdAt: "asc" } } } },
+      payments: { orderBy: { paidAt: "desc" }, take: 1, include: { confirmedBy: true } }
+    }
+  }) : null;
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const selectedQrUrl = selectedTable ? getTableQrUrl(baseUrl, access.restaurant.slug, selectedTable.qrToken) : null;
   const selectedQrDataUrl = selectedQrUrl ? await QRCode.toDataURL(selectedQrUrl, { margin: 1, width: 220 }) : null;
@@ -150,6 +171,9 @@ export default async function TablesPage({
           qrUrl={selectedQrUrl}
           qrDataUrl={selectedQrDataUrl}
           restaurantName={access.restaurant.name}
+          settings={settings}
+          cashierName={access.user.name}
+          lastClosedSession={lastClosedSession}
         />
       </section>
     </RestaurantAdminShell>
@@ -158,6 +182,7 @@ export default async function TablesPage({
 
 function TableSummaryCard({ slug, table, totalAmount, selected }: { slug: string; table: any; totalAmount: number; selected: boolean }) {
   const label = !table.isActive ? "Ngừng sử dụng" : tableStatusLabels[table.status] ?? table.status;
+  const paymentLabel = table.sessions[0]?.paymentStatus === "PENDING" ? "Chờ xác nhận" : table.sessions[0]?.paymentStatus === "PAID" ? "Đã thanh toán" : "Chưa thanh toán";
   const badgeClass = !table.isActive
     ? "bg-slate-100 text-slate-600"
     : table.status === "PAYMENT_REQUESTED"
@@ -176,7 +201,10 @@ function TableSummaryCard({ slug, table, totalAmount, selected }: { slug: string
         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
       </div>
       {table.status !== "AVAILABLE" && table.isActive ? (
-        <p className="mt-4 text-sm text-slate-600">Tổng hiện tại: <span className="font-bold text-teal-700">{formatVnd(totalAmount)}</span></p>
+        <div className="mt-4 space-y-1 text-sm text-slate-600">
+          <p>Thanh toán: <span className="font-semibold">{paymentLabel}</span></p>
+          <p>Tổng: <span className="font-bold text-teal-700">{formatVnd(totalAmount)}</span></p>
+        </div>
       ) : null}
       <Link className="mt-4 inline-flex rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" href={`/${slug}/admin/tables?table=${table.id}`}>
         Xem bàn
@@ -185,12 +213,15 @@ function TableSummaryCard({ slug, table, totalAmount, selected }: { slug: string
   );
 }
 
-function TableDetail({ slug, table, session, areas, qrUrl, qrDataUrl, restaurantName }: { slug: string; table: any | null; session: any | null; areas: any[]; qrUrl: string | null; qrDataUrl: string | null; restaurantName: string }) {
+function TableDetail({ slug, table, session, areas, qrUrl, qrDataUrl, restaurantName, settings, cashierName, lastClosedSession }: { slug: string; table: any | null; session: any | null; areas: any[]; qrUrl: string | null; qrDataUrl: string | null; restaurantName: string; settings: any; cashierName?: string | null; lastClosedSession: any | null }) {
   if (!table) {
     return <aside className="rounded-lg border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Chưa có bàn để xem chi tiết.</p></aside>;
   }
 
   const activeRequests = session?.serviceRequests ?? [];
+  const bill = session ? calculateBillSummary(session.orders, settings) : null;
+  const paidPayment = session?.payments?.[0] ?? lastClosedSession?.payments?.[0] ?? null;
+  const paidInvoiceSession = paidPayment ? (session ?? lastClosedSession) : null;
   const guests = session ? Array.from(new Set([
     ...session.orders.map((order: any) => order.customerName),
     ...activeRequests.map((request: any) => request.customerName)
@@ -209,6 +240,8 @@ function TableDetail({ slug, table, session, areas, qrUrl, qrDataUrl, restaurant
       <div className="mt-4 rounded-md bg-slate-50 p-3">
         <p className="text-sm text-slate-600">Trạng thái</p>
         <p className="font-semibold">{!table.isActive ? "Ngừng sử dụng" : tableStatusLabels[table.status] ?? table.status}</p>
+        <p className="mt-2 text-sm text-slate-600">Thanh toán</p>
+        <p className="font-semibold">{session?.paymentStatus === "PENDING" ? "Chờ xác nhận" : session?.paymentStatus === "PAID" || paidPayment ? "Đã thanh toán" : "Chưa thanh toán"}</p>
       </div>
 
       {session ? (
@@ -257,13 +290,45 @@ function TableDetail({ slug, table, session, areas, qrUrl, qrDataUrl, restaurant
           </section>
 
           <div className="mt-4 flex items-center justify-between border-t pt-4">
-            <p className="font-semibold">Tổng</p>
-            <p className="text-2xl font-bold text-teal-700">{formatVnd(session.totalAmount)}</p>
+            <p className="font-semibold">Tạm tính</p>
+            <p className="font-semibold">{formatVnd(bill?.subtotal ?? 0)}</p>
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <p className="text-sm text-slate-600">Thuế {bill?.taxRate ?? 0}%</p>
+            <p className="font-semibold">{formatVnd(bill?.taxAmount ?? 0)}</p>
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <p className="font-semibold">Tổng thanh toán</p>
+            <p className="text-2xl font-bold text-teal-700">{formatVnd(bill?.grandTotal ?? 0)}</p>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+            <InvoicePrintButton label="In bill" invoice={buildInvoiceData({ restaurantName, settings, table, session, bill, cashierName, payment: null })} />
+            <form className="flex flex-wrap gap-2" action={markDiningSessionPaidAction.bind(null, slug, session.id)}>
+              <select className="h-10 rounded-md border bg-white px-3 text-sm" name="paymentMethod" defaultValue="CASH">
+                <option value="CASH">Tiền mặt</option>
+                <option value="BANK_TRANSFER">Chuyển khoản</option>
+                <option value="CARD">Thẻ</option>
+                <option value="OTHER">Khác</option>
+              </select>
+              <ConfirmSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" message={`Xác nhận bàn ${table.name} đã thanh toán ${formatVnd(bill?.grandTotal ?? 0)}?`}>
+                Xác nhận đã thanh toán
+              </ConfirmSubmitButton>
+            </form>
           </div>
         </>
       ) : (
         <p className="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Bàn đang trống, chưa có phiên phục vụ.</p>
       )}
+
+      {paidPayment && paidInvoiceSession ? (
+        <section className="mt-4 rounded-md border border-teal-100 bg-teal-50 p-3">
+          <p className="text-sm font-semibold text-teal-800">Hóa đơn gần nhất: {paidPayment.invoiceNumber ?? paidPayment.id}</p>
+          <p className="mt-1 text-sm text-teal-800">Tổng: {formatVnd(paidPayment.grandTotal || paidPayment.amount)}</p>
+          <div className="mt-3">
+            <InvoicePrintButton label="In lại hóa đơn" invoice={buildPaidInvoiceData({ restaurantName, table, session: paidInvoiceSession, payment: paidPayment })} />
+          </div>
+        </section>
+      ) : null}
 
       {qrUrl && qrDataUrl ? (
         <details className="mt-5">
@@ -275,6 +340,60 @@ function TableDetail({ slug, table, session, areas, qrUrl, qrDataUrl, restaurant
       ) : null}
     </aside>
   );
+}
+
+function invoiceItems(session: any) {
+  return session.orders.flatMap((order: any) => order.items.map((item: any) => ({
+    id: item.id,
+    name: item.productNameViSnapshot,
+    quantity: item.quantity,
+    unitPrice: item.unitPriceSnapshot,
+    subtotal: item.subtotal
+  })));
+}
+
+function buildInvoiceData({ restaurantName, settings, table, session, bill, cashierName, payment }: { restaurantName: string; settings: any; table: any; session: any; bill: any; cashierName?: string | null; payment: any }) {
+  return {
+    restaurantName,
+    businessName: settings?.invoiceBusinessName ?? restaurantName,
+    taxCode: settings?.invoiceTaxCode ?? null,
+    address: settings?.address ?? null,
+    phone: settings?.phone ?? null,
+    email: settings?.invoiceEmail ?? null,
+    invoiceNumber: payment?.invoiceNumber ?? null,
+    tableName: table.name,
+    cashierName,
+    paidAt: payment?.paidAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(payment.paidAt) : null,
+    status: payment?.status ?? (session.paymentStatus === "PENDING" ? "PENDING" : "UNPAID"),
+    paymentMethod: payment?.paymentMethod ?? null,
+    subtotal: bill.subtotal,
+    taxRate: bill.taxRate,
+    taxAmount: bill.taxAmount,
+    grandTotal: bill.grandTotal,
+    items: invoiceItems(session)
+  };
+}
+
+function buildPaidInvoiceData({ restaurantName, table, session, payment }: { restaurantName: string; table: any; session: any; payment: any }) {
+  return {
+    restaurantName,
+    businessName: payment.invoiceBusinessName ?? restaurantName,
+    taxCode: payment.invoiceTaxCode,
+    address: payment.invoiceAddress,
+    phone: payment.invoicePhone,
+    email: payment.invoiceEmail,
+    invoiceNumber: payment.invoiceNumber,
+    tableName: table.name,
+    cashierName: payment.confirmedBy?.name,
+    paidAt: payment.paidAt ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(payment.paidAt) : null,
+    status: "PAID" as const,
+    paymentMethod: payment.paymentMethod,
+    subtotal: payment.subtotalAmount || payment.amount,
+    taxRate: Number(payment.taxRate ?? 0),
+    taxAmount: payment.taxAmount ?? 0,
+    grandTotal: payment.grandTotal || payment.amount,
+    items: invoiceItems(session)
+  };
 }
 
 function AreaMenu({ slug, area }: { slug: string; area: any }) {
