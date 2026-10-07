@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { RestaurantRole } from "@prisma/client";
-import { BarChart3, Bell, CreditCard, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Users } from "lucide-react";
+import { BarChart3, CreditCard, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Users } from "lucide-react";
 import type { Notification } from "@prisma/client";
 import { InstallAppButton } from "@/components/app-shell/install-app-button";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
-import { PushNotificationButton } from "@/components/app-shell/push-notification-button";
+import { NotificationAudioUnlocker } from "@/components/app-shell/notification-audio-unlocker";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
+import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { restaurantRoutes } from "@/lib/routes";
 
 export function RestaurantAdminShell({
@@ -26,6 +27,7 @@ export function RestaurantAdminShell({
   userName?: string | null;
   notifications?: Notification[];
 }) {
+  const roleLabel = getRoleLabel(role);
   const navItems = [
     ["Tổng quan", restaurantRoutes.admin(slug), Home],
     ["Menu", restaurantRoutes.adminMenu(slug), MenuIcon],
@@ -39,10 +41,11 @@ export function RestaurantAdminShell({
 
   return (
     <main className="min-h-screen bg-slate-50">
+      <NotificationAudioUnlocker />
       <div className="mx-auto flex w-full max-w-7xl gap-6 px-4 py-6">
         <aside className="hidden w-64 shrink-0 rounded-lg border bg-white p-3 shadow-sm md:flex md:min-h-[calc(100vh-3rem)] md:flex-col">
           <p className="px-3 py-2 text-sm font-semibold text-teal-700">{restaurantName}</p>
-          <p className="px-3 text-xs text-slate-500">Role: {role}</p>
+          <p className="px-3 text-xs text-slate-500">Vai trò: {roleLabel}</p>
           <nav className="mt-3 space-y-1">
             {navItems.map(([label, href, Icon]) => (
               <Link key={href} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-slate-100" href={href}>
@@ -53,22 +56,20 @@ export function RestaurantAdminShell({
           </nav>
           <div className="mt-auto space-y-2 border-t pt-3">
             <InstallAppButton />
-            <PushNotificationButton slug={slug} compact />
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm">
               <p className="font-medium">{userName ?? "User"}</p>
-              <p className="text-xs text-slate-500">{role}</p>
+              <p className="text-xs text-slate-500">{roleLabel}</p>
             </div>
           </div>
         </aside>
         <section className="min-w-0 flex-1">
-          <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
+          <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h1 className="text-2xl font-semibold">{title}</h1>
-              <p className="mt-1 text-sm text-slate-600">{restaurantName} · {role}</p>
+              <p className="mt-1 text-sm text-slate-600">{restaurantName} · {roleLabel}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <InstallAppButton compact />
-              <PushNotificationButton slug={slug} compact />
               <NotificationBell slug={slug} notifications={notifications} />
               <details className="relative">
                 <summary className="cursor-pointer list-none rounded-md border bg-white px-3 py-2 text-sm hover:bg-slate-50">
@@ -76,11 +77,8 @@ export function RestaurantAdminShell({
                 </summary>
                 <div className="absolute right-0 z-20 mt-2 w-56 rounded-lg border bg-white p-3 shadow-lg">
                   <p className="text-sm font-semibold">{userName ?? "User"}</p>
-                  <p className="mb-3 text-xs text-slate-500">{role}</p>
+                  <p className="mb-3 text-xs text-slate-500">{roleLabel}</p>
                   <InstallAppButton />
-                  <div className="mt-2">
-                    <PushNotificationButton slug={slug} compact />
-                  </div>
                   <div className="mt-2">
                     <SignOutButton />
                   </div>

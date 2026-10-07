@@ -1,10 +1,10 @@
 import { AppHeader } from "@/components/app-shell/app-header";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
-import { PushNotificationButton } from "@/components/app-shell/push-notification-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { updateOrderStatusAction } from "@/app/[rSlug]/ops/actions";
 
@@ -29,12 +29,11 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
   return (
     <main className="min-h-screen bg-slate-50">
       <AppHeader
-        title={`${access.restaurant.name} · Kitchen`}
-        subtitle={`Role ${access.membership.role}`}
+        title="Bếp"
+        subtitle={`${access.restaurant.name} · ${getRoleLabel(access.membership.role)}`}
         actions={
           <>
             <OpsLiveRefresher slug={access.restaurant.slug} />
-            <PushNotificationButton slug={access.restaurant.slug} compact />
             <NotificationBell slug={access.restaurant.slug} notifications={notifications} />
           </>
         }
@@ -45,7 +44,7 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
             <article key={order.id} className="rounded-lg border bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase text-teal-700">{order.status}</p>
+                  <p className="text-xs font-semibold uppercase text-teal-700">{order.status === "NEW" ? "Đơn mới" : order.status === "CONFIRMED" ? "Đã nhận" : order.status === "PREPARING" ? "Đang làm" : order.status}</p>
                   <h2 className="mt-1 text-lg font-semibold">Order #{order.orderNumber} · Bàn {order.table.name}</h2>
                   <p className="text-sm text-slate-600">{order.customerName}</p>
                 </div>

@@ -7,6 +7,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
+import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getPlatformRestaurantDetail } from "@/server/services/platform-service";
 import { extendSubscriptionAction } from "@/app/platform/restaurants/actions";
 
@@ -71,7 +72,7 @@ export default async function RestaurantDetailPage({
         </Panel>
         <Panel title="Owner / Nhân viên">
           {restaurant.users.map((membership) => (
-            <Info key={membership.id} label={membership.role} value={`${membership.user.name} · ${membership.user.email}`} />
+            <Info key={membership.id} label={getRoleLabel(membership.role)} value={`${membership.user.name} · ${membership.user.email}`} />
           ))}
         </Panel>
         <Panel title="Bàn">

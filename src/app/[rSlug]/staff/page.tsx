@@ -1,11 +1,11 @@
 import { AppHeader } from "@/components/app-shell/app-header";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
-import { PushNotificationButton } from "@/components/app-shell/push-notification-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/db/prisma";
 import { formatVnd } from "@/lib/money";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { updateOrderStatusAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 
@@ -55,12 +55,11 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
   return (
     <main className="min-h-screen bg-slate-50">
       <AppHeader
-        title={`${access.restaurant.name} · Staff`}
-        subtitle={`Role ${access.membership.role}`}
+        title="Phục vụ"
+        subtitle={`${access.restaurant.name} · ${getRoleLabel(access.membership.role)}`}
         actions={
           <>
             <OpsLiveRefresher slug={access.restaurant.slug} />
-            <PushNotificationButton slug={access.restaurant.slug} compact />
             <NotificationBell slug={access.restaurant.slug} notifications={notifications} />
           </>
         }

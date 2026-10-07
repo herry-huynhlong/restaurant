@@ -54,7 +54,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicKey) {
         setStatus("error");
-        setMessage("Đã bật âm thanh trong app. Thiếu NEXT_PUBLIC_VAPID_PUBLIC_KEY nên chưa bật được push ngoài trình duyệt.");
+        setMessage("Thông báo trong app vẫn hoạt động. Thông báo hệ thống chưa được cấu hình.");
         return;
       }
 
@@ -92,11 +92,11 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscriptionId })
     });
-    setMessage(response.ok ? "Đã gửi thông báo thử." : "Không gửi được thông báo thử. Kiểm tra VAPID/subscription.");
+    setMessage(response.ok ? "Đã gửi thông báo thử." : "Không gửi được thông báo thử.");
   }
 
   const label =
-    status === "enabled" ? "Thông báo đẩy đã bật" : status === "unsupported" ? "Thiết bị không hỗ trợ Push" : status === "denied" ? "Notification bị chặn" : "Bật thông báo";
+    status === "enabled" ? "Thông báo hệ thống đã bật" : status === "unsupported" ? "Không hỗ trợ thông báo hệ thống" : status === "denied" ? "Thông báo hệ thống bị chặn" : "Bật thông báo hệ thống";
 
   return (
     <div className={compact ? "relative" : "space-y-2"}>

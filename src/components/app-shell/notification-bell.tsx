@@ -75,6 +75,17 @@ export function NotificationBell({
     audioRef.current = new Audio("/sounds/notification.wav");
     audioRef.current.preload = "auto";
     audioRef.current.volume = 0.45;
+
+    function syncSoundState() {
+      setSoundEnabled(localStorage.getItem("notificationSoundEnabled") === "true");
+    }
+
+    window.addEventListener("pointerdown", syncSoundState);
+    window.addEventListener("keydown", syncSoundState);
+    return () => {
+      window.removeEventListener("pointerdown", syncSoundState);
+      window.removeEventListener("keydown", syncSoundState);
+    };
   }, []);
 
   function playSound() {
@@ -124,9 +135,25 @@ export function NotificationBell({
     }
 
     void fetchNotifications();
-    const interval = window.setInterval(() => void fetchNotifications(), 3000);
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream`);
+      eventSource.addEventListener("notification", () => {
+        void fetchNotifications();
+      });
+      eventSource.onerror = () => {
+        if (!cancelled) setStatus("reconnecting");
+      };
+      eventSource.onopen = () => {
+        if (!cancelled) setStatus("live");
+      };
+    } catch {
+      setStatus("reconnecting");
+    }
+    const interval = window.setInterval(() => void fetchNotifications(), 5000);
     return () => {
       cancelled = true;
+      eventSource?.close();
       window.clearInterval(interval);
     };
   }, [slug]);
@@ -193,7 +220,7 @@ export function NotificationBell({
           </button>
         </div>
         <div className="mb-3 flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <span>{soundEnabled ? "Âm thanh: Bật" : "Âm thanh: Tắt"}</span>
+          <span>{soundEnabled ? "Âm thanh sẵn sàng" : "Âm thanh sẽ bật sau lần chạm/click đầu tiên"}</span>
           <button
             className="font-medium text-teal-700"
             type="button"

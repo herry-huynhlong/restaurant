@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/prisma";
 import { requireAuthenticatedUser } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
+import { getRoleLabel } from "@/lib/restaurant-role-labels";
 
 export default async function SelectRestaurantPage() {
   const user = await requireAuthenticatedUser();
@@ -22,7 +23,7 @@ export default async function SelectRestaurantPage() {
               className="block rounded-md border px-4 py-3 text-sm hover:bg-slate-50"
               href={membership.role === "WAITER" ? restaurantRoutes.staff(membership.restaurant.slug) : membership.role === "KITCHEN" ? restaurantRoutes.kitchen(membership.restaurant.slug) : membership.role === "CASHIER" ? restaurantRoutes.cashier(membership.restaurant.slug) : restaurantRoutes.admin(membership.restaurant.slug)}
             >
-              {membership.restaurant.name} · {membership.role}
+              {membership.restaurant.name} · {getRoleLabel(membership.role)}
             </Link>
           ))}
         </div>

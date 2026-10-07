@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import type { NotificationType, RestaurantRole } from "@prisma/client";
+import { publishNotificationRefresh } from "@/server/services/notification-event-service";
 
 export async function getRecentNotifications(restaurantId: string, userId?: string) {
   return prisma.notification.findMany({
@@ -46,7 +47,7 @@ export async function createNotificationsForRestaurantRoles({
     return [];
   }
 
-  return prisma.notification.createMany({
+  const result = await prisma.notification.createMany({
     data: uniqueUserIds.map((recipientUserId) => ({
       restaurantId,
       recipientUserId,
@@ -58,4 +59,7 @@ export async function createNotificationsForRestaurantRoles({
       serviceRequestId: serviceRequestId ?? null
     }))
   });
+
+  publishNotificationRefresh(restaurantId);
+  return result;
 }

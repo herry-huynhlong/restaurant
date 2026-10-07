@@ -8,4 +8,9 @@ export const restaurantRoleLabels: Record<RestaurantRole, string> = {
   CASHIER: "Thu ngân"
 };
 
+export function getRoleLabel(role: RestaurantRole | string | null | undefined) {
+  if (!role) return "";
+  return restaurantRoleLabels[role as RestaurantRole] ?? String(role);
+}
+
 export const assignableRestaurantRoles: RestaurantRole[] = ["MANAGER", "WAITER", "KITCHEN", "CASHIER"];
