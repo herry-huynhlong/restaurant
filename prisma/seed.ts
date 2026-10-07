@@ -158,11 +158,11 @@ async function main() {
   }
 
   const products = [
-    { nameVi: "Gỏi cuốn", nameEn: "Fresh spring rolls", price: 45000, category: "Khai vị" },
-    { nameVi: "Bò lúc lắc", nameEn: "Shaking beef", price: 159000, category: "Món chính" },
-    { nameVi: "Cơm chiên hải sản", nameEn: "Seafood fried rice", price: 89000, category: "Món chính" },
-    { nameVi: "Coca Cola", nameEn: "Coca Cola", price: 25000, category: "Đồ uống" },
-    { nameVi: "Trà đào", nameEn: "Peach tea", price: 35000, category: "Đồ uống" }
+    { nameVi: "Gỏi cuốn", nameEn: "Fresh spring rolls", price: 45000, category: "Món chính", menuType: "MAIN" },
+    { nameVi: "Bò lúc lắc", nameEn: "Shaking beef", price: 159000, category: "Món chính", menuType: "MAIN" },
+    { nameVi: "Cơm chiên hải sản", nameEn: "Seafood fried rice", price: 89000, category: "Món chính", menuType: "MAIN" },
+    { nameVi: "Coca Cola", nameEn: "Coca Cola", price: 25000, category: "Đồ uống", menuType: "DRINK" },
+    { nameVi: "Trà đào", nameEn: "Peach tea", price: 35000, category: "Đồ uống", menuType: "DRINK" }
   ];
 
   await prisma.product.deleteMany({ where: { restaurantId: restaurant.id } });
@@ -171,6 +171,7 @@ async function main() {
       data: {
         restaurantId: restaurant.id,
         categoryId: categoryIds.get(product.category)!,
+        menuType: product.menuType,
         nameVi: product.nameVi,
         nameEn: product.nameEn,
         price: product.price,

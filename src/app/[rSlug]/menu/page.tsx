@@ -8,6 +8,12 @@ import { redirect } from "next/navigation";
 import { restaurantRoutes } from "@/lib/routes";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
+const menuTypeLabels: Record<string, string> = {
+  MAIN: "Món chính",
+  EXTRA: "Món thêm",
+  DRINK: "Nước / Đồ uống"
+};
+
 export default async function CustomerMenuPage({ params }: { params: { rSlug: string } }) {
   const restaurant = await getRestaurantBySlug(params.rSlug);
   const customerSession = getCustomerSessionCookie();
@@ -32,8 +38,7 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
 
   const products = await prisma.product.findMany({
     where: { restaurantId: restaurant.id, isActive: true },
-    include: { category: true },
-    orderBy: [{ category: { sortOrder: "asc" } }, { sortOrder: "asc" }]
+    orderBy: [{ menuType: "asc" }, { sortOrder: "asc" }, { nameVi: "asc" }]
   });
   return (
     <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName}>
@@ -42,7 +47,8 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
         primaryColor={restaurant.settings?.primaryColor ?? "#0f766e"}
         products={products.map((product) => ({
           id: product.id,
-          categoryName: product.category.nameVi,
+          categoryName: menuTypeLabels[product.menuType] ?? menuTypeLabels.MAIN,
+          menuType: product.menuType === "EXTRA" || product.menuType === "DRINK" ? product.menuType : "MAIN",
           nameVi: product.nameVi,
           descriptionVi: product.descriptionVi,
           price: product.price,

@@ -251,6 +251,7 @@ model Product {
   descriptionVi String?
   descriptionEn String?
   price         Int
+  menuType      String               @default("MAIN")
   imageUrl      String?
   isActive      Boolean              @default(true)
   isSoldOut     Boolean              @default(false)
@@ -264,6 +265,7 @@ model Product {
   orderItems    OrderItem[]
 
   @@index([restaurantId, categoryId])
+  @@index([restaurantId, menuType])
   @@index([restaurantId, isActive])
   @@index([restaurantId, isSoldOut])
   @@index([restaurantId, sortOrder])

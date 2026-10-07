@@ -7,6 +7,7 @@ import { servedUploadUrl } from "@/lib/upload-url";
 type Product = {
   id: string;
   categoryName: string;
+  menuType: "MAIN" | "EXTRA" | "DRINK";
   nameVi: string;
   descriptionVi: string | null;
   price: number;
@@ -51,7 +52,11 @@ export function CustomerMenuClient({
   const cartItems = Object.values(cart);
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const categories = useMemo(() => Array.from(new Set(products.map((product) => product.categoryName))), [products]);
+  const groups = useMemo(() => [
+    { type: "MAIN", label: "Món chính", products: products.filter((product) => product.menuType === "MAIN") },
+    { type: "EXTRA", label: "Món thêm", products: products.filter((product) => product.menuType === "EXTRA") },
+    { type: "DRINK", label: "Nước / Đồ uống", products: products.filter((product) => product.menuType === "DRINK") }
+  ] as const, [products]);
 
   const refreshBill = useCallback(async () => {
     try {
@@ -203,11 +208,11 @@ export function CustomerMenuClient({
         </div>
       </section>
 
-      {categories.map((category) => (
-        <section key={category} className="mb-5">
-          <h2 className="mb-3 text-base font-semibold">{category}</h2>
+      {groups.filter((group) => group.products.length > 0).map((group) => (
+        <section key={group.type} className="mb-5">
+          <h2 className="mb-3 text-base font-semibold">{group.label}</h2>
           <div className="space-y-3">
-            {products.filter((product) => product.categoryName === category).map((product) => {
+            {group.products.map((product) => {
               const quantity = cart[product.id]?.quantity ?? 0;
               return (
                 <article key={product.id} className="rounded-lg border bg-white p-4 shadow-sm">

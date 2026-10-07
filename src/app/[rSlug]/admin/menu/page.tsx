@@ -3,7 +3,7 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getRecentNotifications } from "@/server/services/notification-service";
-import { ensureSimpleMenuCategories, typeFromCategoryName } from "@/server/services/simple-menu-service";
+import { ensureSimpleMenuCategories, type SimpleMenuType } from "@/server/services/simple-menu-service";
 import { SimpleMenuManager } from "@/components/admin/simple-menu-manager";
 
 export default async function MenuPage({ params }: { params: { rSlug: string } }) {
@@ -13,8 +13,7 @@ export default async function MenuPage({ params }: { params: { rSlug: string } }
   const [products, notifications] = await Promise.all([
     prisma.product.findMany({
       where: { restaurantId: access.restaurant.id },
-      include: { category: true },
-      orderBy: [{ sortOrder: "asc" }, { nameVi: "asc" }]
+      orderBy: [{ menuType: "asc" }, { sortOrder: "asc" }, { nameVi: "asc" }]
     }),
     getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
@@ -26,7 +25,7 @@ export default async function MenuPage({ params }: { params: { rSlug: string } }
         initialProducts={products.map((product) => ({
           id: product.id,
           categoryId: product.categoryId,
-          menuType: typeFromCategoryName(product.category.nameVi),
+          menuType: (product.menuType === "EXTRA" || product.menuType === "DRINK" ? product.menuType : "MAIN") as SimpleMenuType,
           nameVi: product.nameVi,
           descriptionVi: product.descriptionVi,
           imageUrl: servedUploadUrl(product.imageUrl),

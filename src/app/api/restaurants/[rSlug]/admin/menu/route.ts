@@ -90,6 +90,7 @@ async function saveUploadedImage(formData: FormData) {
 function productPayload(product: {
   id: string;
   categoryId: string;
+  menuType: string;
   nameVi: string;
   descriptionVi: string | null;
   imageUrl: string | null;
@@ -97,9 +98,8 @@ function productPayload(product: {
   isActive: boolean;
   isSoldOut: boolean;
   isFeatured: boolean;
-  category: { nameVi: string };
 }) {
-  const menuType = (product.category.nameVi === "Nước" ? "DRINK" : product.category.nameVi === "Món thêm" ? "EXTRA" : "MAIN") as SimpleMenuType;
+  const menuType = (product.menuType === "EXTRA" || product.menuType === "DRINK" ? product.menuType : "MAIN") as SimpleMenuType;
   return {
     id: product.id,
     categoryId: product.categoryId,
@@ -185,6 +185,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       data: {
         restaurantId: input.access.restaurant.id,
         categoryId: input.categoryId,
+        menuType: input.parsed.menuType,
         nameVi: input.parsed.nameVi,
         descriptionVi: input.parsed.descriptionVi,
         imageUrl: input.imageUrl,
@@ -193,7 +194,6 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
         isSoldOut: input.parsed.isSoldOut,
         isFeatured: input.parsed.isFeatured
       },
-      include: { category: true }
     });
 
     await prisma.auditLog.create({
@@ -240,6 +240,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { rSlug:
       },
       data: {
         categoryId: input.categoryId,
+        menuType: input.parsed.menuType,
         nameVi: input.parsed.nameVi,
         nameEn: null,
         descriptionVi: input.parsed.descriptionVi,
@@ -250,7 +251,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { rSlug:
         isSoldOut: input.parsed.isSoldOut,
         isFeatured: input.parsed.isFeatured
       },
-      include: { category: true }
     });
 
     await prisma.auditLog.create({

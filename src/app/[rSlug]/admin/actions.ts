@@ -345,7 +345,7 @@ export async function deleteOrDeactivateCategoryAction(slug: string, formData: F
 }
 
 const productSchema = z.object({
-  categoryId: z.string().min(1),
+  menuType: z.enum(["MAIN", "EXTRA", "DRINK"]),
   nameVi: z.string().trim().min(1).max(160),
   nameEn: z.string().trim().max(160).optional(),
   descriptionVi: z.string().trim().max(500).optional(),
@@ -358,10 +358,12 @@ const productSchema = z.object({
   sortOrder: z.coerce.number().int().min(0).default(0)
 });
 
-async function productDataFromForm(formData: FormData) {
+async function productDataFromForm(restaurantId: string, formData: FormData) {
   const uploadedImageUrl = await saveUploadedImage(formData, "imageFile");
+  const menuType = (readString(formData, "menuType") || "MAIN") as SimpleMenuType;
   return {
-    categoryId: readString(formData, "categoryId"),
+    menuType,
+    categoryId: await getCategoryIdForSimpleMenuType(restaurantId, menuType),
     nameVi: readString(formData, "nameVi"),
     nameEn: readString(formData, "nameEn") || undefined,
     descriptionVi: readString(formData, "descriptionVi") || undefined,
@@ -407,6 +409,7 @@ async function simpleProductDataFromForm(restaurantId: string, formData: FormDat
 function simpleProductPayload(product: {
   id: string;
   categoryId: string;
+  menuType: string;
   nameVi: string;
   descriptionVi: string | null;
   imageUrl: string | null;
@@ -414,12 +417,11 @@ function simpleProductPayload(product: {
   isActive: boolean;
   isSoldOut: boolean;
   isFeatured: boolean;
-  category: { nameVi: string };
 }) {
   return {
     id: product.id,
     categoryId: product.categoryId,
-    menuType: (product.category.nameVi === "Nước" ? "DRINK" : product.category.nameVi === "Món thêm" ? "EXTRA" : "MAIN") as SimpleMenuType,
+    menuType: (product.menuType === "EXTRA" || product.menuType === "DRINK" ? product.menuType : "MAIN") as SimpleMenuType,
     nameVi: product.nameVi,
     descriptionVi: product.descriptionVi,
     imageUrl: servedUploadUrl(product.imageUrl),
@@ -461,6 +463,7 @@ export async function saveSimpleProductAction(slug: string, formData: FormData) 
         where: { id: parsed.data.productId, restaurantId: access.restaurant.id },
         data: {
           categoryId: data.categoryId,
+          menuType: parsed.data.menuType,
           nameVi: parsed.data.nameVi,
           nameEn: null,
           descriptionVi: parsed.data.descriptionVi,
@@ -471,12 +474,12 @@ export async function saveSimpleProductAction(slug: string, formData: FormData) 
           isSoldOut: parsed.data.isSoldOut,
           isFeatured: parsed.data.isFeatured
         },
-        include: { category: true }
       })
       : await prisma.product.create({
         data: {
           restaurantId: access.restaurant.id,
           categoryId: data.categoryId,
+          menuType: parsed.data.menuType,
           nameVi: parsed.data.nameVi,
           descriptionVi: parsed.data.descriptionVi,
           imageUrl: parsed.data.imageUrl,
@@ -485,7 +488,6 @@ export async function saveSimpleProductAction(slug: string, formData: FormData) 
           isSoldOut: parsed.data.isSoldOut,
           isFeatured: parsed.data.isFeatured
         },
-        include: { category: true }
       });
 
     if (parsed.data.productId) {
@@ -510,8 +512,7 @@ export async function updateSimpleProductFlagsAction(slug: string, productId: st
     const access = await requireAdminContext(slug);
     const product = await prisma.product.update({
       where: { id: productId, restaurantId: access.restaurant.id },
-      data: flags,
-      include: { category: true }
+      data: flags
     });
     await audit(access.restaurant.id, access.user.id, "PRODUCT_FLAGS_UPDATED", "Product", product.id, flags);
     revalidatePath(restaurantRoutes.adminMenu(slug));
@@ -544,7 +545,6 @@ export async function deleteSimpleProductAction(slug: string, productId: string)
     const product = await prisma.product.update({
       where: { id: productId, restaurantId: access.restaurant.id },
       data: { isActive: false },
-      include: { category: true }
     });
     await audit(access.restaurant.id, access.user.id, "PRODUCT_DEACTIVATED", "Product", productId);
     revalidatePath(restaurantRoutes.adminMenu(slug));
@@ -597,13 +597,11 @@ async function replaceProductOptions(restaurantId: string, productId: string, fo
 export async function createProductAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminMenu(slug);
-  const parsed = productSchema.safeParse(await productDataFromForm(formData));
+  const productData = await productDataFromForm(access.restaurant.id, formData);
+  const parsed = productSchema.safeParse(productData);
   if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu món ăn không hợp lệ.");
 
-  const category = await prisma.category.findFirst({ where: { id: parsed.data.categoryId, restaurantId: access.restaurant.id } });
-  if (!category) redirectWithMessage(path, "error", "Danh mục không tồn tại.");
-
-  const product = await prisma.product.create({ data: { restaurantId: access.restaurant.id, ...parsed.data } });
+  const product = await prisma.product.create({ data: { restaurantId: access.restaurant.id, categoryId: productData.categoryId, ...parsed.data } });
   await replaceProductOptions(access.restaurant.id, product.id, formData);
   await audit(access.restaurant.id, access.user.id, "PRODUCT_CREATED", "Product", product.id, { nameVi: product.nameVi, price: product.price });
   revalidatePath(path);
@@ -614,12 +612,13 @@ export async function updateProductAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminMenu(slug);
   const productId = readString(formData, "productId");
-  const parsed = productSchema.safeParse(await productDataFromForm(formData));
+  const productData = await productDataFromForm(access.restaurant.id, formData);
+  const parsed = productSchema.safeParse(productData);
   if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu món ăn không hợp lệ.");
 
   const product = await prisma.product.update({
     where: { id: productId, restaurantId: access.restaurant.id },
-    data: parsed.data
+    data: { categoryId: productData.categoryId, ...parsed.data }
   });
   await replaceProductOptions(access.restaurant.id, product.id, formData);
   await audit(access.restaurant.id, access.user.id, "PRODUCT_UPDATED", "Product", product.id, { nameVi: product.nameVi, price: product.price });

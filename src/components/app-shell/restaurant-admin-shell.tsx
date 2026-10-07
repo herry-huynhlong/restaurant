@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { RestaurantRole } from "@prisma/client";
-import { BarChart3, Bell, CreditCard, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Tags, Users } from "lucide-react";
+import { BarChart3, Bell, CreditCard, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Users } from "lucide-react";
 import type { Notification } from "@prisma/client";
 import { InstallAppButton } from "@/components/app-shell/install-app-button";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
@@ -29,7 +29,6 @@ export function RestaurantAdminShell({
   const navItems = [
     ["Tổng quan", restaurantRoutes.admin(slug), Home],
     ["Menu", restaurantRoutes.adminMenu(slug), MenuIcon],
-    ["Danh mục", restaurantRoutes.adminCategories(slug), Tags],
     ["Khu vực & Bàn", restaurantRoutes.adminTables(slug), Grid3X3],
     ["Order", restaurantRoutes.adminOrders(slug), ListOrdered],
     ["Nhân viên", restaurantRoutes.adminStaff(slug), Users],
