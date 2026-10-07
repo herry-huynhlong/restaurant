@@ -16,7 +16,7 @@ export function RestaurantLoginForm({ slug }: { slug: string }) {
     setError(null);
 
     const formData = new FormData(event.currentTarget);
-    const username = String(formData.get("username") ?? "").trim().toLowerCase();
+    const username = String(formData.get("username") ?? "").trim();
     const password = String(formData.get("password") ?? "");
     const callbackUrl = searchParams.get("callbackUrl") ?? "/post-login";
 
@@ -46,6 +46,7 @@ export function RestaurantLoginForm({ slug }: { slug: string }) {
         <input
           className="mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"
           name="username"
+          type="text"
           pattern="[a-z0-9_-]{3,30}"
           autoComplete="username"
           required

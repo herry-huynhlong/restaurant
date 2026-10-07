@@ -36,7 +36,7 @@ export const authOptions: NextAuthOptions = {
         const user = parsed.data.restaurantSlug && parsed.data.username
           ? (await prisma.restaurantUser.findFirst({
               where: {
-                username: parsed.data.username.trim().toLowerCase(),
+                username: parsed.data.username.trim(),
                 isActive: true,
                 restaurant: { slug: parsed.data.restaurantSlug, status: "ACTIVE" },
                 user: { isActive: true }

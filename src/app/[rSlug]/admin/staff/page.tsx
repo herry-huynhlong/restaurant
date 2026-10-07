@@ -92,7 +92,7 @@ export default async function AdminStaffPage({
                     <div className="min-w-0">
                       <h3 className="truncate text-lg font-semibold">{membership.user.name}</h3>
                       <p className="text-sm font-medium text-slate-700">{restaurantRoleLabels[membership.role]}</p>
-                      <p className="mt-1 break-all text-sm text-slate-600">Tên đăng nhập: <span className="font-semibold">@{username}</span></p>
+                      <p className="mt-1 break-all text-sm text-slate-600">Tên đăng nhập: <span className="font-semibold">{username}</span></p>
                     </div>
                     <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isEnabled ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}>
                       {isEnabled ? "Đang hoạt động" : "Ngừng sử dụng"}
