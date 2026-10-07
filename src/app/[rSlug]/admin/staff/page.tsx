@@ -1,4 +1,7 @@
 import type { RestaurantRole } from "@prisma/client";
+import QRCode from "qrcode";
+import Image from "next/image";
+import { headers } from "next/headers";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
@@ -13,6 +16,12 @@ import {
   updateStaffAction
 } from "@/app/[rSlug]/admin/actions";
 
+const departmentAccess = [
+  { role: "WAITER", title: "Phục vụ", description: "Dành cho nhân viên phục vụ bàn." },
+  { role: "KITCHEN", title: "Bếp", description: "Dành cho bộ phận bếp." },
+  { role: "CASHIER", title: "Thu ngân", description: "Dành cho quầy thu ngân." }
+] as const;
+
 export default async function AdminStaffPage({
   params,
   searchParams
@@ -21,6 +30,15 @@ export default async function AdminStaffPage({
   searchParams?: { error?: string; success?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
+  const origin = getRequestOrigin();
+  const loginAccessRows = await Promise.all(departmentAccess.map(async (item) => {
+    const url = `${origin}/${access.restaurant.slug}/login?role=${item.role}`;
+    return {
+      ...item,
+      url,
+      qrDataUrl: await QRCode.toDataURL(url, { margin: 1, width: 112 })
+    };
+  }));
   const [staff, notifications] = await Promise.all([
     prisma.restaurantUser.findMany({
       where: {
@@ -43,6 +61,29 @@ export default async function AdminStaffPage({
       notifications={notifications}
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
+
+      <section className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
+        <h2 className="text-base font-semibold">Mã đăng nhập theo bộ phận</h2>
+        <div className="mt-3 grid gap-3">
+          {loginAccessRows.map((item) => (
+            <article key={item.role} className="grid gap-3 rounded-md border p-3 sm:grid-cols-[112px_minmax(0,1fr)]">
+              <Image className="h-28 w-28 rounded-md border bg-white" src={item.qrDataUrl} alt={`QR đăng nhập ${item.title}`} width={112} height={112} unoptimized />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-semibold">{item.title}</h3>
+                    <p className="text-sm text-slate-600">{item.description}</p>
+                  </div>
+                  <a className="rounded-md border px-3 py-2 text-sm font-semibold" href={item.url} target="_blank" rel="noreferrer">
+                    Mở link
+                  </a>
+                </div>
+                <p className="mt-3 break-all rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">{item.url}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <form action={createStaffAction.bind(null, access.restaurant.slug)}>
@@ -77,7 +118,7 @@ export default async function AdminStaffPage({
       <section className="mt-6">
         <h2 className="text-base font-semibold">Danh sách nhân viên</h2>
         {staff.length ? (
-          <div className="mt-3 grid gap-4 lg:grid-cols-2">
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
             {staff.map((membership) => {
               const isSelf = membership.userId === access.user.id;
               const isEnabled = membership.isActive && membership.user.isActive;
@@ -87,10 +128,10 @@ export default async function AdminStaffPage({
               const canToggle = !isSelf && membership.role !== "OWNER";
 
               return (
-                <article key={membership.id} className="min-w-0 rounded-lg border bg-white p-4 shadow-sm">
+                <article key={membership.id} className="min-w-0 rounded-lg border bg-white p-3 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="truncate text-lg font-semibold">{membership.user.name}</h3>
+                      <h3 className="truncate text-base font-semibold">{membership.user.name}</h3>
                       <p className="text-sm font-medium text-slate-700">{restaurantRoleLabels[membership.role]}</p>
                       <p className="mt-1 break-all text-sm text-slate-600">Tên đăng nhập: <span className="font-semibold">{username}</span></p>
                     </div>
@@ -167,6 +208,13 @@ export default async function AdminStaffPage({
       </section>
     </RestaurantAdminShell>
   );
+}
+
+function getRequestOrigin() {
+  const headerList = headers();
+  const host = headerList.get("host");
+  const protocol = headerList.get("x-forwarded-proto") ?? "https";
+  return process.env.NEXTAUTH_URL ?? (host ? `${protocol}://${host}` : "http://localhost:3000");
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
