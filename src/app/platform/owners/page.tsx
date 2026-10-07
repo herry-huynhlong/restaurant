@@ -1,21 +1,34 @@
 import { PlatformShell } from "@/components/app-shell/platform-shell";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { PlatformOwnersManager } from "@/components/platform/owners-manager";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { platformRoutes } from "@/lib/routes";
 import { getPlatformOwners } from "@/server/services/platform-service";
 
-export default async function PlatformOwnersPage() {
+export default async function PlatformOwnersPage({
+  searchParams
+}: {
+  searchParams?: { error?: string; success?: string };
+}) {
   await requirePlatformAdmin();
   const owners = await getPlatformOwners();
   return (
     <PlatformShell title="Tài khoản chủ quán">
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <div className="space-y-2">
-          {owners.map((owner) => (
-            <p key={owner.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm">
-              {owner.user.name} · {owner.user.email} · {owner.restaurant.name}
-            </p>
-          ))}
-        </div>
-      </section>
+      <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
+      <PlatformOwnersManager
+        returnTo={platformRoutes.owners}
+        owners={owners.map((owner) => ({
+          membershipId: owner.id,
+          restaurantId: owner.restaurantId,
+          restaurantName: owner.restaurant.name,
+          restaurantStatus: owner.restaurant.status,
+          ownerUserId: owner.userId,
+          name: owner.user.name,
+          username: owner.username ?? "owner",
+          email: owner.user.email,
+          isActive: owner.isActive && owner.user.isActive
+        }))}
+      />
     </PlatformShell>
   );
 }

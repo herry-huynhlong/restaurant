@@ -18,11 +18,17 @@ const subscriptionStatusSchema = z.enum(["ACTIVE", "EXPIRED", "SUSPENDED"]);
 const languageSchema = z.enum(["vi", "en"]);
 const resetAdminPasswordSchema = z.object({
   restaurantId: z.string().min(1),
+  ownerUserId: z.string().min(1).optional(),
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự."),
   confirmPassword: z.string().min(1, "Vui lòng nhập xác nhận mật khẩu.")
 }).refine((value) => value.password === value.confirmPassword, {
   message: "Xác nhận mật khẩu không khớp.",
   path: ["confirmPassword"]
+});
+const updateOwnerNameSchema = z.object({
+  restaurantId: z.string().min(1),
+  ownerUserId: z.string().min(1),
+  name: z.string().trim().min(1, "Họ tên là bắt buộc.").max(120, "Họ tên quá dài.")
 });
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -563,6 +569,7 @@ export async function resetOwnerPasswordAction(formData: FormData) {
   const returnTo = readPlatformReturnPath(formData);
   const parsed = resetAdminPasswordSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),
+    ownerUserId: optionalString(formData, "ownerUserId"),
     password: readString(formData, "password"),
     confirmPassword: readString(formData, "confirmPassword")
   });
@@ -574,7 +581,12 @@ export async function resetOwnerPasswordAction(formData: FormData) {
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
   const owner = await prisma.restaurantUser.findFirst({
-    where: { restaurantId: parsed.data.restaurantId, role: "OWNER", isActive: true },
+    where: {
+      restaurantId: parsed.data.restaurantId,
+      ...(parsed.data.ownerUserId ? { userId: parsed.data.ownerUserId } : {}),
+      role: "OWNER",
+      isActive: true
+    },
     orderBy: { createdAt: "asc" },
     select: { userId: true }
   });
@@ -599,5 +611,55 @@ export async function resetOwnerPasswordAction(formData: FormData) {
 
   revalidatePath(platformRoutes.restaurants);
   revalidatePath(platformRoutes.restaurantDetail(parsed.data.restaurantId));
-  redirectWithSuccess(returnTo, "Đã reset mật khẩu admin.");
+  revalidatePath(platformRoutes.owners);
+  redirectWithSuccess(returnTo, parsed.data.ownerUserId ? "Đã reset mật khẩu chủ quán." : "Đã reset mật khẩu admin.");
+}
+
+export async function updateOwnerNameAction(formData: FormData) {
+  const actor = await requirePlatformAdmin();
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = updateOwnerNameSchema.safeParse({
+    restaurantId: readString(formData, "restaurantId"),
+    ownerUserId: readString(formData, "ownerUserId"),
+    name: readString(formData, "name")
+  });
+
+  if (!parsed.success) {
+    redirectWithError(returnTo, validationMessage(parsed.error));
+  }
+
+  const owner = await prisma.restaurantUser.findFirst({
+    where: {
+      restaurantId: parsed.data.restaurantId,
+      userId: parsed.data.ownerUserId,
+      role: "OWNER"
+    },
+    select: { id: true }
+  });
+
+  if (!owner) {
+    redirectWithError(returnTo, "Không tìm thấy tài khoản chủ quán của nhà hàng.");
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: parsed.data.ownerUserId },
+      data: { name: parsed.data.name }
+    }),
+    prisma.auditLog.create({
+      data: {
+        restaurantId: parsed.data.restaurantId,
+        userId: actor.id,
+        action: "OWNER_NAME_UPDATED",
+        entityType: "User",
+        entityId: parsed.data.ownerUserId,
+        metadataJson: { role: "OWNER" }
+      }
+    })
+  ]);
+
+  revalidatePath(platformRoutes.owners);
+  revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.restaurantDetail(parsed.data.restaurantId));
+  redirectWithSuccess(returnTo, "Đã cập nhật họ tên chủ quán.");
 }
