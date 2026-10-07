@@ -1,4 +1,5 @@
 import { PlatformShell } from "@/components/app-shell/platform-shell";
+import { CreateRestaurantSubmitButton, RestaurantSlugField } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { createRestaurantAction } from "@/app/platform/restaurants/actions";
@@ -16,7 +17,7 @@ export default async function NewRestaurantPage({
       <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={createRestaurantAction} encType="multipart/form-data">
         <FormSection title="Thông tin nhà hàng">
           <TextField label="Tên nhà hàng *" name="name" required />
-          <TextField label="Slug *" name="slug" required />
+          <RestaurantSlugField label="Slug *" name="slug" required />
           <LogoUploadField />
           <TextField label="Số điện thoại" name="phone" />
           <TextField label="Địa chỉ" name="address" />
@@ -40,9 +41,7 @@ export default async function NewRestaurantPage({
           <SelectField label="Status nhà hàng" name="status" options={[["ACTIVE", "ACTIVE"], ["SUSPENDED", "SUSPENDED"], ["INACTIVE", "INACTIVE"]]} />
         </FormSection>
 
-        <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">
-          Tạo nhà hàng
-        </button>
+        <CreateRestaurantSubmitButton />
       </form>
     </PlatformShell>
   );

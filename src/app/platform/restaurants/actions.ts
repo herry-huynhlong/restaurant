@@ -42,6 +42,30 @@ function readString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+function safeFormDataSummary(formData: FormData) {
+  return Array.from(formData.entries()).map(([key, value]) => {
+    if (value instanceof File) {
+      return {
+        key,
+        file: value.size > 0,
+        name: value.name,
+        type: value.type,
+        size: value.size
+      };
+    }
+
+    if (key.toLowerCase().includes("password")) {
+      return {
+        key,
+        provided: String(value).length > 0,
+        length: String(value).length
+      };
+    }
+
+    return { key, value: String(value) };
+  });
+}
+
 function optionalString(formData: FormData, key: string) {
   return readString(formData, key) || undefined;
 }
@@ -113,13 +137,48 @@ function validateSubscriptionDates(start: Date | null, end: Date | null) {
   return null;
 }
 
+function prismaCreateRestaurantMessage(error: unknown) {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
+    return "Không thể tạo nhà hàng. Vui lòng kiểm tra dữ liệu.";
+  }
+
+  if (error.code === "P2022") {
+    return "Database production chưa đồng bộ migration. Vui lòng chạy prisma migrate deploy rồi thử lại.";
+  }
+
+  if (error.code !== "P2002") {
+    return "Không thể tạo nhà hàng. Vui lòng kiểm tra dữ liệu.";
+  }
+
+  const target = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : String(error.meta?.target ?? "");
+  if (target.includes("slug")) {
+    return "Slug này đã được sử dụng. Vui lòng chọn slug khác.";
+  }
+  if (target.includes("email")) {
+    return "Email owner đã tồn tại trong hệ thống.";
+  }
+  if (target.includes("restaurantId") && target.includes("username")) {
+    return "Username owner đã tồn tại trong nhà hàng này.";
+  }
+  if (target.includes("restaurantId") && target.includes("userId")) {
+    return "Owner này đã thuộc nhà hàng này.";
+  }
+
+  return "Dữ liệu bị trùng. Vui lòng kiểm tra slug hoặc email owner.";
+}
+
 export async function createRestaurantAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
+  console.info("CREATE RESTAURANT SUBMIT", safeFormDataSummary(formData));
   const normalizedSlug = slugify(readString(formData, "slug") || readString(formData, "name"));
   let uploadedLogoUrl: string | undefined;
   try {
     uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
-  } catch {
+  } catch (error) {
+    console.error("CREATE RESTAURANT LOGO ERROR", {
+      error,
+      logoFile: safeFormDataSummary(formData).find((entry) => entry.key === "logoFile")
+    });
     redirectWithError(platformRoutes.newRestaurant, "Logo chỉ hỗ trợ JPG, PNG, WEBP và tối đa 5MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
@@ -142,19 +201,67 @@ export async function createRestaurantAction(formData: FormData) {
   });
 
   if (!parsed.success) {
+    console.warn("CREATE RESTAURANT VALIDATION ERROR", {
+      normalizedSlug,
+      issues: parsed.error.flatten()
+    });
     redirectWithError(platformRoutes.newRestaurant, validationMessage(parsed.error));
   }
+
+  console.info("CREATE RESTAURANT PARSED PAYLOAD", {
+    name: parsed.data.name,
+    slug: parsed.data.slug,
+    hasLogo: Boolean(parsed.data.logoUrl),
+    timezone: parsed.data.timezone,
+    primaryLanguage: parsed.data.primaryLanguage,
+    currency: parsed.data.currency,
+    ownerName: parsed.data.ownerName,
+    ownerEmail: parsed.data.ownerEmail,
+    ownerPhone: parsed.data.ownerPhone,
+    plan: parsed.data.plan,
+    subscriptionStatus: parsed.data.subscriptionStatus,
+    status: parsed.data.status
+  });
 
   const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart"));
   const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.newRestaurant, dateError);
 
+  const existingRestaurant = await prisma.restaurant.findUnique({
+    where: { slug: parsed.data.slug },
+    select: { id: true }
+  });
+  if (existingRestaurant) {
+    console.warn("CREATE RESTAURANT DUPLICATE SLUG", {
+      slug: parsed.data.slug,
+      restaurantId: existingRestaurant.id
+    });
+    redirectWithError(platformRoutes.newRestaurant, "Slug này đã được sử dụng. Vui lòng chọn slug khác.");
+  }
+
+  const existingOwner = await prisma.user.findUnique({
+    where: { email: parsed.data.ownerEmail },
+    select: { id: true, platformRole: true, memberships: { select: { restaurantId: true, role: true, isActive: true } } }
+  });
+  if (existingOwner?.platformRole === "PLATFORM_ADMIN") {
+    console.warn("CREATE RESTAURANT OWNER_EMAIL_IS_PLATFORM_ADMIN", {
+      ownerEmail: parsed.data.ownerEmail,
+      userId: existingOwner.id
+    });
+    redirectWithError(platformRoutes.newRestaurant, "Email owner đang là tài khoản Platform Admin. Vui lòng dùng email owner riêng cho nhà hàng.");
+  }
+
   const passwordHash = await bcrypt.hash(parsed.data.ownerPassword, 12);
 
   let createdRestaurantId: string;
 
   try {
+    console.info("CREATE RESTAURANT TRANSACTION START", {
+      slug: parsed.data.slug,
+      ownerEmail: parsed.data.ownerEmail,
+      ownerUserExists: Boolean(existingOwner)
+    });
     const restaurant = await prisma.$transaction(async (tx) => {
       const createdRestaurant = await tx.restaurant.create({
         data: {
@@ -238,13 +345,21 @@ export async function createRestaurantAction(formData: FormData) {
 
     createdRestaurantId = restaurant.id;
   } catch (error) {
-    console.error("CREATE RESTAURANT DATABASE ERROR", error);
-    const message = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
-      ? "Slug đã tồn tại hoặc email owner đã là owner của nhà hàng này."
-      : "Không thể tạo nhà hàng. Vui lòng kiểm tra dữ liệu.";
-    redirectWithError(platformRoutes.newRestaurant, message);
+    console.error("CREATE RESTAURANT DATABASE ERROR", {
+      error,
+      prismaCode: error instanceof Prisma.PrismaClientKnownRequestError ? error.code : undefined,
+      prismaMeta: error instanceof Prisma.PrismaClientKnownRequestError ? error.meta : undefined,
+      slug: parsed.data.slug,
+      ownerEmail: parsed.data.ownerEmail
+    });
+    redirectWithError(platformRoutes.newRestaurant, prismaCreateRestaurantMessage(error));
   }
 
+  console.info("CREATE RESTAURANT SUCCESS", {
+    restaurantId: createdRestaurantId,
+    slug: parsed.data.slug,
+    ownerEmail: parsed.data.ownerEmail
+  });
   revalidatePath(platformRoutes.restaurants);
   redirect(platformRoutes.restaurantDetail(createdRestaurantId));
 }
