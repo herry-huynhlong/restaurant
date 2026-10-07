@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { deleteSimpleProductAction, saveSimpleProductAction, updateSimpleProductFlagsAction } from "@/app/[rSlug]/admin/actions";
 import { formatVnd, parseVndInteger } from "@/lib/money";
 import type { SimpleMenuType } from "@/server/services/simple-menu-service";
@@ -35,13 +35,36 @@ const menuTypeOptions: Array<[SimpleMenuType, string]> = [
   ["DRINK", "Nước"]
 ];
 
+function isMenuType(value: unknown): value is SimpleMenuType {
+  return value === "MAIN" || value === "EXTRA" || value === "DRINK";
+}
+
+function normalizeProduct(raw: unknown): Product | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Partial<Product>;
+  if (!value.id || !value.nameVi) return null;
+
+  return {
+    id: String(value.id),
+    categoryId: String(value.categoryId ?? ""),
+    menuType: isMenuType(value.menuType) ? value.menuType : "MAIN",
+    nameVi: String(value.nameVi),
+    descriptionVi: value.descriptionVi ? String(value.descriptionVi) : null,
+    imageUrl: value.imageUrl ? String(value.imageUrl) : null,
+    price: Number(value.price ?? 0),
+    isActive: Boolean(value.isActive),
+    isSoldOut: Boolean(value.isSoldOut),
+    isFeatured: Boolean(value.isFeatured)
+  };
+}
+
 function formatPriceInput(value: string | number) {
   const numericValue = typeof value === "number" ? value : parseVndInteger(value);
   return numericValue ? numericValue.toLocaleString("vi-VN") : "";
 }
 
 export function SimpleMenuManager({ slug, initialProducts }: { slug: string; initialProducts: Product[] }) {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState(() => initialProducts.map(normalizeProduct).filter((product): product is Product => Boolean(product)));
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<number | null>(null);
 
@@ -53,22 +76,24 @@ export function SimpleMenuManager({ slug, initialProducts }: { slug: string; ini
 
   function upsertProduct(product: Product) {
     setProducts((current) => {
-      const exists = current.some((item) => item.id === product.id);
+      const safeCurrent = Array.isArray(current) ? current : [];
+      const exists = safeCurrent.some((item) => item.id === product.id);
       return exists
-        ? current.map((item) => (item.id === product.id ? product : item))
-        : [product, ...current];
+        ? safeCurrent.map((item) => (item.id === product.id ? product : item))
+        : [product, ...safeCurrent];
     });
   }
 
   function removeProduct(productId: string) {
-    setProducts((current) => current.filter((item) => item.id !== productId));
+    setProducts((current) => (Array.isArray(current) ? current : []).filter((item) => item.id !== productId));
   }
 
   const groupedProducts = useMemo(() => {
+    const safeProducts = Array.isArray(products) ? products : [];
     return menuTypeOptions.map(([type, label]) => ({
       type,
       label,
-      products: products.filter((product) => product.menuType === type)
+      products: safeProducts.filter((product) => product.menuType === type)
     }));
   }, [products]);
 
@@ -126,16 +151,29 @@ function NewProductCard({
 
   function submit(formData: FormData) {
     startTransition(async () => {
-      const result = await saveSimpleProductAction(slug, formData);
-      if (!result.ok || !result.product) {
-        onToast({ type: "error", message: result.error ?? "Không thể tạo món." });
-        return;
+      try {
+        const result = await saveSimpleProductAction(slug, formData);
+        if (!result?.ok) {
+          onToast({ type: "error", message: result?.error ?? "Không thể tạo món." });
+          return;
+        }
+
+        const product = normalizeProduct(result.product);
+        if (!product) {
+          console.error("CREATE MENU RESPONSE INVALID", result);
+          onToast({ type: "error", message: "Server đã lưu nhưng trả dữ liệu món không hợp lệ." });
+          return;
+        }
+
+        onSaved(product);
+        onToast({ type: "success", message: result.message ?? `Đã tạo món ${product.nameVi}.` });
+        formRef.current?.reset();
+        setPreviewUrl(null);
+        setPrice("");
+      } catch (error) {
+        console.error("CREATE MENU ERROR", error);
+        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể tạo món." });
       }
-      onSaved(result.product);
-      onToast({ type: "success", message: result.message });
-      formRef.current?.reset();
-      setPreviewUrl(null);
-      setPrice("");
     });
   }
 
@@ -172,17 +210,35 @@ function ProductCard({
   const [price, setPrice] = useState(formatPriceInput(product.price));
   const [isPending, startTransition] = useTransition();
 
+  useEffect(() => {
+    setPreviewUrl(product.imageUrl);
+    setPrice(formatPriceInput(product.price));
+  }, [product.imageUrl, product.price]);
+
   function submit(formData: FormData) {
     startTransition(async () => {
-      const result = await saveSimpleProductAction(slug, formData);
-      if (!result.ok || !result.product) {
-        onToast({ type: "error", message: result.error ?? "Không thể lưu món." });
-        return;
+      try {
+        const result = await saveSimpleProductAction(slug, formData);
+        if (!result?.ok) {
+          onToast({ type: "error", message: result?.error ?? "Không thể lưu món." });
+          return;
+        }
+
+        const nextProduct = normalizeProduct(result.product);
+        if (!nextProduct) {
+          console.error("SAVE MENU RESPONSE INVALID", result);
+          onToast({ type: "error", message: "Server đã lưu nhưng trả dữ liệu món không hợp lệ." });
+          return;
+        }
+
+        setPreviewUrl(nextProduct.imageUrl);
+        setPrice(formatPriceInput(nextProduct.price));
+        onSaved(nextProduct);
+        onToast({ type: "success", message: result.message ?? `Đã cập nhật món ${nextProduct.nameVi}.` });
+      } catch (error) {
+        console.error("SAVE MENU ITEM ERROR", error);
+        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể lưu món." });
       }
-      setPreviewUrl(result.product.imageUrl);
-      setPrice(formatPriceInput(result.product.price));
-      onSaved(result.product);
-      onToast({ type: "success", message: result.message });
     });
   }
 
@@ -190,31 +246,57 @@ function ProductCard({
     const optimisticProduct = { ...product, ...flags };
     onSaved(optimisticProduct);
     startTransition(async () => {
-      const result = await updateSimpleProductFlagsAction(slug, product.id, flags);
-      if (!result.ok || !result.product) {
+      try {
+        const result = await updateSimpleProductFlagsAction(slug, product.id, flags);
+        if (!result?.ok) {
+          onSaved(product);
+          onToast({ type: "error", message: result?.error ?? "Không thể cập nhật trạng thái món." });
+          return;
+        }
+
+        const nextProduct = normalizeProduct(result.product);
+        if (!nextProduct) {
+          console.error("UPDATE MENU FLAGS RESPONSE INVALID", result);
+          onSaved(product);
+          onToast({ type: "error", message: "Server trả dữ liệu trạng thái không hợp lệ." });
+          return;
+        }
+
+        onSaved(nextProduct);
+        onToast({ type: "success", message: result.message ?? `Đã cập nhật ${nextProduct.nameVi}.` });
+      } catch (error) {
         onSaved(product);
-        onToast({ type: "error", message: result.error ?? "Không thể cập nhật trạng thái món." });
-        return;
+        console.error("UPDATE MENU FLAGS ERROR", error);
+        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể cập nhật trạng thái món." });
       }
-      onSaved(result.product);
-      onToast({ type: "success", message: result.message });
     });
   }
 
   function deleteProduct() {
     if (!window.confirm(`Xóa hoặc ngừng bán món ${product.nameVi}?`)) return;
     startTransition(async () => {
-      const result = await deleteSimpleProductAction(slug, product.id);
-      if (!result.ok) {
-        onToast({ type: "error", message: result.error ?? "Không thể xóa món." });
-        return;
+      try {
+        const result = await deleteSimpleProductAction(slug, product.id);
+        if (!result?.ok) {
+          onToast({ type: "error", message: result?.error ?? "Không thể xóa món." });
+          return;
+        }
+        if (result.deleted) {
+          onDeleted(product.id);
+        } else {
+          const nextProduct = normalizeProduct(result.product);
+          if (!nextProduct) {
+            console.error("DELETE MENU RESPONSE INVALID", result);
+            onToast({ type: "error", message: "Server trả dữ liệu món không hợp lệ." });
+            return;
+          }
+          onSaved(nextProduct);
+        }
+        onToast({ type: "success", message: result.message ?? `Đã xóa món ${product.nameVi}.` });
+      } catch (error) {
+        console.error("DELETE MENU ITEM ERROR", error);
+        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể xóa món." });
       }
-      if (result.deleted) {
-        onDeleted(product.id);
-      } else if (result.product) {
-        onSaved(result.product);
-      }
-      onToast({ type: "success", message: result.message ?? `Đã xóa món ${product.nameVi}.` });
     });
   }
 
@@ -227,8 +309,8 @@ function ProductCard({
         <div className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-lg font-semibold">{product.nameVi}</h3>
-              <p className="text-sm text-slate-600">{formatVnd(product.price)} · {menuTypeLabels[product.menuType]}</p>
+              <h3 className="text-lg font-semibold">{product.nameVi || "Món chưa đặt tên"}</h3>
+              <p className="text-sm text-slate-600">{formatVnd(Number(product.price ?? 0))} · {menuTypeLabels[product.menuType] ?? "Món chính"}</p>
             </div>
             <span className={`rounded-full px-2 py-1 text-xs font-semibold ${product.isActive && !product.isSoldOut ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-600"}`}>
               {!product.isActive ? "Ngừng bán" : product.isSoldOut ? "Hết món" : "Đang bán"}
