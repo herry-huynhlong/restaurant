@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { PaymentMethod } from "@prisma/client";
 import { formatVnd } from "@/lib/money";
+import { paymentMethodLabels } from "@/lib/payment-method";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { QrCard } from "@/components/admin/qr-card";
 
@@ -82,6 +84,8 @@ const requestLabels: Record<string, string> = {
   OTHER: "Hỗ trợ"
 };
 
+const paymentMethods: PaymentMethod[] = ["CASH", "QR", "BANK_TRANSFER", "CARD", "OTHER"];
+
 export function TablesLivePanel({
   slug,
   restaurantName,
@@ -98,6 +102,9 @@ export function TablesLivePanel({
   const [state, setState] = useState(initialState);
   const [selectedTableId, setSelectedTableId] = useState(initialSelectedTableId ?? initialState.areas[0]?.tables[0]?.id ?? null);
   const [status, setStatus] = useState<"live" | "reconnecting">("live");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const [payingSessionId, setPayingSessionId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const tables = useMemo(() => state.areas.flatMap((area) => area.tables), [state.areas]);
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0] ?? null;
 
@@ -125,12 +132,44 @@ export function TablesLivePanel({
     };
   }, [refreshTables]);
 
+  async function confirmPaid(table: LiveTable) {
+    if (!table.activeSession) return;
+    const ok = window.confirm(`Xác nhận Bàn ${table.name} đã thanh toán ${formatVnd(table.activeSession.grandTotal)}?`);
+    if (!ok) return;
+
+    setPayingSessionId(table.activeSession.id);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/restaurants/${slug}/ops/pay-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          diningSessionId: table.activeSession.id,
+          paymentMethod
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error === "SESSION_NOT_ACTIVE" ? "Phiên này đã được đóng hoặc không còn hiệu lực." : "Không xác nhận được thanh toán.");
+      }
+
+      setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
+      await refreshTables();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không xác nhận được thanh toán.");
+    } finally {
+      setPayingSessionId(null);
+    }
+  }
+
   return (
     <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
       <div className="space-y-5">
         <div className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${status === "live" ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700"}`}>
           {status === "live" ? "Live" : "Đang kết nối lại"}
         </div>
+        {message ? <p className="rounded-md border bg-white px-3 py-2 text-sm text-slate-700">{message}</p> : null}
         {state.areas.map((area) => (
           <section key={area.id} className="space-y-3">
             <h2 className="text-base font-semibold">{area.name}</h2>
@@ -151,7 +190,16 @@ export function TablesLivePanel({
           </section>
         ))}
       </div>
-      <TableDetail restaurantName={restaurantName} cashierName={cashierName} settings={state.settings} table={selectedTable} />
+      <TableDetail
+        restaurantName={restaurantName}
+        cashierName={cashierName}
+        settings={state.settings}
+        table={selectedTable}
+        paymentMethod={paymentMethod}
+        onPaymentMethodChange={setPaymentMethod}
+        onConfirmPaid={confirmPaid}
+        paymentPending={payingSessionId === selectedTable?.activeSession?.id}
+      />
     </section>
   );
 }
@@ -189,7 +237,25 @@ function TableSummaryCard({ table, selected, onSelect }: { table: LiveTable; sel
   );
 }
 
-function TableDetail({ restaurantName, cashierName, settings, table }: { restaurantName: string; cashierName?: string | null; settings: TableState["settings"]; table: LiveTable | null }) {
+function TableDetail({
+  restaurantName,
+  cashierName,
+  settings,
+  table,
+  paymentMethod,
+  onPaymentMethodChange,
+  onConfirmPaid,
+  paymentPending
+}: {
+  restaurantName: string;
+  cashierName?: string | null;
+  settings: TableState["settings"];
+  table: LiveTable | null;
+  paymentMethod: PaymentMethod;
+  onPaymentMethodChange: (method: PaymentMethod) => void;
+  onConfirmPaid: (table: LiveTable) => void;
+  paymentPending: boolean;
+}) {
   if (!table) {
     return <aside className="rounded-lg border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Chưa có bàn để xem chi tiết.</p></aside>;
   }
@@ -256,7 +322,20 @@ function TableDetail({ restaurantName, cashierName, settings, table }: { restaur
             <div className="flex justify-between"><span className="text-sm text-slate-600">Thuế {session.taxRate}%</span><span className="font-semibold">{formatVnd(session.taxAmount)}</span></div>
             <div className="flex justify-between"><span className="font-semibold">Tổng thanh toán</span><span className="text-2xl font-bold text-teal-700">{formatVnd(session.grandTotal)}</span></div>
           </div>
-          <div className="mt-4">
+          <div className="mt-4 grid gap-3 border-t pt-4">
+            <label className="text-sm font-medium">
+              Phương thức thanh toán
+              <select
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={paymentMethod}
+                onChange={(event) => onPaymentMethodChange(event.target.value as PaymentMethod)}
+              >
+                {paymentMethods.map((method) => (
+                  <option key={method} value={method}>{paymentMethodLabels[method]}</option>
+                ))}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
             <InvoicePrintButton label="In bill" invoice={{
               restaurantName,
               businessName: settings.invoiceBusinessName ?? restaurantName,
@@ -276,6 +355,15 @@ function TableDetail({ restaurantName, cashierName, settings, table }: { restaur
               grandTotal: session.grandTotal,
               items: session.orders.flatMap((order) => order.items)
             }} />
+              <button
+                className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                type="button"
+                disabled={paymentPending}
+                onClick={() => onConfirmPaid(table)}
+              >
+                {paymentPending ? "Đang lưu..." : "Đã thanh toán"}
+              </button>
+            </div>
           </div>
         </>
       ) : (

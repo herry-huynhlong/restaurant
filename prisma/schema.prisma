@@ -423,6 +423,8 @@ model Payment {
   taxRate           Decimal        @default(0) @db.Decimal(5, 2)
   taxAmount         Int            @default(0)
   grandTotal        Int            @default(0)
+  tableIdSnapshot   String?
+  tableNameSnapshot String?
   invoiceBusinessName String?
   invoiceTaxCode    String?
   invoiceAddress    String?

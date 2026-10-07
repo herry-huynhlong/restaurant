@@ -7,8 +7,8 @@ import { restaurantRoutes } from "@/lib/routes";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
-import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
-import { calculateBillSummary, generateInvoiceNumber, readPaymentMethod } from "@/server/services/billing-service";
+import { readPaymentMethod } from "@/server/services/billing-service";
+import { confirmDiningSessionPaid } from "@/server/services/payment-service";
 
 export async function updateOrderStatusAction(slug: string, orderId: string, status: OrderStatus) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "KITCHEN"]);
@@ -63,89 +63,17 @@ export async function updateServiceRequestStatusAction(slug: string, requestId: 
 
 export async function markDiningSessionPaidAction(slug: string, diningSessionId: string, formData?: FormData) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "CASHIER"]);
-  const session = await prisma.diningSession.findFirst({
-    where: {
-      id: diningSessionId,
-      restaurantId: access.restaurant.id,
-      ...activeDiningSessionWhere()
-    },
-    include: {
-      table: true,
-      restaurant: { include: { settings: true } },
-      orders: {
-        include: { items: true }
-      }
-    }
-  });
-
-  if (!session) return;
   const paymentMethod = readPaymentMethod(formData?.get("paymentMethod") ?? null);
-
-  await prisma.$transaction(async (tx) => {
-    const closedAt = new Date();
-    const bill = calculateBillSummary(session.orders, session.restaurant.settings);
-    const invoiceNumber = generateInvoiceNumber(closedAt);
-    const closedSession = await tx.diningSession.updateMany({
-      where: {
-        id: session.id,
-        restaurantId: access.restaurant.id,
-        ...activeDiningSessionWhere()
-      },
-      data: { status: "CLOSED", paymentStatus: "PAID", closedAt, totalAmount: bill.subtotal }
-    });
-
-    if (closedSession.count === 0) {
-      return;
-    }
-
-    await tx.payment.create({
-      data: {
-        restaurantId: access.restaurant.id,
-        diningSessionId: session.id,
-        amount: bill.grandTotal,
-        invoiceNumber,
-        subtotalAmount: bill.subtotal,
-        taxRate: bill.taxRate,
-        taxAmount: bill.taxAmount,
-        grandTotal: bill.grandTotal,
-        invoiceBusinessName: session.restaurant.settings?.invoiceBusinessName ?? session.restaurant.name,
-        invoiceTaxCode: session.restaurant.settings?.invoiceTaxCode ?? null,
-        invoiceAddress: session.restaurant.settings?.address ?? null,
-        invoicePhone: session.restaurant.settings?.phone ?? null,
-        invoiceEmail: session.restaurant.settings?.invoiceEmail ?? null,
-        invoiceDisplayName: session.restaurant.settings?.invoiceDisplayName ?? session.restaurant.settings?.restaurantName ?? session.restaurant.name,
-        paymentMethod,
-        status: "PAID",
-        idempotencyKey: `cash-${session.id}-${closedAt.getTime()}`,
-        paidAt: closedAt,
-        confirmedByUserId: access.user.id
-      }
-    });
-
-    await tx.restaurantTable.update({
-      where: { id: session.tableId },
-      data: { status: "AVAILABLE" }
-    });
-
-    await tx.order.updateMany({
-      where: {
-        restaurantId: access.restaurant.id,
-        diningSessionId: session.id,
-        status: { in: ["NEW", "CONFIRMED", "PREPARING", "READY"] }
-      },
-      data: { status: "SERVED" }
-    });
-
-    await tx.serviceRequest.updateMany({
-      where: {
-        restaurantId: access.restaurant.id,
-        diningSessionId: session.id,
-        status: { in: ["NEW", "ACKNOWLEDGED"] }
-      },
-      data: { status: "COMPLETED", resolvedAt: closedAt }
-    });
+  await confirmDiningSessionPaid({
+    restaurantId: access.restaurant.id,
+    diningSessionId,
+    confirmedByUserId: access.user.id,
+    paymentMethod
   });
 
   revalidatePath(restaurantRoutes.cashier(slug));
   revalidatePath(restaurantRoutes.staff(slug));
+  revalidatePath(restaurantRoutes.adminTables(slug));
+  revalidatePath(restaurantRoutes.admin(slug));
+  revalidatePath(restaurantRoutes.adminReports(slug));
 }
