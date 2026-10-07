@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -40,6 +41,42 @@ async function saveUploadedImage(formData: FormData, key: string) {
   await mkdir(uploadDir, { recursive: true });
   await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
   return `/uploads/products/${fileName}`;
+}
+
+function actionError(code: string, error: string, fieldErrors?: Record<string, string[]>) {
+  return { ok: false as const, code, error, fieldErrors };
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
+function prismaErrorPayload(error: unknown, fallback: string) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    const meta = error.meta ? ` ${JSON.stringify(error.meta)}` : "";
+    switch (error.code) {
+      case "P2002":
+        return actionError("UNIQUE_CONSTRAINT", `Dữ liệu bị trùng.${meta}`);
+      case "P2003":
+        return actionError("FOREIGN_KEY_CONSTRAINT", `Dữ liệu liên kết không tồn tại.${meta}`);
+      case "P2011":
+        return actionError("NULL_CONSTRAINT", `Thiếu dữ liệu bắt buộc.${meta}`);
+      case "P2025":
+        return actionError("RECORD_NOT_FOUND", `Không tìm thấy dữ liệu cần cập nhật.${meta}`);
+      default:
+        return actionError(`PRISMA_${error.code}`, `${fallback} (${error.code})${meta}`);
+    }
+  }
+
+  if (error instanceof Error && error.message === "INVALID_IMAGE_TYPE") {
+    return actionError("INVALID_IMAGE_TYPE", "Ảnh món phải là file ảnh hợp lệ.");
+  }
+
+  if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
+    return actionError("AUTH_REQUIRED", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+
+  return actionError("UNKNOWN_ERROR", `${fallback}: ${errorMessage(error)}`);
 }
 
 function redirectWithMessage(path: string, key: "error" | "success", message: string): never {
@@ -379,9 +416,25 @@ export async function saveSimpleProductAction(slug: string, formData: FormData) 
     const access = await requireAdminContext(slug);
     const path = restaurantRoutes.adminMenu(slug);
     const data = await simpleProductDataFromForm(access.restaurant.id, formData);
+    console.log("CREATE MENU PAYLOAD", {
+      slug,
+      restaurantId: access.restaurant.id,
+      userId: access.user.id,
+      role: access.membership.role,
+      productId: data.productId,
+      menuType: data.menuType,
+      categoryId: data.categoryId,
+      nameVi: data.nameVi,
+      price: data.price,
+      hasImage: Boolean(data.imageUrl),
+      isActive: data.isActive,
+      isSoldOut: data.isSoldOut,
+      isFeatured: data.isFeatured
+    });
     const parsed = simpleProductSchema.safeParse(data);
     if (!parsed.success) {
-      return { ok: false, error: "Dữ liệu món ăn không hợp lệ." };
+      console.error("CREATE MENU VALIDATION ERROR", JSON.stringify(parsed.error.flatten(), null, 2));
+      return actionError("VALIDATION_ERROR", "Dữ liệu món ăn không hợp lệ.", parsed.error.flatten().fieldErrors);
     }
 
     const product = parsed.data.productId
@@ -428,8 +481,8 @@ export async function saveSimpleProductAction(slug: string, formData: FormData) 
       message: parsed.data.productId ? `Đã cập nhật món ${product.nameVi}.` : `Đã tạo món ${product.nameVi}.`
     };
   } catch (error) {
-    console.error("SAVE_SIMPLE_PRODUCT_ERROR", error);
-    return { ok: false, error: error instanceof Error && error.message === "INVALID_IMAGE_TYPE" ? "Ảnh món phải là file ảnh hợp lệ." : "Không thể lưu món." };
+    console.error("CREATE MENU ITEM SERVER ERROR", error);
+    return prismaErrorPayload(error, "Không thể lưu món");
   }
 }
 

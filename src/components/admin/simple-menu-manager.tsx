@@ -58,6 +58,23 @@ function normalizeProduct(raw: unknown): Product | null {
   };
 }
 
+function logFormData(label: string, formData: FormData) {
+  for (const [key, value] of formData.entries()) {
+    if (value instanceof File) {
+      console.log(label, key, { name: value.name, type: value.type, size: value.size });
+    } else {
+      console.log(label, key, value);
+    }
+  }
+}
+
+function resultErrorMessage(result: unknown, fallback: string) {
+  const value = result && typeof result === "object" ? result as { code?: string; error?: string; fieldErrors?: Record<string, string[] | undefined> } : null;
+  const fieldMessages = value?.fieldErrors ? Object.values(value.fieldErrors).flat().filter(Boolean) : [];
+  const detail = fieldMessages.length ? fieldMessages.join(" ") : value?.error;
+  return value?.code ? `${detail ?? fallback} [${value.code}]` : detail ?? fallback;
+}
+
 function formatPriceInput(value: string | number) {
   const numericValue = typeof value === "number" ? value : parseVndInteger(value);
   return numericValue ? numericValue.toLocaleString("vi-VN") : "";
@@ -152,9 +169,11 @@ function NewProductCard({
   function submit(formData: FormData) {
     startTransition(async () => {
       try {
+        logFormData("CREATE MENU FORMDATA", formData);
         const result = await saveSimpleProductAction(slug, formData);
+        console.log("CREATE MENU RESPONSE", result);
         if (!result?.ok) {
-          onToast({ type: "error", message: result?.error ?? "Không thể tạo món." });
+          onToast({ type: "error", message: resultErrorMessage(result, "Không thể tạo món.") });
           return;
         }
 
@@ -171,7 +190,7 @@ function NewProductCard({
         setPreviewUrl(null);
         setPrice("");
       } catch (error) {
-        console.error("CREATE MENU ERROR", error);
+        console.error("CREATE MENU ITEM FRONTEND ERROR", error);
         onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể tạo món." });
       }
     });
@@ -218,9 +237,11 @@ function ProductCard({
   function submit(formData: FormData) {
     startTransition(async () => {
       try {
+        logFormData("SAVE MENU FORMDATA", formData);
         const result = await saveSimpleProductAction(slug, formData);
+        console.log("SAVE MENU RESPONSE", result);
         if (!result?.ok) {
-          onToast({ type: "error", message: result?.error ?? "Không thể lưu món." });
+          onToast({ type: "error", message: resultErrorMessage(result, "Không thể lưu món.") });
           return;
         }
 
@@ -250,7 +271,7 @@ function ProductCard({
         const result = await updateSimpleProductFlagsAction(slug, product.id, flags);
         if (!result?.ok) {
           onSaved(product);
-          onToast({ type: "error", message: result?.error ?? "Không thể cập nhật trạng thái món." });
+          onToast({ type: "error", message: resultErrorMessage(result, "Không thể cập nhật trạng thái món.") });
           return;
         }
 
@@ -278,7 +299,7 @@ function ProductCard({
       try {
         const result = await deleteSimpleProductAction(slug, product.id);
         if (!result?.ok) {
-          onToast({ type: "error", message: result?.error ?? "Không thể xóa món." });
+          onToast({ type: "error", message: resultErrorMessage(result, "Không thể xóa món.") });
           return;
         }
         if (result.deleted) {
