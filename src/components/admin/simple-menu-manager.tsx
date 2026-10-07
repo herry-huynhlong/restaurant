@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { deleteSimpleProductAction, saveSimpleProductAction, updateSimpleProductFlagsAction } from "@/app/[rSlug]/admin/actions";
+import { deleteSimpleProductAction, updateSimpleProductFlagsAction } from "@/app/[rSlug]/admin/actions";
 import { formatVnd, parseVndInteger } from "@/lib/money";
 import type { SimpleMenuType } from "@/server/services/simple-menu-service";
 
@@ -73,6 +73,31 @@ function resultErrorMessage(result: unknown, fallback: string) {
   const fieldMessages = value?.fieldErrors ? Object.values(value.fieldErrors).flat().filter(Boolean) : [];
   const detail = fieldMessages.length ? fieldMessages.join(" ") : value?.error;
   return value?.code ? `${detail ?? fallback} [${value.code}]` : detail ?? fallback;
+}
+
+async function saveProductRequest(slug: string, formData: FormData, mode: "create" | "update") {
+  const response = await fetch(`/api/restaurants/${slug}/admin/menu`, {
+    method: mode === "create" ? "POST" : "PATCH",
+    body: formData
+  });
+
+  let data: unknown = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  console.log(mode === "create" ? "CREATE MENU RESPONSE" : "SAVE MENU RESPONSE", {
+    status: response.status,
+    body: data
+  });
+
+  if (!response.ok) {
+    throw new Error(resultErrorMessage(data, `Request failed (${response.status})`));
+  }
+
+  return data as { ok: true; product: unknown; message?: string };
 }
 
 function formatPriceInput(value: string | number) {
@@ -170,12 +195,7 @@ function NewProductCard({
     startTransition(async () => {
       try {
         logFormData("CREATE MENU FORMDATA", formData);
-        const result = await saveSimpleProductAction(slug, formData);
-        console.log("CREATE MENU RESPONSE", result);
-        if (!result?.ok) {
-          onToast({ type: "error", message: resultErrorMessage(result, "Không thể tạo món.") });
-          return;
-        }
+        const result = await saveProductRequest(slug, formData, "create");
 
         const product = normalizeProduct(result.product);
         if (!product) {
@@ -206,7 +226,7 @@ function NewProductCard({
         onPriceChange={setPrice}
       />
       <button className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" type="submit" disabled={isPending}>
-        {isPending ? "Đang lưu..." : "Lưu món"}
+        {isPending ? "Đang tạo..." : "Tạo món"}
       </button>
     </form>
   );
@@ -238,12 +258,7 @@ function ProductCard({
     startTransition(async () => {
       try {
         logFormData("SAVE MENU FORMDATA", formData);
-        const result = await saveSimpleProductAction(slug, formData);
-        console.log("SAVE MENU RESPONSE", result);
-        if (!result?.ok) {
-          onToast({ type: "error", message: resultErrorMessage(result, "Không thể lưu món.") });
-          return;
-        }
+        const result = await saveProductRequest(slug, formData, "update");
 
         const nextProduct = normalizeProduct(result.product);
         if (!nextProduct) {
@@ -350,7 +365,7 @@ function ProductCard({
           </div>
           <div className="flex flex-wrap gap-2">
             <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" type="submit" disabled={isPending}>
-              {isPending ? "Đang lưu..." : "Lưu món"}
+              {isPending ? "Đang lưu..." : "Lưu thay đổi"}
             </button>
             <button className="rounded-md border px-4 py-2 text-sm font-semibold" type="button" onClick={() => updateFlag({ isSoldOut: !product.isSoldOut })} disabled={isPending}>
               {product.isSoldOut ? "Đánh dấu còn món" : "Đánh dấu hết món"}
