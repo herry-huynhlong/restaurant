@@ -33,7 +33,7 @@ export async function startCustomerSessionAction(slug: string, formData: FormDat
     subscriptionStatus: restaurant.subscriptionStatus,
     subscriptionEnd: restaurant.subscriptionEnd
   })) {
-    redirect(`${restaurantRoutes.welcome(slug)}?t=${encodeURIComponent(parsed.data.qrToken)}&error=${encodeURIComponent("Nhà hàng hiện chưa nhận đơn.")}`);
+    redirect(`${restaurantRoutes.welcome(slug)}?t=${encodeURIComponent(parsed.data.qrToken)}&error=${encodeURIComponent("Nhà hàng hiện tạm ngừng hoạt động.")}`);
   }
 
   const table = await prisma.restaurantTable.findFirst({

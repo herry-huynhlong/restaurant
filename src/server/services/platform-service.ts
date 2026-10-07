@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
 
 export async function getPlatformOverview() {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const inThirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   const [
@@ -12,9 +11,7 @@ export async function getPlatformOverview() {
     inactiveRestaurants,
     suspendedRestaurants,
     expiredRestaurants,
-    totalOrdersToday,
     newRestaurantsThisMonth,
-    totalOrders,
     restaurants,
     expiringSoon,
     expired
@@ -25,9 +22,7 @@ export async function getPlatformOverview() {
       prisma.restaurant.count({ where: { status: "INACTIVE" } }),
       prisma.restaurant.count({ where: { status: "SUSPENDED" } }),
       prisma.restaurant.count({ where: { subscriptionStatus: "EXPIRED" } }),
-      prisma.order.count({ where: { createdAt: { gte: startOfToday } } }),
       prisma.restaurant.count({ where: { createdAt: { gte: startOfMonth } } }),
-      prisma.order.count(),
       prisma.restaurant.findMany({
         take: 8,
         orderBy: { createdAt: "desc" },
@@ -35,8 +30,7 @@ export async function getPlatformOverview() {
           _count: {
             select: {
               tables: true,
-              users: true,
-              orders: true
+              users: true
             }
           }
         }
@@ -66,9 +60,7 @@ export async function getPlatformOverview() {
     inactiveRestaurants,
     suspendedRestaurants,
     expiredRestaurants,
-    totalOrdersToday,
     newRestaurantsThisMonth,
-    totalOrders,
     restaurants,
     expiringSoon,
     expired
@@ -87,8 +79,7 @@ export async function getPlatformRestaurants() {
       _count: {
         select: {
           tables: true,
-          users: true,
-          orders: true
+          users: true
         }
       }
     }

@@ -32,10 +32,13 @@ async function requireMenuAccess(slug: string) {
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug },
-    select: { id: true, slug: true }
+    select: { id: true, slug: true, status: true }
   });
   if (!restaurant) {
     return { error: NextResponse.json({ ok: false, code: "TENANT_NOT_FOUND", error: "Không tìm thấy nhà hàng." }, { status: 404 }) };
+  }
+  if (restaurant.status !== "ACTIVE") {
+    return { error: NextResponse.json({ ok: false, code: "TENANT_LOCKED", error: "Nhà hàng hiện đang bị khóa." }, { status: 403 }) };
   }
 
   const membership = await prisma.restaurantUser.findUnique({

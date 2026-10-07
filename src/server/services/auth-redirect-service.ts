@@ -10,7 +10,7 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
     where: { userId, isActive: true },
     include: {
       restaurant: {
-        select: { slug: true }
+        select: { slug: true, status: true }
       }
     },
     orderBy: { createdAt: "asc" }
@@ -21,6 +21,10 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
   }
 
   const membership = memberships[0];
+  if (membership.restaurant.status !== "ACTIVE") {
+    return restaurantRoutes.locked(membership.restaurant.slug);
+  }
+
   const slug = membership.restaurant.slug;
 
   switch (membership.role) {

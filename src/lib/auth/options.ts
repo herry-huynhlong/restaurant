@@ -38,7 +38,7 @@ export const authOptions: NextAuthOptions = {
               where: {
                 username: parsed.data.username.trim().toLowerCase(),
                 isActive: true,
-                restaurant: { slug: parsed.data.restaurantSlug },
+                restaurant: { slug: parsed.data.restaurantSlug, status: "ACTIVE" },
                 user: { isActive: true }
               },
               select: {

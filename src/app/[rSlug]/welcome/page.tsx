@@ -54,7 +54,7 @@ export default async function WelcomePage({
 function BlockedMessage() {
   return (
     <section className="rounded-lg border bg-white p-5 text-center shadow-sm">
-      <h2 className="text-lg font-semibold">Nhà hàng hiện chưa nhận đơn</h2>
+      <h2 className="text-lg font-semibold">Nhà hàng hiện tạm ngừng hoạt động.</h2>
       <p className="mt-2 text-sm text-slate-600">Vui lòng liên hệ nhân viên để được hỗ trợ.</p>
     </section>
   );

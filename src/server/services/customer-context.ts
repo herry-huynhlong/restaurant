@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { CUSTOMER_SESSION_COOKIE, verifyCustomerSessionValue } from "@/lib/customer-session";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
+import { canRestaurantOperate } from "@/lib/tenant/restaurant";
 
 export async function getCustomerContext(request: NextRequest, slug: string) {
   const session = verifyCustomerSessionValue(request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value);
@@ -21,6 +22,14 @@ export async function getCustomerContext(request: NextRequest, slug: string) {
   });
 
   if (!diningSession || !diningSession.table.isActive || diningSession.table.qrToken !== session.qrToken) {
+    return null;
+  }
+
+  if (!canRestaurantOperate({
+    restaurantStatus: diningSession.restaurant.status,
+    subscriptionStatus: diningSession.restaurant.subscriptionStatus,
+    subscriptionEnd: diningSession.restaurant.subscriptionEnd
+  })) {
     return null;
   }
 

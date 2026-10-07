@@ -1,21 +1,21 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
-import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { PlatformRestaurantActions } from "@/components/platform/restaurant-row-actions";
 import { StatCard } from "@/components/ui/stat-card";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
+import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
 import { getPlatformRestaurantDetail } from "@/server/services/platform-service";
-import {
-  extendSubscriptionAction,
-  resetOwnerPasswordAction,
-  setRestaurantStatusAction
-} from "@/app/platform/restaurants/actions";
+import { extendSubscriptionAction } from "@/app/platform/restaurants/actions";
 
 export default async function RestaurantDetailPage({
-  params
+  params,
+  searchParams
 }: {
   params: { restaurantId: string };
+  searchParams?: { error?: string; success?: string };
 }) {
   await requirePlatformAdmin();
   const restaurant = await getPlatformRestaurantDetail(params.restaurantId);
@@ -24,43 +24,31 @@ export default async function RestaurantDetailPage({
     notFound();
   }
 
-  const revenue = restaurant.payments.reduce((sum, payment) => sum + payment.amount, 0);
-
   return (
     <PlatformShell
       title={restaurant.name}
       action={<Link className="rounded-md border px-4 py-2 text-sm font-semibold" href={platformRoutes.restaurantEdit(restaurant.id)}>Chỉnh sửa</Link>}
     >
+      <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
       <section className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Status" value={restaurant.status} />
-        <StatCard label="Plan" value={restaurant.plan} />
+        <StatCard label="Trạng thái" value={restaurantStatusLabel(restaurant.status)} />
+        <StatCard label="Gói" value={restaurant.plan} />
+        <StatCard label="Subscription" value={subscriptionStatusLabel(restaurant.subscriptionStatus)} />
         <StatCard label="Hết hạn" value={formatDate(restaurant.subscriptionEnd)} />
-        <StatCard label="Doanh thu gần đây" value={`${revenue.toLocaleString("vi-VN")}đ`} />
         <StatCard label="Tổng bàn" value={restaurant._count.tables} />
         <StatCard label="Tổng nhân viên" value={restaurant._count.users} />
-        <StatCard label="Tổng order" value={restaurant._count.orders} />
-        <StatCard label="Payments" value={restaurant._count.payments} />
       </section>
 
       <section className="mb-5 rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="text-base font-semibold">Thao tác</h2>
         <div className="mt-3 flex flex-wrap gap-2">
-          <form action={setRestaurantStatusAction}>
-            <input name="restaurantId" type="hidden" value={restaurant.id} />
-            <input name="status" type="hidden" value="ACTIVE" />
-            <button className="rounded-md border px-3 py-2 text-sm" type="submit">Kích hoạt</button>
-          </form>
-          <form action={setRestaurantStatusAction}>
-            <input name="restaurantId" type="hidden" value={restaurant.id} />
-            <input name="status" type="hidden" value="SUSPENDED" />
-            <ConfirmSubmitButton
-              className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700"
-              message={`Bạn có chắc muốn tạm khóa ${restaurant.name}?`}
-              description="Khách sẽ không thể gọi món và nhân viên sẽ không thể vận hành đơn hàng."
-            >
-              Tạm khóa
-            </ConfirmSubmitButton>
-          </form>
+          <PlatformRestaurantActions
+            restaurantId={restaurant.id}
+            restaurantName={restaurant.name}
+            status={restaurant.status}
+            plan={restaurant.plan}
+            returnTo={platformRoutes.restaurantDetail(restaurant.id)}
+          />
           <form className="flex flex-wrap gap-2" action={extendSubscriptionAction}>
             <input name="restaurantId" type="hidden" value={restaurant.id} />
             <input className="rounded-md border px-3 py-2 text-sm" name="subscriptionEnd" type="date" />
@@ -70,10 +58,6 @@ export default async function RestaurantDetailPage({
               <option value="PRO">PRO</option>
             </select>
             <button className="rounded-md border px-3 py-2 text-sm" type="submit">Gia hạn</button>
-          </form>
-          <form action={resetOwnerPasswordAction}>
-            <input name="restaurantId" type="hidden" value={restaurant.id} />
-            <button className="rounded-md border px-3 py-2 text-sm" type="submit">Reset mật khẩu owner</button>
           </form>
         </div>
       </section>
@@ -92,9 +76,6 @@ export default async function RestaurantDetailPage({
         </Panel>
         <Panel title="Bàn">
           {restaurant.tables.length ? restaurant.tables.map((table) => <Info key={table.id} label={table.name} value={`${table.area.name} · ${table.status}`} />) : <Empty />}
-        </Panel>
-        <Panel title="Orders">
-          {restaurant.orders.length ? restaurant.orders.map((order) => <Info key={order.id} label={`#${order.orderNumber}`} value={`${order.table.name} · ${order.status} · ${order.subtotal.toLocaleString("vi-VN")}đ`} />) : <Empty />}
         </Panel>
         <Panel title="Audit logs">
           {restaurant.auditLogs.length ? restaurant.auditLogs.map((log) => <Info key={log.id} label={log.action} value={`${log.user?.email ?? "system"} · ${formatDateTime(log.createdAt)}`} />) : <Empty />}

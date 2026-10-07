@@ -16,6 +16,14 @@ const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 const planSchema = z.enum(["FREE", "BASIC", "PRO"]);
 const subscriptionStatusSchema = z.enum(["ACTIVE", "EXPIRED", "SUSPENDED"]);
 const languageSchema = z.enum(["vi", "en"]);
+const resetAdminPasswordSchema = z.object({
+  restaurantId: z.string().min(1),
+  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự."),
+  confirmPassword: z.string().min(1, "Vui lòng nhập xác nhận mật khẩu.")
+}).refine((value) => value.password === value.confirmPassword, {
+  message: "Xác nhận mật khẩu không khớp.",
+  path: ["confirmPassword"]
+});
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
@@ -123,6 +131,15 @@ const updateRestaurantSchema = createRestaurantSchema
 
 function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
+}
+
+function redirectWithSuccess(path: string, message: string): never {
+  redirect(`${path}?success=${encodeURIComponent(message)}`);
+}
+
+function readPlatformReturnPath(formData: FormData) {
+  const returnTo = readString(formData, "returnTo");
+  return returnTo.startsWith("/platform") ? returnTo : platformRoutes.restaurants;
 }
 
 function validationMessage(error: z.ZodError) {
@@ -465,6 +482,7 @@ export async function setRestaurantStatusAction(formData: FormData) {
   const restaurantId = readString(formData, "restaurantId");
   const status = statusSchema.parse(readString(formData, "status"));
   const action = status === "ACTIVE" ? "RESTAURANT_ACTIVATED" : "RESTAURANT_SUSPENDED";
+  const returnTo = readPlatformReturnPath(formData);
 
   await prisma.$transaction([
     prisma.restaurant.update({ where: { id: restaurantId }, data: { status } }),
@@ -481,6 +499,8 @@ export async function setRestaurantStatusAction(formData: FormData) {
   ]);
 
   revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.restaurantDetail(restaurantId));
+  redirectWithSuccess(returnTo, status === "ACTIVE" ? "Đã mở lại nhà hàng." : "Đã khóa nhà hàng.");
 }
 
 export async function extendSubscriptionAction(formData: FormData) {
@@ -517,6 +537,7 @@ export async function changePlanAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
   const restaurantId = readString(formData, "restaurantId");
   const plan = planSchema.parse(readString(formData, "plan"));
+  const returnTo = readPlatformReturnPath(formData);
 
   await prisma.$transaction([
     prisma.restaurant.update({ where: { id: restaurantId }, data: { plan } }),
@@ -533,36 +554,50 @@ export async function changePlanAction(formData: FormData) {
   ]);
 
   revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.restaurantDetail(restaurantId));
+  redirectWithSuccess(returnTo, "Đã đổi gói nhà hàng.");
 }
 
 export async function resetOwnerPasswordAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
-  const restaurantId = readString(formData, "restaurantId");
-  const password = readString(formData, "password") || "Password123!";
-  const passwordHash = await bcrypt.hash(password, 12);
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = resetAdminPasswordSchema.safeParse({
+    restaurantId: readString(formData, "restaurantId"),
+    password: readString(formData, "password"),
+    confirmPassword: readString(formData, "confirmPassword")
+  });
+
+  if (!parsed.success) {
+    redirectWithError(returnTo, validationMessage(parsed.error));
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
   const owner = await prisma.restaurantUser.findFirst({
-    where: { restaurantId, role: "OWNER", isActive: true },
+    where: { restaurantId: parsed.data.restaurantId, role: "OWNER", isActive: true },
+    orderBy: { createdAt: "asc" },
     select: { userId: true }
   });
 
   if (!owner) {
-    return;
+    redirectWithError(returnTo, "Không tìm thấy tài khoản admin của nhà hàng.");
   }
 
   await prisma.$transaction([
     prisma.user.update({ where: { id: owner.userId }, data: { passwordHash } }),
     prisma.auditLog.create({
       data: {
-        restaurantId,
+        restaurantId: parsed.data.restaurantId,
         userId: actor.id,
-        action: "OWNER_PASSWORD_RESET",
+        action: "ADMIN_PASSWORD_RESET",
         entityType: "User",
         entityId: owner.userId,
-        metadataJson: { resetToDemoPassword: password === "Password123!" }
+        metadataJson: { role: "OWNER" }
       }
     })
   ]);
 
-  revalidatePath(platformRoutes.restaurantDetail(restaurantId));
+  revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.restaurantDetail(parsed.data.restaurantId));
+  redirectWithSuccess(returnTo, "Đã reset mật khẩu admin.");
 }

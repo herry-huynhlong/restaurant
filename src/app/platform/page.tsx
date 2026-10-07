@@ -20,13 +20,10 @@ export default async function PlatformPage() {
     >
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Tổng nhà hàng" value={overview.totalRestaurants} />
-        <StatCard label="Active" value={overview.activeRestaurants} />
-        <StatCard label="Inactive" value={overview.inactiveRestaurants} />
-        <StatCard label="Suspended" value={overview.suspendedRestaurants} />
-        <StatCard label="Expired" value={overview.expiredRestaurants} />
-        <StatCard label="Order hôm nay" value={overview.totalOrdersToday} />
+        <StatCard label="Đang hoạt động" value={overview.activeRestaurants} />
+        <StatCard label="Đã khóa" value={overview.suspendedRestaurants} />
+        <StatCard label="Hết hạn" value={overview.expiredRestaurants} />
         <StatCard label="Nhà hàng mới tháng này" value={overview.newRestaurantsThisMonth} />
-        <StatCard label="Tổng order" value={overview.totalOrders} />
       </section>
 
       <section className="mt-6 grid gap-4 lg:grid-cols-3">

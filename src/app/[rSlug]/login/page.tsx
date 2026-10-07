@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 export default async function RestaurantLoginPage({ params }: { params: { rSlug: string } }) {
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug: params.rSlug },
-    select: { name: true, slug: true }
+    select: { name: true, slug: true, status: true }
   });
 
   if (!restaurant) {
@@ -20,7 +20,13 @@ export default async function RestaurantLoginPage({ params }: { params: { rSlug:
           <h1 className="mt-2 text-2xl font-semibold tracking-normal">Đăng nhập nhân viên</h1>
           <p className="mt-2 text-sm text-slate-600">Dùng tên đăng nhập do chủ quán hoặc quản lý tạo.</p>
         </div>
-        <RestaurantLoginForm slug={restaurant.slug} />
+        {restaurant.status === "ACTIVE" ? (
+          <RestaurantLoginForm slug={restaurant.slug} />
+        ) : (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Nhà hàng hiện đang bị khóa. Vui lòng liên hệ quản trị hệ thống.
+          </div>
+        )}
       </section>
     </main>
   );

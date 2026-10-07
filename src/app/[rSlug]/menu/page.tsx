@@ -1,6 +1,6 @@
 import { CustomerShell } from "@/components/app-shell/customer-shell";
 import { CustomerMenuClient } from "@/components/customer/customer-menu-client";
-import { getRestaurantBySlug } from "@/lib/tenant/restaurant";
+import { canRestaurantOperate, getRestaurantBySlug } from "@/lib/tenant/restaurant";
 import { prisma } from "@/lib/db/prisma";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getCustomerSessionCookie } from "@/lib/customer-session";
@@ -17,6 +17,14 @@ const menuTypeLabels: Record<string, string> = {
 export default async function CustomerMenuPage({ params }: { params: { rSlug: string } }) {
   const restaurant = await getRestaurantBySlug(params.rSlug);
   const customerSession = getCustomerSessionCookie();
+
+  if (!canRestaurantOperate({
+    restaurantStatus: restaurant.status,
+    subscriptionStatus: restaurant.subscriptionStatus,
+    subscriptionEnd: restaurant.subscriptionEnd
+  })) {
+    redirect(`${restaurantRoutes.welcome(restaurant.slug)}?error=${encodeURIComponent("Nhà hàng hiện tạm ngừng hoạt động.")}`);
+  }
 
   if (!customerSession || customerSession.restaurantId !== restaurant.id || customerSession.restaurantSlug !== restaurant.slug) {
     redirect(restaurantRoutes.welcome(restaurant.slug));

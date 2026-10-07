@@ -4,6 +4,7 @@ import type { RestaurantRole } from "@prisma/client";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
 import { hasAnyRestaurantRole } from "@/lib/rbac/roles";
+import { restaurantRoutes } from "@/lib/routes";
 
 export async function requireAuthenticatedUser() {
   const session = await getServerSession(authOptions);
@@ -41,6 +42,10 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
 
   if (!restaurant) {
     notFound();
+  }
+
+  if (restaurant.status !== "ACTIVE") {
+    redirect(restaurantRoutes.locked(restaurant.slug));
   }
 
   const membership = await prisma.restaurantUser.findUnique({
