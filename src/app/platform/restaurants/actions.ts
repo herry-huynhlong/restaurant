@@ -1,6 +1,10 @@
 "use server";
 
+import crypto from "node:crypto";
+import path from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -28,25 +32,49 @@ function parseOptionalDate(value: FormDataEntryValue | null) {
     return null;
   }
 
-  return new Date(String(value));
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function readString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
+function optionalString(formData: FormData, key: string) {
+  return readString(formData, key) || undefined;
+}
+
+async function saveUploadedImage(formData: FormData, key: string, folder: "logos") {
+  const file = formData.get(key);
+  if (!(file instanceof File) || file.size === 0) {
+    return undefined;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("INVALID_IMAGE_TYPE");
+  }
+
+  const extension = path.extname(file.name).toLowerCase() || ".jpg";
+  const safeExtension = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(extension) ? extension : ".jpg";
+  const fileName = `${crypto.randomUUID()}${safeExtension}`;
+  const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
+  return `/uploads/${folder}/${fileName}`;
+}
+
 const createRestaurantSchema = z.object({
-  name: z.string().min(1),
-  slug: z.string().min(1),
+  name: z.string().min(1, "Tên nhà hàng là bắt buộc."),
+  slug: z.string().min(1, "Slug là bắt buộc.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ được chứa chữ thường, số và dấu gạch ngang."),
   logoUrl: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
-  timezone: z.string().min(1),
+  timezone: z.string().min(1, "Timezone là bắt buộc."),
   primaryLanguage: languageSchema,
-  currency: z.string().min(1),
-  ownerName: z.string().min(1),
-  ownerEmail: z.string().email(),
-  ownerPassword: z.string().min(8),
+  currency: z.string().min(1, "Currency là bắt buộc."),
+  ownerName: z.string().min(1, "Tên chủ quán là bắt buộc."),
+  ownerEmail: z.string().email("Email owner không hợp lệ.").transform((value) => value.toLowerCase()),
+  ownerPassword: z.string().min(8, "Password phải có ít nhất 8 ký tự."),
   ownerPhone: z.string().optional(),
   plan: planSchema,
   subscriptionStatus: subscriptionStatusSchema,
@@ -68,33 +96,55 @@ function redirectWithError(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
 }
 
+function validationMessage(error: z.ZodError) {
+  const fieldErrors = error.flatten().fieldErrors;
+  return Object.values(fieldErrors).flat().filter(Boolean).join(" ") || "Dữ liệu không hợp lệ.";
+}
+
+function validateSubscriptionDates(start: Date | null, end: Date | null) {
+  if (start && end && end <= start) {
+    return "Ngày hết hạn phải sau ngày bắt đầu.";
+  }
+  return null;
+}
+
 export async function createRestaurantAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
   const normalizedSlug = slugify(readString(formData, "slug") || readString(formData, "name"));
+  let uploadedLogoUrl: string | undefined;
+  try {
+    uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
+  } catch {
+    redirectWithError(platformRoutes.newRestaurant, "Logo phải là file ảnh hợp lệ.");
+  }
+  const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = createRestaurantSchema.safeParse({
     name: readString(formData, "name"),
     slug: normalizedSlug,
-    logoUrl: readString(formData, "logoUrl"),
-    phone: readString(formData, "phone"),
-    address: readString(formData, "address"),
+    logoUrl,
+    phone: optionalString(formData, "phone"),
+    address: optionalString(formData, "address"),
     timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
     primaryLanguage: readString(formData, "primaryLanguage") || "vi",
     currency: readString(formData, "currency") || "VND",
     ownerName: readString(formData, "ownerName"),
     ownerEmail: readString(formData, "ownerEmail"),
     ownerPassword: readString(formData, "ownerPassword"),
-    ownerPhone: readString(formData, "ownerPhone"),
+    ownerPhone: optionalString(formData, "ownerPhone"),
     plan: readString(formData, "plan") || "FREE",
     subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
     status: readString(formData, "status") || "INACTIVE"
   });
 
   if (!parsed.success) {
-    redirectWithError(platformRoutes.newRestaurant, "Dữ liệu tạo nhà hàng không hợp lệ.");
+    redirectWithError(platformRoutes.newRestaurant, validationMessage(parsed.error));
   }
 
   const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart"));
   const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
+  const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
+  if (dateError) redirectWithError(platformRoutes.newRestaurant, dateError);
+
   const passwordHash = await bcrypt.hash(parsed.data.ownerPassword, 12);
 
   let createdRestaurantId: string;
@@ -105,7 +155,7 @@ export async function createRestaurantAction(formData: FormData) {
         data: {
           name: parsed.data.name,
           slug: parsed.data.slug,
-          logoUrl: parsed.data.logoUrl || null,
+          logoUrl: parsed.data.logoUrl ?? null,
           status: parsed.data.status,
           plan: parsed.data.plan,
           subscriptionStatus: parsed.data.subscriptionStatus,
@@ -114,11 +164,16 @@ export async function createRestaurantAction(formData: FormData) {
         }
       });
 
-      const owner = await tx.user.create({
-        data: {
+      const owner = await tx.user.upsert({
+        where: { email: parsed.data.ownerEmail },
+        update: {
+          name: parsed.data.ownerName,
+          phone: parsed.data.ownerPhone ?? null
+        },
+        create: {
           name: parsed.data.ownerName,
           email: parsed.data.ownerEmail,
-          phone: parsed.data.ownerPhone || null,
+          phone: parsed.data.ownerPhone ?? null,
           passwordHash
         }
       });
@@ -135,9 +190,9 @@ export async function createRestaurantAction(formData: FormData) {
         data: {
           restaurantId: createdRestaurant.id,
           restaurantName: parsed.data.name,
-          logoUrl: parsed.data.logoUrl || null,
-          phone: parsed.data.phone || null,
-          address: parsed.data.address || null,
+          logoUrl: parsed.data.logoUrl ?? null,
+          phone: parsed.data.phone ?? null,
+          address: parsed.data.address ?? null,
           timezone: parsed.data.timezone,
           primaryLanguage: parsed.data.primaryLanguage,
           currency: parsed.data.currency
@@ -177,8 +232,9 @@ export async function createRestaurantAction(formData: FormData) {
 
     createdRestaurantId = restaurant.id;
   } catch (error) {
-    const message = error instanceof Error && error.message.includes("Unique constraint")
-      ? "Slug hoặc email owner đã tồn tại."
+    console.error("CREATE RESTAURANT DATABASE ERROR", error);
+    const message = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
+      ? "Slug đã tồn tại hoặc email owner đã là owner của nhà hàng này."
       : "Không thể tạo nhà hàng. Vui lòng kiểm tra dữ liệu.";
     redirectWithError(platformRoutes.newRestaurant, message);
   }
@@ -190,13 +246,20 @@ export async function createRestaurantAction(formData: FormData) {
 export async function updateRestaurantAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
   const restaurantId = readString(formData, "restaurantId");
+  let uploadedLogoUrl: string | undefined;
+  try {
+    uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
+  } catch {
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo phải là file ảnh hợp lệ.");
+  }
+  const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = updateRestaurantSchema.safeParse({
     restaurantId,
     name: readString(formData, "name"),
     slug: slugify(readString(formData, "slug")),
-    logoUrl: readString(formData, "logoUrl"),
-    phone: readString(formData, "phone"),
-    address: readString(formData, "address"),
+    logoUrl,
+    phone: optionalString(formData, "phone"),
+    address: optionalString(formData, "address"),
     timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
     primaryLanguage: readString(formData, "primaryLanguage") || "vi",
     currency: readString(formData, "currency") || "VND",
@@ -206,11 +269,13 @@ export async function updateRestaurantAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Dữ liệu cập nhật không hợp lệ.");
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), validationMessage(parsed.error));
   }
 
   const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart"));
   const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
+  const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
+  if (dateError) redirectWithError(platformRoutes.restaurantEdit(restaurantId), dateError);
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -219,7 +284,7 @@ export async function updateRestaurantAction(formData: FormData) {
         data: {
           name: parsed.data.name,
           slug: parsed.data.slug,
-          logoUrl: parsed.data.logoUrl || null,
+          logoUrl: parsed.data.logoUrl ?? null,
           status: parsed.data.status,
           plan: parsed.data.plan,
           subscriptionStatus: parsed.data.subscriptionStatus,
@@ -232,9 +297,9 @@ export async function updateRestaurantAction(formData: FormData) {
         where: { restaurantId: parsed.data.restaurantId },
         update: {
           restaurantName: parsed.data.name,
-          logoUrl: parsed.data.logoUrl || null,
-          phone: parsed.data.phone || null,
-          address: parsed.data.address || null,
+          logoUrl: parsed.data.logoUrl ?? null,
+          phone: parsed.data.phone ?? null,
+          address: parsed.data.address ?? null,
           timezone: parsed.data.timezone,
           primaryLanguage: parsed.data.primaryLanguage,
           currency: parsed.data.currency
@@ -242,9 +307,9 @@ export async function updateRestaurantAction(formData: FormData) {
         create: {
           restaurantId: parsed.data.restaurantId,
           restaurantName: parsed.data.name,
-          logoUrl: parsed.data.logoUrl || null,
-          phone: parsed.data.phone || null,
-          address: parsed.data.address || null,
+          logoUrl: parsed.data.logoUrl ?? null,
+          phone: parsed.data.phone ?? null,
+          address: parsed.data.address ?? null,
           timezone: parsed.data.timezone,
           primaryLanguage: parsed.data.primaryLanguage,
           currency: parsed.data.currency
@@ -262,8 +327,12 @@ export async function updateRestaurantAction(formData: FormData) {
         }
       });
     });
-  } catch {
-    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Slug đã tồn tại hoặc dữ liệu không hợp lệ.");
+  } catch (error) {
+    console.error("UPDATE RESTAURANT DATABASE ERROR", error);
+    const message = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
+      ? "Slug đã tồn tại."
+      : "Không thể cập nhật nhà hàng. Vui lòng kiểm tra dữ liệu.";
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), message);
   }
 
   revalidatePath(platformRoutes.restaurants);

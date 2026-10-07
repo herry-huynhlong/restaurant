@@ -22,14 +22,15 @@ export default async function EditRestaurantPage({
   return (
     <PlatformShell title={`Chỉnh sửa ${restaurant.name}`}>
       {searchParams?.error ? <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{searchParams.error}</p> : null}
-      <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={updateRestaurantAction}>
+      <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={updateRestaurantAction} encType="multipart/form-data">
         <input name="restaurantId" type="hidden" value={restaurant.id} />
+        <input name="existingLogoUrl" type="hidden" value={restaurant.logoUrl ?? ""} />
         <section>
           <h2 className="text-base font-semibold">Thông tin nhà hàng</h2>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <TextField label="Tên nhà hàng *" name="name" defaultValue={restaurant.name} required />
             <TextField label="Slug *" name="slug" defaultValue={restaurant.slug} required />
-            <TextField label="Logo URL" name="logoUrl" defaultValue={restaurant.logoUrl} />
+            <LogoUploadField currentLogoUrl={restaurant.logoUrl} />
             <TextField label="Số điện thoại" name="phone" defaultValue={restaurant.settings?.phone} />
             <TextField label="Địa chỉ" name="address" defaultValue={restaurant.settings?.address} />
             <TextField label="Timezone" name="timezone" defaultValue={restaurant.settings?.timezone ?? "Asia/Ho_Chi_Minh"} required />
@@ -55,4 +56,25 @@ export default async function EditRestaurantPage({
 
 function toDateInput(date: Date | null) {
   return date ? date.toISOString().slice(0, 10) : "";
+}
+
+function LogoUploadField({ currentLogoUrl }: { currentLogoUrl: string | null }) {
+  return (
+    <label className="block text-sm font-medium">
+      Logo nhà hàng
+      <input
+        className="mt-1 h-10 w-full rounded-md border px-3 py-2 outline-none focus:border-teal-600"
+        name="logoFile"
+        type="file"
+        accept="image/*"
+      />
+      {currentLogoUrl ? (
+        <span className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img alt="Logo hiện tại" className="h-8 w-8 rounded border object-cover" src={currentLogoUrl} />
+          Đang dùng logo hiện tại. Tải ảnh mới để thay đổi.
+        </span>
+      ) : null}
+    </label>
+  );
 }

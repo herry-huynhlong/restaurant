@@ -13,11 +13,11 @@ export default async function NewRestaurantPage({
   return (
     <PlatformShell title="Thêm nhà hàng">
       {searchParams?.error ? <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{searchParams.error}</p> : null}
-      <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={createRestaurantAction}>
+      <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={createRestaurantAction} encType="multipart/form-data">
         <FormSection title="Thông tin nhà hàng">
           <TextField label="Tên nhà hàng *" name="name" required />
           <TextField label="Slug *" name="slug" required />
-          <TextField label="Logo URL" name="logoUrl" />
+          <LogoUploadField />
           <TextField label="Số điện thoại" name="phone" />
           <TextField label="Địa chỉ" name="address" />
           <TextField label="Timezone" name="timezone" defaultValue="Asia/Ho_Chi_Minh" required />
@@ -54,5 +54,19 @@ function FormSection({ title, children }: { title: string; children: React.React
       <h2 className="text-base font-semibold">{title}</h2>
       <div className="mt-3 grid gap-4 md:grid-cols-2">{children}</div>
     </section>
+  );
+}
+
+function LogoUploadField() {
+  return (
+    <label className="block text-sm font-medium">
+      Logo nhà hàng
+      <input
+        className="mt-1 h-10 w-full rounded-md border px-3 py-2 outline-none focus:border-teal-600"
+        name="logoFile"
+        type="file"
+        accept="image/*"
+      />
+    </label>
   );
 }
