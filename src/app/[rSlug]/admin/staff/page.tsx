@@ -23,7 +23,10 @@ export default async function AdminStaffPage({
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
   const [staff, notifications] = await Promise.all([
     prisma.restaurantUser.findMany({
-      where: { restaurantId: access.restaurant.id },
+      where: {
+        restaurantId: access.restaurant.id,
+        role: { in: assignableRestaurantRoles }
+      },
       include: { user: true },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }]
     }),

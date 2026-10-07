@@ -801,10 +801,19 @@ function staffActionErrorMessage(error: unknown) {
   if (error instanceof Error && error.message === "ONLY_OWNER_CAN_MANAGE_OWNER") {
     return "Chỉ chủ quán mới được chỉnh tài khoản chủ quán.";
   }
+  if (error instanceof Error && error.message === "OWNER_NOT_STAFF") {
+    return "Không thể chỉnh sửa chủ quán từ trang nhân viên.";
+  }
   if (error instanceof z.ZodError) {
     return error.issues[0]?.message ?? "Dữ liệu nhân viên không hợp lệ.";
   }
   return "Không lưu được nhân viên.";
+}
+
+function rethrowNextRedirect(error: unknown) {
+  if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
+    throw error;
+  }
 }
 
 export async function createStaffAction(slug: string, formData: FormData) {
@@ -863,6 +872,7 @@ export async function createStaffAction(slug: string, formData: FormData) {
     revalidatePath(path);
     redirectWithMessage(path, "success", `Đã tạo nhân viên ${staff.name}.`);
   } catch (error) {
+    rethrowNextRedirect(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
@@ -880,8 +890,17 @@ export async function updateStaffAction(slug: string, formData: FormData) {
       role: readString(formData, "role"),
       isActive: readBoolean(formData, "isActive")
     });
+    console.log("UPDATE STAFF PAYLOAD", {
+      membershipId: parsed.membershipId,
+      name: parsed.name,
+      username: parsed.username,
+      hasPhone: Boolean(parsed.phone),
+      role: parsed.role,
+      isActive: parsed.isActive
+    });
     const membership = await getManagedStaffMembership(access.restaurant.id, parsed.membershipId);
     if (!membership) throw new Error("STAFF_NOT_FOUND");
+    if (membership.role === "OWNER") throw new Error("OWNER_NOT_STAFF");
     ensureCanMutateStaff(access, membership, parsed.role, parsed.isActive);
 
     await prisma.$transaction([
@@ -915,6 +934,8 @@ export async function updateStaffAction(slug: string, formData: FormData) {
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã lưu nhân viên.");
   } catch (error) {
+    rethrowNextRedirect(error);
+    console.error("UPDATE STAFF ERROR", error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
@@ -930,6 +951,7 @@ export async function resetStaffPasswordAction(slug: string, formData: FormData)
     });
     const membership = await getManagedStaffMembership(access.restaurant.id, parsed.membershipId);
     if (!membership) throw new Error("STAFF_NOT_FOUND");
+    if (membership.role === "OWNER") throw new Error("OWNER_NOT_STAFF");
     ensureCanMutateStaff(access, membership);
 
     const passwordHash = await bcrypt.hash(parsed.password, 12);
@@ -957,6 +979,7 @@ export async function resetStaffPasswordAction(slug: string, formData: FormData)
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã đổi mật khẩu nhân viên.");
   } catch (error) {
+    rethrowNextRedirect(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
@@ -970,6 +993,7 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
     const isActive = readBoolean(formData, "isActive");
     const membership = await getManagedStaffMembership(access.restaurant.id, membershipId);
     if (!membership) throw new Error("STAFF_NOT_FOUND");
+    if (membership.role === "OWNER") throw new Error("OWNER_NOT_STAFF");
     ensureCanMutateStaff(access, membership, undefined, isActive);
 
     await prisma.$transaction([
@@ -992,6 +1016,7 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
     revalidatePath(path);
     redirectWithMessage(path, "success", isActive ? "Đã kích hoạt nhân viên." : "Đã ngừng sử dụng nhân viên.");
   } catch (error) {
+    rethrowNextRedirect(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
