@@ -34,6 +34,8 @@ const menuTypeOptions: Array<[SimpleMenuType, string]> = [
   ["EXTRA", "Món thêm"],
   ["DRINK", "Nước"]
 ];
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function isMenuType(value: unknown): value is SimpleMenuType {
   return value === "MAIN" || value === "EXTRA" || value === "DRINK";
@@ -94,6 +96,9 @@ async function saveProductRequest(slug: string, formData: FormData, mode: "creat
   });
 
   if (!response.ok) {
+    if (response.status === 413) {
+      throw new Error("Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB.");
+    }
     throw new Error(resultErrorMessage(data, `Request failed (${response.status})`));
   }
 
@@ -224,6 +229,7 @@ function NewProductCard({
         price={price}
         onImagePreview={setPreviewUrl}
         onPriceChange={setPrice}
+        onToast={onToast}
       />
       <button className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" type="submit" disabled={isPending}>
         {isPending ? "Đang tạo..." : "Tạo món"}
@@ -341,7 +347,7 @@ function ProductCard({
       <form action={submit} className="grid gap-4 md:grid-cols-[128px_1fr]">
         <input name="productId" type="hidden" value={product.id} />
         <input name="existingImageUrl" type="hidden" value={product.imageUrl ?? ""} />
-        <ProductImagePicker previewUrl={previewUrl} onImagePreview={setPreviewUrl} />
+        <ProductImagePicker previewUrl={previewUrl} onImagePreview={setPreviewUrl} onToast={onToast} />
         <div className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -384,16 +390,18 @@ function ProductFields({
   previewUrl,
   price,
   onImagePreview,
-  onPriceChange
+  onPriceChange,
+  onToast
 }: {
   previewUrl: string | null;
   price: string;
   onImagePreview: (value: string | null) => void;
   onPriceChange: (value: string) => void;
+  onToast: (toast: Toast) => void;
 }) {
   return (
     <div className="mt-3 grid gap-4 md:grid-cols-[128px_1fr]">
-      <ProductImagePicker previewUrl={previewUrl} onImagePreview={onImagePreview} />
+      <ProductImagePicker previewUrl={previewUrl} onImagePreview={onImagePreview} onToast={onToast} />
       <div className="grid gap-3 lg:grid-cols-3">
         <TextInput label="Tên món" name="nameVi" required />
         <PriceInput value={price} onChange={onPriceChange} />
@@ -411,7 +419,15 @@ function ProductFields({
   );
 }
 
-function ProductImagePicker({ previewUrl, onImagePreview }: { previewUrl: string | null; onImagePreview: (value: string | null) => void }) {
+function ProductImagePicker({
+  previewUrl,
+  onImagePreview,
+  onToast
+}: {
+  previewUrl: string | null;
+  onImagePreview: (value: string | null) => void;
+  onToast: (toast: Toast) => void;
+}) {
   return (
     <label className="block text-sm font-medium">
       Ảnh món
@@ -426,7 +442,33 @@ function ProductImagePicker({ previewUrl, onImagePreview }: { previewUrl: string
         accept="image/*"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
-          onImagePreview(file ? URL.createObjectURL(file) : null);
+          if (!file) {
+            onImagePreview(null);
+            return;
+          }
+
+          console.log("IMAGE SELECTED", {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            sizeMB: file.size / 1024 / 1024
+          });
+
+          if (!allowedImageTypes.includes(file.type)) {
+            event.currentTarget.value = "";
+            onImagePreview(null);
+            onToast({ type: "error", message: "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP." });
+            return;
+          }
+
+          if (file.size > MAX_IMAGE_SIZE) {
+            event.currentTarget.value = "";
+            onImagePreview(null);
+            onToast({ type: "error", message: "Ảnh phải nhỏ hơn 5MB." });
+            return;
+          }
+
+          onImagePreview(URL.createObjectURL(file));
         }}
       />
     </label>

@@ -16,6 +16,8 @@ const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 const planSchema = z.enum(["FREE", "BASIC", "PRO"]);
 const subscriptionStatusSchema = z.enum(["ACTIVE", "EXPIRED", "SUSPENDED"]);
 const languageSchema = z.enum(["vi", "en"]);
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function slugify(input: string) {
   return input
@@ -50,15 +52,15 @@ async function saveUploadedImage(formData: FormData, key: string, folder: "logos
     return undefined;
   }
 
-  if (!file.type.startsWith("image/")) {
+  if (!allowedImageTypes.includes(file.type)) {
     throw new Error("INVALID_IMAGE_TYPE");
   }
-  if (file.size > 8 * 1024 * 1024) {
+  if (file.size > MAX_IMAGE_SIZE) {
     throw new Error("INVALID_IMAGE_SIZE");
   }
 
   const extension = path.extname(file.name).toLowerCase() || ".jpg";
-  const safeExtension = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(extension) ? extension : ".jpg";
+  const safeExtension = [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
   const fileName = `${crypto.randomUUID()}${safeExtension}`;
   const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
   await mkdir(uploadDir, { recursive: true });
@@ -118,7 +120,7 @@ export async function createRestaurantAction(formData: FormData) {
   try {
     uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
   } catch {
-    redirectWithError(platformRoutes.newRestaurant, "Logo phải là file ảnh hợp lệ và tối đa 8MB.");
+    redirectWithError(platformRoutes.newRestaurant, "Logo chỉ hỗ trợ JPG, PNG, WEBP và tối đa 5MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = createRestaurantSchema.safeParse({
@@ -253,7 +255,7 @@ export async function updateRestaurantAction(formData: FormData) {
   try {
     uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
   } catch {
-    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo phải là file ảnh hợp lệ và tối đa 8MB.");
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo chỉ hỗ trợ JPG, PNG, WEBP và tối đa 5MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = updateRestaurantSchema.safeParse({

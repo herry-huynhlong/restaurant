@@ -15,6 +15,8 @@ import { parseVndInteger } from "@/lib/money";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
 const adminRoles = ["OWNER", "MANAGER"] as const;
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 function readString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -30,15 +32,15 @@ async function saveUploadedImage(formData: FormData, key: string) {
     return undefined;
   }
 
-  if (!file.type.startsWith("image/")) {
+  if (!allowedImageTypes.includes(file.type)) {
     throw new Error("INVALID_IMAGE_TYPE");
   }
-  if (file.size > 8 * 1024 * 1024) {
+  if (file.size > MAX_IMAGE_SIZE) {
     throw new Error("INVALID_IMAGE_SIZE");
   }
 
   const extension = path.extname(file.name).toLowerCase() || ".jpg";
-  const safeExtension = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(extension) ? extension : ".jpg";
+  const safeExtension = [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
   const fileName = `${crypto.randomUUID()}${safeExtension}`;
   const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
   await mkdir(uploadDir, { recursive: true });
@@ -72,10 +74,10 @@ function prismaErrorPayload(error: unknown, fallback: string) {
   }
 
   if (error instanceof Error && error.message === "INVALID_IMAGE_TYPE") {
-    return actionError("INVALID_IMAGE_TYPE", "Ảnh món phải là file ảnh hợp lệ.");
+    return actionError("INVALID_IMAGE_TYPE", "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP.");
   }
   if (error instanceof Error && error.message === "INVALID_IMAGE_SIZE") {
-    return actionError("INVALID_IMAGE_SIZE", "Ảnh món tối đa 8MB. Vui lòng chọn ảnh nhỏ hơn.");
+    return actionError("INVALID_IMAGE_SIZE", "Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB.");
   }
 
   if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {

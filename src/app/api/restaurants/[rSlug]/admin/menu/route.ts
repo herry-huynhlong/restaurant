@@ -20,6 +20,8 @@ const menuItemSchema = z.object({
   isSoldOut: z.boolean(),
   isFeatured: z.boolean()
 });
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
 async function requireMenuAccess(slug: string) {
   const session = await getServerSession(authOptions);
@@ -66,15 +68,15 @@ async function saveUploadedImage(formData: FormData) {
 
   console.log("MENU IMAGE FILE", { name: file.name, type: file.type, size: file.size });
 
-  if (!file.type.startsWith("image/")) {
-    return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_TYPE", error: "Ảnh món phải là file ảnh hợp lệ." }, { status: 400 }) };
+  if (!allowedImageTypes.includes(file.type)) {
+    return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_TYPE", error: "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP." }, { status: 400 }) };
   }
-  if (file.size > 8 * 1024 * 1024) {
-    return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_SIZE", error: "Ảnh món tối đa 8MB. Vui lòng chọn ảnh nhỏ hơn." }, { status: 413 }) };
+  if (file.size > MAX_IMAGE_SIZE) {
+    return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_SIZE", error: "Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB." }, { status: 413 }) };
   }
 
   const extension = path.extname(file.name).toLowerCase() || ".jpg";
-  const safeExtension = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(extension) ? extension : ".jpg";
+  const safeExtension = [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
   const fileName = `${Date.now()}-${crypto.randomUUID()}${safeExtension}`;
   const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
   await mkdir(uploadDir, { recursive: true });
