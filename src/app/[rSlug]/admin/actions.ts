@@ -721,7 +721,11 @@ export async function markNotificationReadAction(slug: string, formData: FormDat
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"]);
   const notificationId = readString(formData, "notificationId");
   await prisma.notification.updateMany({
-    where: { id: notificationId, restaurantId: access.restaurant.id },
+    where: {
+      id: notificationId,
+      restaurantId: access.restaurant.id,
+      OR: [{ recipientUserId: null }, { recipientUserId: access.user.id }]
+    },
     data: { isRead: true }
   });
   revalidatePath("/");
@@ -730,7 +734,11 @@ export async function markNotificationReadAction(slug: string, formData: FormDat
 export async function markAllNotificationsReadAction(slug: string) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"]);
   await prisma.notification.updateMany({
-    where: { restaurantId: access.restaurant.id, isRead: false },
+    where: {
+      restaurantId: access.restaurant.id,
+      isRead: false,
+      OR: [{ recipientUserId: null }, { recipientUserId: access.user.id }]
+    },
     data: { isRead: true }
   });
   revalidatePath("/");

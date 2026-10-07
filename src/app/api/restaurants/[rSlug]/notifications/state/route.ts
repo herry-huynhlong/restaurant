@@ -3,7 +3,7 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 
 export async function GET(_request: Request, { params }: { params: { rSlug: string } }) {
-  const access = await requireRestaurantAccess(params.rSlug);
+  const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"]);
   const where = {
     restaurantId: access.restaurant.id,
     OR: [{ recipientUserId: null }, { recipientUserId: access.user.id }]

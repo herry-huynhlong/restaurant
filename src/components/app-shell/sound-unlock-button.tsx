@@ -7,7 +7,7 @@ export function SoundUnlockButton() {
   const [enabled, setEnabled] = useState(false);
 
   function enableSound() {
-    const audio = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQoGAACAgICAgICAgICAgICAgICAgICAgICAgICAkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYqKioqKioqKioqKioqKioqKioqKioqKiampqampqampqampqampqampqampqamqurq6urq6urq6urq6urq6urq6urq6urq7CwsLCwsLCwsLCwsLCwsLCwsLCwsLCwtra2tra2tra2tra2tra2tra2tra2tra2tsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxvLy8vLy8vLy8vLy8vLy8vLy8vLy8vLy8wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA");
+    const audio = new Audio("/sounds/notification.wav");
     audio.volume = 0.25;
     void audio.play().catch(() => undefined);
     localStorage.setItem("notificationSoundEnabled", "true");

@@ -6,6 +6,13 @@ import { urlBase64ToUint8Array } from "@/lib/push";
 
 type Status = "checking" | "unsupported" | "denied" | "idle" | "enabled" | "error";
 
+function unlockNotificationAudio() {
+  localStorage.setItem("notificationSoundEnabled", "true");
+  const audio = new Audio("/sounds/notification.wav");
+  audio.volume = 0.05;
+  return audio.play().catch(() => undefined);
+}
+
 export function PushNotificationButton({ slug, compact = false }: { slug: string; compact?: boolean }) {
   const [status, setStatus] = useState<Status>("checking");
   const [message, setMessage] = useState<string | null>(null);
@@ -42,10 +49,12 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
         return;
       }
 
+      await unlockNotificationAudio();
+
       const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicKey) {
         setStatus("error");
-        setMessage("Thiếu NEXT_PUBLIC_VAPID_PUBLIC_KEY.");
+        setMessage("Đã bật âm thanh trong app. Thiếu NEXT_PUBLIC_VAPID_PUBLIC_KEY nên chưa bật được push ngoài trình duyệt.");
         return;
       }
 
@@ -69,7 +78,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       const data = (await response.json()) as { subscriptionId: string };
       setSubscriptionId(data.subscriptionId);
       setStatus("enabled");
-      setMessage("Đã bật thông báo đẩy cho thiết bị này.");
+      setMessage("Đã bật thông báo đẩy và âm thanh ting ting cho thiết bị này.");
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Không thể bật thông báo đẩy.");
