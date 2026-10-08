@@ -5,6 +5,7 @@ import type { Notification } from "@prisma/client";
 import { InstallAppButton } from "@/components/app-shell/install-app-button";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { NotificationAudioUnlocker } from "@/components/app-shell/notification-audio-unlocker";
+import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { restaurantRoutes } from "@/lib/routes";
@@ -70,6 +71,7 @@ export function RestaurantAdminShell({
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <InstallAppButton compact />
+              <NotificationEnableButton />
               <NotificationBell slug={slug} notifications={notifications} />
               <details className="relative">
                 <summary className="cursor-pointer list-none rounded-md border bg-white px-3 py-2 text-sm hover:bg-slate-50">

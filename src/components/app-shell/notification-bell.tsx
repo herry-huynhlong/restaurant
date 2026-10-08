@@ -46,14 +46,6 @@ function formatCreatedAt(value: string) {
   return new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(new Date(value));
 }
 
-function unlockNotificationAudio() {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("notificationSoundEnabled", "true");
-  const audio = new Audio("/sounds/notification.wav");
-  audio.volume = 0.01;
-  void audio.play().catch(() => undefined);
-}
-
 export function NotificationBell({
   slug,
   notifications
@@ -82,9 +74,11 @@ export function NotificationBell({
 
     window.addEventListener("pointerdown", syncSoundState);
     window.addEventListener("keydown", syncSoundState);
+    window.addEventListener("notification-sound-enabled", syncSoundState);
     return () => {
       window.removeEventListener("pointerdown", syncSoundState);
       window.removeEventListener("keydown", syncSoundState);
+      window.removeEventListener("notification-sound-enabled", syncSoundState);
     };
   }, []);
 
@@ -207,38 +201,30 @@ export function NotificationBell({
             </span>
           ) : null}
         </span>
-        <span>Thông báo</span>
+        <span className="hidden sm:inline">Thông báo</span>
+        <span className="sm:hidden">TB</span>
       </summary>
-      <div className="absolute right-0 z-20 mt-2 w-80 rounded-lg border bg-white p-3 shadow-lg">
+      <div className="fixed left-3 right-3 top-20 z-50 max-h-[70vh] max-w-[calc(100vw-24px)] overflow-hidden rounded-lg border bg-white p-3 shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-none">
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <p className="font-semibold">Thông báo</p>
             <p className={`text-xs ${status === "live" ? "text-teal-700" : "text-amber-700"}`}>{status === "live" ? "Live" : "Đang kết nối lại"}</p>
           </div>
           <button className="text-xs font-medium text-teal-700" type="button" onClick={markAll}>
-            Đánh dấu tất cả đã đọc
+            <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
+            <span className="sm:hidden">Đọc hết</span>
           </button>
         </div>
-        <div className="mb-3 flex items-center justify-between rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <span>{soundEnabled ? "Âm thanh sẵn sàng" : "Âm thanh sẽ bật sau lần chạm/click đầu tiên"}</span>
-          <button
-            className="font-medium text-teal-700"
-            type="button"
-            onClick={() => {
-              unlockNotificationAudio();
-              setSoundEnabled(true);
-            }}
-          >
-            {soundEnabled ? "Bật lại" : "Bật âm thanh"}
-          </button>
+        <div className="mb-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          Âm thanh: {soundEnabled ? "Bật" : "Tắt"}
         </div>
-        <div className="max-h-80 space-y-2 overflow-auto">
+        <div className="max-h-[calc(70vh-112px)] space-y-2 overflow-y-auto pr-1">
           {items.length ? (
             items.map((notification) => (
-              <div key={notification.id} className={`rounded-md p-3 ${notification.isRead ? "bg-slate-50" : "bg-teal-50"}`}>
-                <p className="text-sm font-medium">{notification.title}</p>
-                <p className="mt-1 text-xs text-slate-600">{notification.message}</p>
-                <div className="mt-2 flex items-center justify-between">
+              <div key={notification.id} className={`rounded-md p-3 [overflow-wrap:anywhere] ${notification.isRead ? "bg-slate-50" : "bg-teal-50"}`}>
+                <p className="whitespace-normal text-sm font-medium leading-snug">{notification.title}</p>
+                <p className="mt-1 whitespace-normal text-xs leading-relaxed text-slate-600">{notification.message}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs text-slate-500">{formatCreatedAt(notification.createdAt)}</span>
                   {!notification.isRead ? (
                     <button className="text-xs text-teal-700" type="button" onClick={() => markOne(notification.id)}>
