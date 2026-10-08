@@ -1,7 +1,7 @@
 "use client";
 
 import { BellRing } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { urlBase64ToUint8Array } from "@/lib/push";
 
 type Status = "idle" | "enabled" | "denied" | "unsupported" | "error";
@@ -19,6 +19,81 @@ function getDeviceName() {
 export function NotificationEnableButton({ slug }: { slug?: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
+
+  const subscribeCurrentDevice = useCallback(async () => {
+    if (!slug || !supportsPushNotifications() || Notification.permission !== "granted") return false;
+
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!publicKey) {
+      setMessage("Không thể bật thông báo. Vui lòng kiểm tra cấu hình thông báo của ứng dụng.");
+      return false;
+    }
+
+    await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const readyRegistration = await navigator.serviceWorker.ready;
+    const existing = await readyRegistration.pushManager.getSubscription();
+    const subscription =
+      existing ??
+      (await readyRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      }));
+
+    if (process.env.NODE_ENV !== "production") {
+      console.info("PUSH SUBSCRIPTION", {
+        hasEndpoint: Boolean(subscription.endpoint),
+        hasKeys: Boolean(subscription.toJSON().keys?.p256dh && subscription.toJSON().keys?.auth)
+      });
+    }
+
+    const response = await fetch(`/api/restaurants/${slug}/push/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...subscription.toJSON(),
+        deviceName: getDeviceName()
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("push_subscribe_failed");
+    }
+
+    return true;
+  }, [slug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const soundEnabled = localStorage.getItem("notificationSoundEnabled") === "true";
+    async function syncExistingPermission() {
+      if ("Notification" in window && Notification.permission === "denied") {
+        setStatus("denied");
+        return;
+      }
+
+      if (!soundEnabled) return;
+
+      if ("Notification" in window && Notification.permission === "granted" && slug) {
+        try {
+          await subscribeCurrentDevice();
+        } catch {
+          if (!cancelled) {
+            setStatus("error");
+            setMessage("Không thể bật thông báo. Vui lòng kiểm tra quyền thông báo của ứng dụng.");
+          }
+          return;
+        }
+      }
+
+      if (!cancelled) setStatus("enabled");
+    }
+
+    void syncExistingPermission();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, subscribeCurrentDevice]);
 
   useEffect(() => {
     const enabled = localStorage.getItem("notificationSoundEnabled") === "true";
@@ -73,41 +148,13 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       return;
     }
 
-    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!publicKey) {
-      setStatus("enabled");
-      setMessage("Đã bật âm thanh. Server chưa cấu hình VAPID nên chưa gửi được thông báo ngoài app.");
-      return;
-    }
-
     try {
-      const registration = await navigator.serviceWorker.register("/sw.js");
-      const existing = await registration.pushManager.getSubscription();
-      const subscription =
-        existing ??
-        (await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey)
-        }));
-
-      const response = await fetch(`/api/restaurants/${slug}/push/subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...subscription.toJSON(),
-          deviceName: getDeviceName()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error("push_subscribe_failed");
-      }
-
+      await subscribeCurrentDevice();
       setStatus("enabled");
       setMessage("Đã bật âm thanh và thông báo trên thiết bị này.");
     } catch {
       setStatus("error");
-      setMessage("Âm thanh đã bật, nhưng chưa đăng ký được thông báo hệ thống cho thiết bị này.");
+      setMessage("Không thể bật thông báo. Vui lòng kiểm tra quyền thông báo của ứng dụng.");
     }
   }
 

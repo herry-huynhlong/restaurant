@@ -9,6 +9,11 @@ function configureWebPush() {
   const subject = process.env.VAPID_SUBJECT;
 
   if (!publicKey || !privateKey || !subject) {
+    console.warn("[push] missing VAPID config", {
+      hasPublicKey: Boolean(publicKey),
+      hasPrivateKey: Boolean(privateKey),
+      hasSubject: Boolean(subject)
+    });
     return false;
   }
 
@@ -42,9 +47,8 @@ export async function sendPushToSubscription(subscriptionId: string, payload: Pu
   } catch (error) {
     const statusCode = typeof error === "object" && error && "statusCode" in error ? Number((error as { statusCode?: number }).statusCode) : undefined;
     if (statusCode === 404 || statusCode === 410) {
-      await prisma.pushSubscription.update({
+      await prisma.pushSubscription.delete({
         where: { id: subscription.id },
-        data: { isActive: false }
       });
     }
     return { ok: false, reason: `push-error-${statusCode ?? "unknown"}` };
@@ -76,7 +80,22 @@ export async function sendPushToRestaurantRoles({
     }
   });
 
-  return Promise.all(subscriptions.map((subscription) => sendPushToSubscription(subscription.id, payload)));
+  console.info("[push] recipients", {
+    restaurantId,
+    roles,
+    count: subscriptions.length,
+    title: payload.title
+  });
+
+  const results = await Promise.all(subscriptions.map((subscription) => sendPushToSubscription(subscription.id, payload)));
+  console.info("[push] result", {
+    restaurantId,
+    sent: results.filter((result) => result.ok).length,
+    failed: results.filter((result) => !result.ok).length,
+    reasons: results.filter((result) => !result.ok).map((result) => result.reason)
+  });
+
+  return results;
 }
 
 export function getPushTargetsForEvent(type: "ORDER_CREATED" | "SERVICE_REQUEST_CREATED" | "PAYMENT_REQUESTED" | "ORDER_READY"): RestaurantRole[] {

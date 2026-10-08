@@ -44,5 +44,13 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     }
   });
 
+  console.info("[push] subscription saved", {
+    restaurantId: access.restaurant.id,
+    userId: access.user.id,
+    subscriptionId: subscription.id,
+    hasEndpoint: Boolean(subscription.endpoint),
+    hasKeys: Boolean(subscription.p256dh && subscription.auth)
+  });
+
   return NextResponse.json({ ok: true, subscriptionId: subscription.id });
 }
