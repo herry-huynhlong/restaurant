@@ -12,8 +12,8 @@ self.addEventListener("push", (event) => {
   let payload = {
     title: "Restaurant Ordering",
     body: "Bạn có thông báo mới.",
-    icon: "/icons/icon-192.svg",
-    badge: "/icons/icon-192.svg",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
     url: "/post-login"
   };
 
@@ -28,8 +28,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: payload.icon || "/icons/icon-192.svg",
-      badge: payload.badge || "/icons/icon-192.svg",
+      icon: payload.icon || "/icons/icon-192.png",
+      badge: payload.badge || "/icons/icon-192.png",
       data: { url: payload.url || "/post-login", type: payload.type },
       tag: payload.tag,
       renotify: Boolean(payload.tag),

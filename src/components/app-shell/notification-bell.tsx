@@ -115,8 +115,8 @@ export function NotificationBell({
         try {
           const options: NotificationOptions & { renotify?: boolean } = {
             body: notification.message,
-            icon: "/icons/icon-192.svg",
-            badge: "/icons/icon-192.svg",
+            icon: "/icons/icon-192.png",
+            badge: "/icons/icon-192.png",
             tag: notification.id,
             renotify: true
           };
