@@ -117,6 +117,9 @@ async function saveProductRequest(slug: string, formData: FormData, mode: "creat
     if (errorCode === "INVALID_IMAGE_SIZE") {
       throw new Error("Ảnh tối đa 5MB.");
     }
+    if (response.status === 413) {
+      throw new Error("Máy chủ đang giới hạn dung lượng request. Cần tăng client_max_body_size của Nginx lên 8M.");
+    }
     throw new Error(resultErrorMessage(data, `Request failed (${response.status})`));
   }
 
