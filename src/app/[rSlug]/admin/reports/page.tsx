@@ -1,10 +1,10 @@
 import Link from "next/link";
+import { PaymentReportTable } from "@/components/admin/payment-report-table";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { ReportsAutoRefresh } from "@/components/admin/reports-auto-refresh";
 import { StatCard } from "@/components/ui/stat-card";
 import { formatVnd } from "@/lib/money";
 import { getReportPeriodLabel, normalizeReportPeriod, type ReportPeriod } from "@/lib/period";
-import { paymentMethodLabels } from "@/lib/payment-method";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { getRestaurantPaymentReport } from "@/server/services/reporting-service";
@@ -70,43 +70,7 @@ export default async function AdminReportsPage({
           )}
         </section>
 
-        <section className="overflow-hidden rounded-lg border bg-white shadow-sm">
-          <div className="border-b p-5">
-            <h2 className="text-lg font-semibold">Danh sách thanh toán</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-4 py-3">Thời gian</th>
-                  <th className="px-4 py-3">Bill</th>
-                  <th className="px-4 py-3">Bàn</th>
-                  <th className="px-4 py-3">Phương thức</th>
-                  <th className="px-4 py-3">Người xác nhận</th>
-                  <th className="px-4 py-3 text-right">Số tiền</th>
-                  <th className="px-4 py-3">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {report.payments.length ? report.payments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td className="px-4 py-3">{payment.paidAtLabel}</td>
-                    <td className="px-4 py-3 font-medium">{payment.invoiceNumber ?? payment.id.slice(0, 8)}</td>
-                    <td className="px-4 py-3">Bàn {payment.tableName}</td>
-                    <td className="px-4 py-3">{paymentMethodLabels[payment.paymentMethod]}</td>
-                    <td className="px-4 py-3">{payment.confirmedByName ?? "-"}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{formatVnd(payment.amount)}</td>
-                    <td className="px-4 py-3"><span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700">{payment.status}</span></td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td className="px-4 py-6 text-center text-slate-500" colSpan={7}>Chưa có thanh toán nào.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <PaymentReportTable slug={access.restaurant.slug} payments={report.payments} />
       </section>
     </RestaurantAdminShell>
   );
