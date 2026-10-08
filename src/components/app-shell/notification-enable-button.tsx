@@ -4,7 +4,7 @@ import { BellRing } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { urlBase64ToUint8Array } from "@/lib/push";
 
-type Status = "idle" | "enabled" | "denied" | "unsupported" | "error";
+type Status = "idle" | "enabled" | "denied";
 
 function supportsPushNotifications() {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -18,16 +18,13 @@ function getDeviceName() {
 
 export function NotificationEnableButton({ slug }: { slug?: string }) {
   const [status, setStatus] = useState<Status>("idle");
-  const [message, setMessage] = useState<string | null>(null);
-  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
 
   const subscribeCurrentDevice = useCallback(async () => {
     if (!slug || !supportsPushNotifications() || Notification.permission !== "granted") return false;
 
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!publicKey) {
-      setMessage("Không thể bật thông báo. Vui lòng kiểm tra cấu hình thông báo của ứng dụng.");
-      return null;
+      return false;
     }
 
     await navigator.serviceWorker.register("/sw.js");
@@ -61,33 +58,32 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       throw new Error("push_subscribe_failed");
     }
 
-    const data = await response.json().catch(() => ({})) as { subscriptionId?: string };
-    return data.subscriptionId ?? null;
+    return true;
   }, [slug]);
 
   useEffect(() => {
     let cancelled = false;
-    const soundEnabled = localStorage.getItem("notificationSoundEnabled") === "true";
+    const enabled = localStorage.getItem("notificationEnabled") === "true" || localStorage.getItem("notificationSoundEnabled") === "true";
+    if (enabled) {
+      localStorage.setItem("notificationEnabled", "true");
+      localStorage.setItem("notificationSoundEnabled", "true");
+    }
     async function syncExistingPermission() {
       if ("Notification" in window && Notification.permission === "denied") {
         setStatus("denied");
         return;
       }
 
-      if (!soundEnabled) return;
+      if (!enabled) {
+        setStatus("idle");
+        return;
+      }
 
       if ("Notification" in window && Notification.permission === "granted" && slug) {
         try {
-          const currentSubscriptionId = await subscribeCurrentDevice();
-          if (currentSubscriptionId) {
-            setSubscriptionId(currentSubscriptionId);
-          }
+          await subscribeCurrentDevice();
         } catch {
-          if (!cancelled) {
-            setStatus("error");
-            setMessage("Không thể bật thông báo. Vui lòng kiểm tra quyền thông báo của ứng dụng.");
-          }
-          return;
+          // Keep the user's preference on; in-app sound still works even if system push cannot subscribe.
         }
       }
 
@@ -101,8 +97,10 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
   }, [slug, subscribeCurrentDevice]);
 
   useEffect(() => {
-    const enabled = localStorage.getItem("notificationSoundEnabled") === "true";
+    const enabled = localStorage.getItem("notificationEnabled") === "true" || localStorage.getItem("notificationSoundEnabled") === "true";
     if (enabled) {
+      localStorage.setItem("notificationEnabled", "true");
+      localStorage.setItem("notificationSoundEnabled", "true");
       setStatus("enabled");
       return;
     }
@@ -112,7 +110,7 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
   }, []);
 
   async function enableNotifications() {
-    setMessage(null);
+    localStorage.setItem("notificationEnabled", "true");
     localStorage.setItem("notificationSoundEnabled", "true");
     window.dispatchEvent(new Event("notification-sound-enabled"));
     const audio = new Audio("/sounds/notification.wav");
@@ -122,7 +120,6 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
 
     if (!("Notification" in window)) {
       setStatus("enabled");
-      setMessage("Đã bật âm thanh trong app. Trình duyệt này không hỗ trợ thông báo hệ thống.");
       return;
     }
 
@@ -132,13 +129,11 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
 
     if (permission === "denied") {
       setStatus("denied");
-      setMessage("Âm thanh đã bật, nhưng thông báo hệ thống đang bị chặn trong cài đặt trình duyệt.");
       return;
     }
 
     if (permission !== "granted") {
       setStatus("enabled");
-      setMessage("Đã bật âm thanh. Khi cần thông báo ngoài app, hãy cho phép notification trên điện thoại.");
       return;
     }
 
@@ -148,72 +143,47 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
     }
 
     if (!supportsPushNotifications()) {
-      setStatus("unsupported");
-      setMessage("Đã bật âm thanh trong app. Trình duyệt này không hỗ trợ push notification.");
+      setStatus("enabled");
       return;
     }
 
     try {
-      const currentSubscriptionId = await subscribeCurrentDevice();
-      if (currentSubscriptionId) {
-        setSubscriptionId(currentSubscriptionId);
-      }
+      await subscribeCurrentDevice();
       setStatus("enabled");
-      setMessage("Đã bật âm thanh và thông báo trên thiết bị này.");
     } catch {
-      setStatus("error");
-      setMessage("Không thể bật thông báo. Vui lòng kiểm tra quyền thông báo của ứng dụng.");
+      setStatus("enabled");
     }
   }
 
-  async function sendTestNotification() {
-    if (!slug) return;
-    setMessage(null);
-    try {
-      const response = await fetch(`/api/restaurants/${slug}/push/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscriptionId })
-      });
+  async function disableNotifications() {
+    localStorage.setItem("notificationEnabled", "false");
+    localStorage.setItem("notificationSoundEnabled", "false");
+    window.dispatchEvent(new Event("notification-sound-enabled"));
+    setStatus("idle");
 
-      setMessage(response.ok
-        ? "Đã gửi thông báo thử tới thiết bị này."
-        : "Không gửi được thông báo thử. Vui lòng bấm bật thông báo lại.");
+    try {
+      if ("serviceWorker" in navigator && "PushManager" in window) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        await subscription?.unsubscribe();
+      }
     } catch {
-      setMessage("Không gửi được thông báo thử. Vui lòng kiểm tra kết nối.");
+      // Local preference still disables in-app sound and foreground notifications.
     }
   }
 
   const isEnabled = status === "enabled";
   const isBlocked = status === "denied";
+  const label = isEnabled ? "Thông báo: Bật" : isBlocked ? "Thông báo bị chặn" : "Thông báo: Tắt";
 
   return (
-    <div className="relative">
-      <div className="flex flex-wrap gap-2">
-        <button
-          className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm hover:bg-slate-50 ${isEnabled ? "border-teal-200 bg-teal-50 text-teal-800" : isBlocked ? "border-red-200 bg-red-50 text-red-700" : "bg-white"}`}
-          type="button"
-          onClick={enableNotifications}
-        >
-          <BellRing className="h-4 w-4" />
-          <span className="sm:hidden">{isEnabled ? "TB: Bật" : "Bật thông báo"}</span>
-          <span className="hidden sm:inline">{isEnabled ? "Thông báo: Bật" : "Bật thông báo"}</span>
-        </button>
-        {isEnabled && slug ? (
-          <button
-            className="inline-flex h-10 items-center rounded-md border bg-white px-3 text-sm hover:bg-slate-50"
-            type="button"
-            onClick={sendTestNotification}
-          >
-            Gửi thử
-          </button>
-        ) : null}
-      </div>
-      {message ? (
-        <div className="absolute right-0 z-40 mt-2 w-72 rounded-md border bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
-          {message}
-        </div>
-      ) : null}
-    </div>
+    <button
+      className={`inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 text-sm hover:bg-slate-50 ${isEnabled ? "border-teal-200 bg-teal-50 text-teal-800" : isBlocked ? "border-red-200 bg-red-50 text-red-700" : "bg-white"}`}
+      type="button"
+      onClick={isEnabled ? disableNotifications : enableNotifications}
+    >
+      <BellRing className="h-4 w-4 shrink-0" />
+      <span>{label}</span>
+    </button>
   );
 }

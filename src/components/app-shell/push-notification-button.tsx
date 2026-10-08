@@ -97,6 +97,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
 
   const label =
     status === "enabled" ? "Thông báo hệ thống đã bật" : status === "unsupported" ? "Không hỗ trợ thông báo hệ thống" : status === "denied" ? "Thông báo hệ thống bị chặn" : "Bật thông báo hệ thống";
+  const canShowTestButton = process.env.NODE_ENV !== "production";
 
   return (
     <div className={compact ? "relative" : "space-y-2"}>
@@ -110,7 +111,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
           <BellRing className="h-4 w-4" />
           {label}
         </button>
-        {status === "enabled" ? (
+        {status === "enabled" && canShowTestButton ? (
           <button className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50" type="button" onClick={testPush}>
             Gửi thông báo thử
           </button>

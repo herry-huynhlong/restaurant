@@ -4,12 +4,13 @@ import { useEffect } from "react";
 
 export function NotificationAudioUnlocker() {
   useEffect(() => {
-    let unlocked = localStorage.getItem("notificationSoundEnabled") === "true";
+    let unlocked = false;
 
     function unlock() {
       if (unlocked) return;
+      const enabled = localStorage.getItem("notificationEnabled") === "true" || localStorage.getItem("notificationSoundEnabled") === "true";
+      if (!enabled) return;
       unlocked = true;
-      localStorage.setItem("notificationSoundEnabled", "true");
       const audio = new Audio("/sounds/notification.wav");
       audio.volume = 0.01;
       void audio.play().catch(() => undefined);

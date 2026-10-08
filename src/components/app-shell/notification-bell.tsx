@@ -3,7 +3,6 @@
 import { Bell, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Notification, NotificationType } from "@prisma/client";
-import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
 
 type NotificationItem = {
   id: string;
@@ -57,7 +56,6 @@ export function NotificationBell({
   const [items, setItems] = useState<NotificationItem[]>(() => notifications.map(normalizeInitialNotification));
   const [unreadCount, setUnreadCount] = useState(() => notifications.filter((item) => !item.isRead).length);
   const [status, setStatus] = useState<"live" | "reconnecting">("live");
-  const [soundEnabled, setSoundEnabled] = useState(false);
   const [open, setOpen] = useState(false);
   const knownIdsRef = useRef(new Set(notifications.map((notification) => notification.id)));
   const initializedRef = useRef(false);
@@ -66,23 +64,9 @@ export function NotificationBell({
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setSoundEnabled(localStorage.getItem("notificationSoundEnabled") === "true");
     audioRef.current = new Audio("/sounds/notification.wav");
     audioRef.current.preload = "auto";
     audioRef.current.volume = 0.45;
-
-    function syncSoundState() {
-      setSoundEnabled(localStorage.getItem("notificationSoundEnabled") === "true");
-    }
-
-    window.addEventListener("pointerdown", syncSoundState);
-    window.addEventListener("keydown", syncSoundState);
-    window.addEventListener("notification-sound-enabled", syncSoundState);
-    return () => {
-      window.removeEventListener("pointerdown", syncSoundState);
-      window.removeEventListener("keydown", syncSoundState);
-      window.removeEventListener("notification-sound-enabled", syncSoundState);
-    };
   }, []);
 
   useEffect(() => {
@@ -123,6 +107,7 @@ export function NotificationBell({
     let cancelled = false;
 
     function showSystemNotifications(newItems: NotificationItem[]) {
+      if (localStorage.getItem("notificationEnabled") !== "true") return;
       if (!("Notification" in window) || Notification.permission !== "granted") return;
 
       for (const notification of newItems) {
@@ -243,7 +228,7 @@ export function NotificationBell({
   return (
     <div className="relative" ref={containerRef}>
       <button
-        className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-md border bg-white px-3 text-sm hover:bg-slate-50"
+        className="flex h-10 shrink-0 cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-md border bg-white px-3 text-sm hover:bg-slate-50"
         type="button"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
@@ -264,9 +249,7 @@ export function NotificationBell({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-semibold">Thông báo</p>
-                <p className={`text-xs ${status === "live" ? "text-teal-700" : "text-amber-700"}`}>
-                  {status === "live" ? "Live" : "Đang kết nối lại"} · Âm thanh {soundEnabled ? "bật" : "tắt"}
-                </p>
+                {status === "reconnecting" ? <p className="text-xs text-amber-700">Đang kết nối lại</p> : null}
               </div>
               <div className="flex items-center gap-3">
                 <button className="text-xs font-medium text-teal-700" type="button" onClick={markAll}>
@@ -282,9 +265,6 @@ export function NotificationBell({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-            </div>
-            <div className="mt-3">
-              <NotificationEnableButton slug={slug} />
             </div>
           </div>
           <div className="max-h-[calc(70vh-72px)] space-y-2 overflow-y-auto p-3">
