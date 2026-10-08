@@ -1,8 +1,5 @@
 "use server";
 
-import crypto from "node:crypto";
-import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -11,6 +8,7 @@ import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { platformRoutes } from "@/lib/routes";
+import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 const planSchema = z.enum(["FREE", "BASIC", "PRO"]);
@@ -30,9 +28,6 @@ const updateOwnerNameSchema = z.object({
   ownerUserId: z.string().min(1),
   name: z.string().trim().min(1, "Họ tên là bắt buộc.").max(120, "Họ tên quá dài.")
 });
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-
 function slugify(input: string) {
   return input
     .normalize("NFD")
@@ -90,20 +85,15 @@ async function saveUploadedImage(formData: FormData, key: string, folder: "logos
     return undefined;
   }
 
-  if (!allowedImageTypes.includes(file.type)) {
+  if (!allowedUploadImageTypes.includes(file.type)) {
     throw new Error("INVALID_IMAGE_TYPE");
   }
-  if (file.size > MAX_IMAGE_SIZE) {
+  if (file.size > MAX_UPLOAD_IMAGE_SIZE) {
     throw new Error("INVALID_IMAGE_SIZE");
   }
 
-  const extension = path.extname(file.name).toLowerCase() || ".jpg";
-  const safeExtension = [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
-  const fileName = `${crypto.randomUUID()}${safeExtension}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads", folder);
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
-  return `/api/uploads/${folder}/${fileName}`;
+  const optimized = await saveOptimizedUploadImage(file, folder);
+  return optimized?.imageUrl;
 }
 
 const createRestaurantSchema = z.object({
@@ -202,7 +192,7 @@ export async function createRestaurantAction(formData: FormData) {
       error,
       logoFile: safeFormDataSummary(formData).find((entry) => entry.key === "logoFile")
     });
-    redirectWithError(platformRoutes.newRestaurant, "Logo chỉ hỗ trợ JPG, PNG, WEBP và tối đa 5MB.");
+    redirectWithError(platformRoutes.newRestaurant, "Logo chỉ hỗ trợ JPG, PNG, WEBP. Ảnh tối đa 5MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = createRestaurantSchema.safeParse({
@@ -394,7 +384,7 @@ export async function updateRestaurantAction(formData: FormData) {
   try {
     uploadedLogoUrl = await saveUploadedImage(formData, "logoFile", "logos");
   } catch {
-    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo chỉ hỗ trợ JPG, PNG, WEBP và tối đa 5MB.");
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo chỉ hỗ trợ JPG, PNG, WEBP. Ảnh tối đa 5MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
   const parsed = updateRestaurantSchema.safeParse({

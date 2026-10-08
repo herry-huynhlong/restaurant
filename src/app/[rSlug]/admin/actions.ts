@@ -1,8 +1,5 @@
 "use server";
 
-import crypto from "node:crypto";
-import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
 import { Prisma } from "@prisma/client";
 import type { RestaurantRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -17,13 +14,11 @@ import { parseVndInteger } from "@/lib/money";
 import { assignableRestaurantRoles } from "@/lib/restaurant-role-labels";
 import { isValidUsername, makeInternalStaffEmail, normalizeUsername, usernameValidationMessage } from "@/lib/username";
 import { servedUploadUrl } from "@/lib/upload-url";
+import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
 const adminRoles = ["OWNER", "MANAGER"] as const;
 const staffRoles = ["MANAGER", "WAITER", "KITCHEN", "CASHIER"] as const satisfies RestaurantRole[];
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-
 function readString(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
@@ -38,20 +33,15 @@ async function saveUploadedImage(formData: FormData, key: string) {
     return undefined;
   }
 
-  if (!allowedImageTypes.includes(file.type)) {
+  if (!allowedUploadImageTypes.includes(file.type)) {
     throw new Error("INVALID_IMAGE_TYPE");
   }
-  if (file.size > MAX_IMAGE_SIZE) {
+  if (file.size > MAX_UPLOAD_IMAGE_SIZE) {
     throw new Error("INVALID_IMAGE_SIZE");
   }
 
-  const extension = path.extname(file.name).toLowerCase() || ".jpg";
-  const safeExtension = [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
-  const fileName = `${crypto.randomUUID()}${safeExtension}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
-  return `/api/uploads/products/${fileName}`;
+  const optimized = await saveOptimizedUploadImage(file, "products");
+  return optimized?.imageUrl;
 }
 
 function actionError(code: string, error: string, fieldErrors?: Record<string, string[]>) {
@@ -83,7 +73,7 @@ function prismaErrorPayload(error: unknown, fallback: string) {
     return actionError("INVALID_IMAGE_TYPE", "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP.");
   }
   if (error instanceof Error && error.message === "INVALID_IMAGE_SIZE") {
-    return actionError("INVALID_IMAGE_SIZE", "Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB.");
+    return actionError("INVALID_IMAGE_SIZE", "Ảnh tối đa 5MB.");
   }
 
   if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {

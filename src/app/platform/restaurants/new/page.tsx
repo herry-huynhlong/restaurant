@@ -1,5 +1,5 @@
 import { PlatformShell } from "@/components/app-shell/platform-shell";
-import { CreateRestaurantSubmitButton, RestaurantSlugField } from "@/components/platform/restaurant-form-controls";
+import { CreateRestaurantSubmitButton, LogoUploadInput, RestaurantSlugField } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { createRestaurantAction } from "@/app/platform/restaurants/actions";
@@ -60,12 +60,7 @@ function LogoUploadField() {
   return (
     <label className="block text-sm font-medium">
       Logo nhà hàng
-      <input
-        className="mt-1 h-10 w-full rounded-md border px-3 py-2 outline-none focus:border-teal-600"
-        name="logoFile"
-        type="file"
-        accept="image/*"
-      />
+      <LogoUploadInput />
     </label>
   );
 }

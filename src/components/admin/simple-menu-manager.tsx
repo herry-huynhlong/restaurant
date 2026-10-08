@@ -98,7 +98,7 @@ async function saveProductRequest(slug: string, formData: FormData, mode: "creat
 
   if (!response.ok) {
     if (response.status === 413) {
-      throw new Error("Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB.");
+      throw new Error("Ảnh tối đa 5MB.");
     }
     throw new Error(resultErrorMessage(data, `Request failed (${response.status})`));
   }
@@ -465,7 +465,7 @@ function ProductImagePicker({
           if (file.size > MAX_IMAGE_SIZE) {
             event.currentTarget.value = "";
             onImagePreview(null);
-            onToast({ type: "error", message: "Ảnh phải nhỏ hơn 5MB." });
+            onToast({ type: "error", message: "Ảnh tối đa 5MB." });
             return;
           }
 

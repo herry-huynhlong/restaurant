@@ -2,6 +2,9 @@
 
 import { useFormStatus } from "react-dom";
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+
 function slugifyInput(input: string) {
   return input
     .normalize("NFD")
@@ -54,5 +57,29 @@ export function CreateRestaurantSubmitButton() {
     >
       {pending ? "Đang tạo..." : "Tạo nhà hàng"}
     </button>
+  );
+}
+
+export function LogoUploadInput() {
+  return (
+    <input
+      className="mt-1 h-10 w-full rounded-md border px-3 py-2 outline-none focus:border-teal-600"
+      name="logoFile"
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      onChange={(event) => {
+        const file = event.currentTarget.files?.[0];
+        if (!file) return;
+        if (!allowedImageTypes.includes(file.type)) {
+          event.currentTarget.value = "";
+          window.alert("Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP.");
+          return;
+        }
+        if (file.size > MAX_IMAGE_SIZE) {
+          event.currentTarget.value = "";
+          window.alert("Ảnh tối đa 5MB.");
+        }
+      }}
+    />
   );
 }

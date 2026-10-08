@@ -1,6 +1,3 @@
-import crypto from "node:crypto";
-import path from "node:path";
-import { mkdir, writeFile } from "node:fs/promises";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
@@ -9,6 +6,7 @@ import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
 import { parseVndInteger } from "@/lib/money";
 import { servedUploadUrl } from "@/lib/upload-url";
+import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
 
 const menuItemSchema = z.object({
@@ -21,9 +19,6 @@ const menuItemSchema = z.object({
   isSoldOut: z.boolean(),
   isFeatured: z.boolean()
 });
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-
 async function requireMenuAccess(slug: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -72,22 +67,16 @@ async function saveUploadedImage(formData: FormData) {
 
   console.log("MENU IMAGE FILE", { name: file.name, type: file.type, size: file.size });
 
-  if (!allowedImageTypes.includes(file.type)) {
+  if (!allowedUploadImageTypes.includes(file.type)) {
     return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_TYPE", error: "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP." }, { status: 400 }) };
   }
-  if (file.size > MAX_IMAGE_SIZE) {
-    return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_SIZE", error: "Ảnh quá lớn. Vui lòng chọn ảnh nhỏ hơn 5MB." }, { status: 413 }) };
+  if (file.size > MAX_UPLOAD_IMAGE_SIZE) {
+    return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_SIZE", error: "Ảnh tối đa 5MB." }, { status: 413 }) };
   }
 
-  const extension = path.extname(file.name).toLowerCase() || ".jpg";
-  const safeExtension = [".jpg", ".jpeg", ".png", ".webp"].includes(extension) ? extension : ".jpg";
-  const fileName = `${Date.now()}-${crypto.randomUUID()}${safeExtension}`;
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "products");
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
-  const imageUrl = `/api/uploads/products/${fileName}`;
-  console.log("SAVED MENU IMAGE PATH", imageUrl);
-  return { imageUrl };
+  const optimized = await saveOptimizedUploadImage(file, "products");
+  console.log("SAVED MENU IMAGE PATH", optimized?.imageUrl);
+  return { imageUrl: optimized?.imageUrl };
 }
 
 function productPayload(product: {

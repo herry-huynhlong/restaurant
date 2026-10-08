@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
+import { LogoUploadInput } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { servedUploadUrl } from "@/lib/upload-url";
@@ -63,12 +64,7 @@ function LogoUploadField({ currentLogoUrl }: { currentLogoUrl: string | null }) 
   return (
     <label className="block text-sm font-medium">
       Logo nhà hàng
-      <input
-        className="mt-1 h-10 w-full rounded-md border px-3 py-2 outline-none focus:border-teal-600"
-        name="logoFile"
-        type="file"
-        accept="image/*"
-      />
+      <LogoUploadInput />
       {currentLogoUrl ? (
         <span className="mt-2 flex items-center gap-2 text-xs text-slate-500">
           {/* eslint-disable-next-line @next/next/no-img-element */}
