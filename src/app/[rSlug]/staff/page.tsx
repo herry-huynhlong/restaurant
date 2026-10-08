@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { formatVnd } from "@/lib/money";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { updateOrderStatusAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 
@@ -34,9 +35,12 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
       },
       include: {
         table: true,
-        items: { orderBy: { createdAt: "asc" } }
+        items: {
+          orderBy: { createdAt: "asc" },
+          include: { product: true }
+        }
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ tableId: "asc" }, { createdAt: "asc" }],
       take: 50
     }),
     prisma.serviceRequest.findMany({
@@ -51,6 +55,19 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
     }),
     getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
+  const ordersByTable = new Map<string, {
+    tableName: string;
+    orders: typeof orders;
+  }>();
+  for (const order of orders) {
+    const existing = ordersByTable.get(order.tableId);
+    if (existing) {
+      existing.orders.push(order);
+    } else {
+      ordersByTable.set(order.tableId, { tableName: order.table.name, orders: [order] });
+    }
+  }
+  const tableGroups = Array.from(ordersByTable.values()).sort((a, b) => a.tableName.localeCompare(b.tableName, "vi"));
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -67,38 +84,56 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
       />
       <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-4">
-          {orders.length ? (
-            orders.map((order) => (
-              <article key={order.id} className="rounded-lg border bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-teal-700">{orderLabels[order.status] ?? order.status}</p>
-                    <h2 className="mt-1 text-lg font-semibold">Order #{order.orderNumber} · Bàn {order.table.name}</h2>
-                    <p className="text-sm text-slate-600">{order.customerName} · {new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(order.createdAt)}</p>
-                  </div>
-                  <p className="rounded-md bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800">{formatVnd(order.subtotal)}</p>
+          {tableGroups.length ? (
+            tableGroups.map((group) => (
+              <section key={group.tableName} className="rounded-lg border bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                  <h2 className="text-lg font-semibold">Bàn {group.tableName}</h2>
+                  <span className="rounded-md bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700">{group.orders.length} order active</span>
                 </div>
-                <ul className="mt-3 divide-y text-sm">
-                  {order.items.map((item) => (
-                    <li key={item.id} className="flex justify-between gap-3 py-2">
-                      <span>{item.quantity} x {item.productNameViSnapshot}</span>
-                      <span className="font-medium">{formatVnd(item.subtotal)}</span>
-                    </li>
+                <div className="mt-3 space-y-3">
+                  {group.orders.map((order) => (
+                    <article key={order.id} className="rounded-md border p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase text-teal-700">{orderLabels[order.status] ?? order.status}</p>
+                          <h3 className="mt-1 font-semibold">Order #{order.orderNumber} · {order.customerName}</h3>
+                          <p className="text-xs text-slate-500">{new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(order.createdAt)}</p>
+                        </div>
+                        <p className="rounded-md bg-slate-50 px-3 py-2 text-sm font-semibold text-teal-800">{formatVnd(order.subtotal)}</p>
+                      </div>
+                      <ul className="mt-3 divide-y text-sm">
+                        {order.items.map((item) => {
+                          const imageUrl = servedUploadUrl(item.product.imageUrl);
+                          return (
+                            <li key={item.id} className="flex items-center justify-between gap-3 py-2">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="h-10 w-10 shrink-0 rounded-md bg-slate-100">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  {imageUrl ? <img alt={item.productNameViSnapshot} className="h-full w-full rounded-md object-cover" src={imageUrl} /> : null}
+                                </div>
+                                <span className="min-w-0">{item.quantity} x {item.productNameViSnapshot}</span>
+                              </div>
+                              <span className="shrink-0 font-medium">{formatVnd(item.subtotal)}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {order.status === "NEW" ? (
+                          <form action={updateOrderStatusAction.bind(null, access.restaurant.slug, order.id, "CONFIRMED")}>
+                            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" type="submit">Nhận đơn</button>
+                          </form>
+                        ) : (
+                          <form action={updateOrderStatusAction.bind(null, access.restaurant.slug, order.id, "SERVED")}>
+                            <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" type="submit">Hoàn tất</button>
+                          </form>
+                        )}
+                      </div>
+                    </article>
                   ))}
-                </ul>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {order.status === "NEW" ? (
-                    <form action={updateOrderStatusAction.bind(null, access.restaurant.slug, order.id, "CONFIRMED")}>
-                      <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" type="submit">Nhận đơn</button>
-                    </form>
-                  ) : null}
-                  {order.status === "READY" ? (
-                    <form action={updateOrderStatusAction.bind(null, access.restaurant.slug, order.id, "SERVED")}>
-                      <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" type="submit">Đã phục vụ</button>
-                    </form>
-                  ) : null}
                 </div>
-              </article>
+              </section>
             ))
           ) : (
             <EmptyState title="Đơn mới" description="Chưa có đơn đang xử lý." />

@@ -29,8 +29,8 @@ export function CustomerShell({
           </div>
         </div>
       </header>
-      <section className="mx-auto w-full max-w-md px-4 py-6">{children}</section>
-      <nav className="fixed inset-x-0 bottom-0 border-t bg-white">
+      <section className="mx-auto w-full max-w-md px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))]">{children}</section>
+      <nav className="fixed inset-x-0 bottom-0 border-t bg-white pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto grid max-w-md grid-cols-3 text-center text-xs">
           <Link className="px-2 py-3" href={restaurantRoutes.menu(slug)}>Menu</Link>
           <Link className="px-2 py-3" href={restaurantRoutes.orders(slug)}>Đã gọi</Link>

@@ -43,6 +43,7 @@ export async function updateOrderStatusAction(slug: string, orderId: string, sta
     });
   }
 
+  publishNotificationRefresh(access.restaurant.id);
   revalidatePath(restaurantRoutes.staff(slug));
   revalidatePath(restaurantRoutes.kitchen(slug));
   revalidatePath(restaurantRoutes.cashier(slug));

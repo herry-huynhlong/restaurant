@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { formatVnd } from "@/lib/money";
 import { servedUploadUrl } from "@/lib/upload-url";
 
@@ -19,22 +19,6 @@ type CartItem = Product & {
   quantity: number;
 };
 
-type BillItem = {
-  productName: string;
-  quantity: number;
-  unitPrice: number;
-  subtotal: number;
-};
-
-type CurrentBill = {
-  totalAmount: number;
-  subtotal?: number;
-  taxRate?: number;
-  taxAmount?: number;
-  grandTotal?: number;
-  items: BillItem[];
-};
-
 export function CustomerMenuClient({
   slug,
   products,
@@ -46,9 +30,6 @@ export function CustomerMenuClient({
 }) {
   const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const [bill, setBill] = useState<CurrentBill>({ totalAmount: 0, items: [] });
-  const [billStatus, setBillStatus] = useState<"live" | "reconnecting">("live");
-  const [paymentRequested, setPaymentRequested] = useState(false);
   const [isPending, startTransition] = useTransition();
   const cartItems = Object.values(cart);
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -58,38 +39,6 @@ export function CustomerMenuClient({
     { type: "EXTRA", label: "Món thêm", products: products.filter((product) => product.menuType === "EXTRA") },
     { type: "DRINK", label: "Nước / Đồ uống", products: products.filter((product) => product.menuType === "DRINK") }
   ] as const, [products]);
-
-  const refreshBill = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/restaurants/${slug}/customer/bill`, { cache: "no-store" });
-      if (!response.ok) throw new Error("bill_failed");
-      const data = (await response.json()) as CurrentBill;
-      setBill({
-        totalAmount: data.grandTotal ?? data.totalAmount ?? 0,
-        subtotal: data.subtotal ?? data.totalAmount ?? 0,
-        taxRate: data.taxRate ?? 0,
-        taxAmount: data.taxAmount ?? 0,
-        grandTotal: data.grandTotal ?? data.totalAmount ?? 0,
-        items: Array.isArray(data.items) ? data.items : []
-      });
-      setBillStatus("live");
-    } catch {
-      setBillStatus("reconnecting");
-    }
-  }, [slug]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function tick() {
-      if (!cancelled) await refreshBill();
-    }
-    void tick();
-    const interval = window.setInterval(() => void tick(), 3000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [refreshBill]);
 
   function add(product: Product) {
     if (product.isSoldOut) return;
@@ -133,7 +82,6 @@ export function CustomerMenuClient({
       }
       setCart({});
       setMessage(`Đã gửi order #${data.orderNumber}.`);
-      await refreshBill();
     });
   }
 
@@ -146,21 +94,15 @@ export function CustomerMenuClient({
         body: JSON.stringify({ requestType })
       });
       const data = await response.json();
-      if (response.ok && requestType === "REQUEST_PAYMENT") {
-        setPaymentRequested(true);
-        setMessage(data.message ?? "Đã gửi yêu cầu thanh toán. Vui lòng ra quầy để hoàn tất thanh toán.");
-        await refreshBill();
-        return;
-      }
       setMessage(response.ok ? data.message ?? `Đã gửi yêu cầu: ${label}.` : data.error ?? "Không gửi được yêu cầu.");
     });
   }
 
   return (
-    <>
+    <div className="pb-[calc(9rem+env(safe-area-inset-bottom))]">
       <section className="mb-4 rounded-lg border bg-white p-3 shadow-sm">
         <p className="text-sm font-semibold">Gọi nhanh</p>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
           <button className="rounded-md border px-3 py-2 disabled:opacity-60" type="button" disabled={isPending} onClick={() => sendServiceRequest("CALL_STAFF", "Gọi nhân viên")}>
             Gọi nhân viên
           </button>
@@ -170,56 +112,8 @@ export function CustomerMenuClient({
           <button className="rounded-md border px-3 py-2" type="button" onClick={() => sendServiceRequest("REQUEST_UTENSILS", "Thêm dụng cụ")}>
             Thêm dụng cụ
           </button>
-          <button className="rounded-md border px-3 py-2 disabled:bg-slate-100 disabled:text-slate-500" type="button" disabled={paymentRequested || isPending} onClick={() => sendServiceRequest("REQUEST_PAYMENT", "Yêu cầu thanh toán")}>
-            {paymentRequested ? "Đang chờ thanh toán" : "Yêu cầu thanh toán"}
-          </button>
         </div>
         {message ? <p className="mt-3 rounded-md bg-teal-50 px-3 py-2 text-sm text-teal-800">{message}</p> : null}
-        {paymentRequested ? (
-          <div className="mt-3 rounded-md border border-teal-200 bg-teal-50 p-3 text-sm text-teal-900">
-            <p className="font-semibold">Yêu cầu thanh toán đã được gửi</p>
-            <p className="mt-1">Tổng bàn: <span className="font-bold">{formatVnd(bill.grandTotal ?? bill.totalAmount)}</span></p>
-            <p className="mt-1">Vui lòng ra quầy để hoàn tất thanh toán.</p>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="mb-5 rounded-lg border bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold">Đã gọi</h2>
-          <span className={`rounded-full px-2 py-1 text-xs font-medium ${billStatus === "live" ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700"}`}>
-            {billStatus === "live" ? "Live" : "Đang cập nhật"}
-          </span>
-        </div>
-        {bill.items.length ? (
-          <div className="mt-3 divide-y">
-            {bill.items.map((item) => (
-              <div key={`${item.productName}-${item.unitPrice}`} className="flex items-start justify-between gap-3 py-3">
-                <div>
-                  <p className="font-medium">{item.productName}</p>
-                  <p className="text-sm text-slate-600">{item.quantity} x {formatVnd(item.unitPrice)}</p>
-                </div>
-                <p className="font-semibold">{formatVnd(item.subtotal)}</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Chưa có món nào được gọi.</p>
-        )}
-        <div className="mt-3 flex items-center justify-between border-t pt-3">
-          <p className="font-semibold">Tạm tính</p>
-          <p className="font-semibold">{formatVnd(bill.subtotal ?? bill.totalAmount)}</p>
-        </div>
-        {bill.taxAmount ? (
-          <div className="mt-2 flex items-center justify-between">
-            <p className="text-sm text-slate-600">Thuế {bill.taxRate ?? 0}%</p>
-            <p className="font-semibold">{formatVnd(bill.taxAmount)}</p>
-          </div>
-        ) : null}
-        <div className="mt-2 flex items-center justify-between">
-          <p className="font-semibold">Tổng bàn</p>
-          <p className="text-xl font-bold text-teal-700">{formatVnd(bill.grandTotal ?? bill.totalAmount)}</p>
-        </div>
       </section>
 
       {groups.filter((group) => group.products.length > 0).map((group) => (
@@ -270,7 +164,7 @@ export function CustomerMenuClient({
         </section>
       ) : null}
 
-      <div className="fixed inset-x-0 bottom-12 border-t bg-white p-3 shadow-lg">
+      <div className="fixed inset-x-0 border-t bg-white p-3 shadow-lg" style={{ bottom: "calc(3rem + env(safe-area-inset-bottom))" }}>
         <div className="mx-auto flex max-w-md items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold">{totalQuantity} món</p>
@@ -287,6 +181,6 @@ export function CustomerMenuClient({
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
