@@ -38,6 +38,16 @@ const menuTypeOptions: Array<[SimpleMenuType, string]> = [
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
 
+function validateMenuImage(file: File) {
+  if (!allowedImageTypes.includes(file.type)) {
+    return "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP.";
+  }
+  if (file.size > MAX_IMAGE_SIZE) {
+    return "Ảnh tối đa 5MB.";
+  }
+  return null;
+}
+
 function isMenuType(value: unknown): value is SimpleMenuType {
   return value === "MAIN" || value === "EXTRA" || value === "DRINK";
 }
@@ -348,7 +358,7 @@ function ProductCard({
       <form action={submit} className="grid gap-4 md:grid-cols-[128px_1fr]">
         <input name="productId" type="hidden" value={product.id} />
         <input name="existingImageUrl" type="hidden" value={product.imageUrl ?? ""} />
-        <ProductImagePicker previewUrl={previewUrl} onImagePreview={setPreviewUrl} onToast={onToast} />
+        <ProductImagePicker previewUrl={previewUrl} fallbackPreviewUrl={product.imageUrl} onImagePreview={setPreviewUrl} onToast={onToast} />
         <div className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -402,7 +412,7 @@ function ProductFields({
 }) {
   return (
     <div className="mt-3 grid gap-4 md:grid-cols-[128px_1fr]">
-      <ProductImagePicker previewUrl={previewUrl} onImagePreview={onImagePreview} onToast={onToast} />
+      <ProductImagePicker previewUrl={previewUrl} fallbackPreviewUrl={null} onImagePreview={onImagePreview} onToast={onToast} />
       <div className="grid gap-3 lg:grid-cols-3">
         <TextInput label="Tên món" name="nameVi" required />
         <PriceInput value={price} onChange={onPriceChange} />
@@ -422,10 +432,12 @@ function ProductFields({
 
 function ProductImagePicker({
   previewUrl,
+  fallbackPreviewUrl,
   onImagePreview,
   onToast
 }: {
   previewUrl: string | null;
+  fallbackPreviewUrl: string | null;
   onImagePreview: (value: string | null) => void;
   onToast: (toast: Toast) => void;
 }) {
@@ -440,32 +452,19 @@ function ProductImagePicker({
         className="mt-2 block w-full text-xs"
         name="imageFile"
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           if (!file) {
-            onImagePreview(null);
+            onImagePreview(fallbackPreviewUrl);
             return;
           }
 
-          console.log("IMAGE SELECTED", {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            sizeMB: file.size / 1024 / 1024
-          });
-
-          if (!allowedImageTypes.includes(file.type)) {
+          const imageError = validateMenuImage(file);
+          if (imageError) {
             event.currentTarget.value = "";
-            onImagePreview(null);
-            onToast({ type: "error", message: "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP." });
-            return;
-          }
-
-          if (file.size > MAX_IMAGE_SIZE) {
-            event.currentTarget.value = "";
-            onImagePreview(null);
-            onToast({ type: "error", message: "Ảnh tối đa 5MB." });
+            onImagePreview(fallbackPreviewUrl);
+            onToast({ type: "error", message: imageError });
             return;
           }
 
