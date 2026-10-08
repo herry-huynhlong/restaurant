@@ -57,6 +57,7 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
       <AppHeader
         title="Phục vụ"
         subtitle={`${access.restaurant.name} · ${getRoleLabel(access.membership.role)}`}
+        notificationSlug={access.restaurant.slug}
         actions={
           <>
             <OpsLiveRefresher slug={access.restaurant.slug} />

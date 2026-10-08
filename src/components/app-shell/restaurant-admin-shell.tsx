@@ -71,7 +71,7 @@ export function RestaurantAdminShell({
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <InstallAppButton compact />
-              <NotificationEnableButton />
+              <NotificationEnableButton slug={slug} />
               <NotificationBell slug={slug} notifications={notifications} />
               <details className="relative">
                 <summary className="cursor-pointer list-none rounded-md border bg-white px-3 py-2 text-sm hover:bg-slate-50">

@@ -65,6 +65,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
       <AppHeader
         title="Thu ngân"
         subtitle={`${access.restaurant.name} · ${getRoleLabel(access.membership.role)}`}
+        notificationSlug={access.restaurant.slug}
         actions={
           <>
             <OpsLiveRefresher slug={access.restaurant.slug} />

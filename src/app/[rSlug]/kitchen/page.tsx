@@ -31,6 +31,7 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
       <AppHeader
         title="Bếp"
         subtitle={`${access.restaurant.name} · ${getRoleLabel(access.membership.role)}`}
+        notificationSlug={access.restaurant.slug}
         actions={
           <>
             <OpsLiveRefresher slug={access.restaurant.slug} />

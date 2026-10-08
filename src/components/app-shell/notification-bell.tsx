@@ -96,6 +96,27 @@ export function NotificationBell({
   useEffect(() => {
     let cancelled = false;
 
+    function showSystemNotifications(newItems: NotificationItem[]) {
+      if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+      for (const notification of newItems) {
+        if (!soundTypes.has(notification.type)) continue;
+        try {
+          const options: NotificationOptions & { renotify?: boolean } = {
+            body: notification.message,
+            icon: "/icons/icon-192.svg",
+            badge: "/icons/icon-192.svg",
+            tag: notification.id,
+            renotify: true
+          };
+          const systemNotification = new Notification(notification.title, options);
+          systemNotification.onclick = () => window.focus();
+        } catch {
+          // Some mobile browsers only allow background notifications from the service worker.
+        }
+      }
+    }
+
     async function fetchNotifications() {
       try {
         const response = await fetch(`/api/restaurants/${slug}/notifications`, { cache: "no-store" });
@@ -121,6 +142,7 @@ export function NotificationBell({
 
         if (initializedRef.current && newItems.some((notification) => soundTypes.has(notification.type))) {
           playSound();
+          showSystemNotifications(newItems);
         }
         initializedRef.current = true;
       } catch {
@@ -201,8 +223,7 @@ export function NotificationBell({
             </span>
           ) : null}
         </span>
-        <span className="hidden sm:inline">Thông báo</span>
-        <span className="sm:hidden">TB</span>
+        <span>Thông báo</span>
       </summary>
       <div className="fixed left-3 right-3 top-20 z-50 max-h-[70vh] max-w-[calc(100vw-24px)] overflow-hidden rounded-lg border bg-white p-3 shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-none">
         <div className="mb-3 flex items-start justify-between gap-3">
