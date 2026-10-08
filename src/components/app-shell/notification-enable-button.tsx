@@ -19,6 +19,7 @@ function getDeviceName() {
 export function NotificationEnableButton({ slug }: { slug?: string }) {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
 
   const subscribeCurrentDevice = useCallback(async () => {
     if (!slug || !supportsPushNotifications() || Notification.permission !== "granted") return false;
@@ -26,7 +27,7 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!publicKey) {
       setMessage("Không thể bật thông báo. Vui lòng kiểm tra cấu hình thông báo của ứng dụng.");
-      return false;
+      return null;
     }
 
     await navigator.serviceWorker.register("/sw.js");
@@ -60,7 +61,8 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       throw new Error("push_subscribe_failed");
     }
 
-    return true;
+    const data = await response.json().catch(() => ({})) as { subscriptionId?: string };
+    return data.subscriptionId ?? null;
   }, [slug]);
 
   useEffect(() => {
@@ -76,7 +78,10 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
 
       if ("Notification" in window && Notification.permission === "granted" && slug) {
         try {
-          await subscribeCurrentDevice();
+          const currentSubscriptionId = await subscribeCurrentDevice();
+          if (currentSubscriptionId) {
+            setSubscriptionId(currentSubscriptionId);
+          }
         } catch {
           if (!cancelled) {
             setStatus("error");
@@ -149,7 +154,10 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
     }
 
     try {
-      await subscribeCurrentDevice();
+      const currentSubscriptionId = await subscribeCurrentDevice();
+      if (currentSubscriptionId) {
+        setSubscriptionId(currentSubscriptionId);
+      }
       setStatus("enabled");
       setMessage("Đã bật âm thanh và thông báo trên thiết bị này.");
     } catch {
@@ -158,20 +166,49 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
     }
   }
 
+  async function sendTestNotification() {
+    if (!slug) return;
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/restaurants/${slug}/push/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscriptionId })
+      });
+
+      setMessage(response.ok
+        ? "Đã gửi thông báo thử tới thiết bị này."
+        : "Không gửi được thông báo thử. Vui lòng bấm bật thông báo lại.");
+    } catch {
+      setMessage("Không gửi được thông báo thử. Vui lòng kiểm tra kết nối.");
+    }
+  }
+
   const isEnabled = status === "enabled";
   const isBlocked = status === "denied";
 
   return (
     <div className="relative">
-      <button
-        className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm hover:bg-slate-50 ${isEnabled ? "border-teal-200 bg-teal-50 text-teal-800" : isBlocked ? "border-red-200 bg-red-50 text-red-700" : "bg-white"}`}
-        type="button"
-        onClick={enableNotifications}
-      >
-        <BellRing className="h-4 w-4" />
-        <span className="sm:hidden">{isEnabled ? "TB: Bật" : "Bật thông báo"}</span>
-        <span className="hidden sm:inline">{isEnabled ? "Thông báo: Bật" : "Bật thông báo"}</span>
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className={`inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm hover:bg-slate-50 ${isEnabled ? "border-teal-200 bg-teal-50 text-teal-800" : isBlocked ? "border-red-200 bg-red-50 text-red-700" : "bg-white"}`}
+          type="button"
+          onClick={enableNotifications}
+        >
+          <BellRing className="h-4 w-4" />
+          <span className="sm:hidden">{isEnabled ? "TB: Bật" : "Bật thông báo"}</span>
+          <span className="hidden sm:inline">{isEnabled ? "Thông báo: Bật" : "Bật thông báo"}</span>
+        </button>
+        {isEnabled && slug ? (
+          <button
+            className="inline-flex h-10 items-center rounded-md border bg-white px-3 text-sm hover:bg-slate-50"
+            type="button"
+            onClick={sendTestNotification}
+          >
+            Gửi thử
+          </button>
+        ) : null}
+      </div>
       {message ? (
         <div className="absolute right-0 z-40 mt-2 w-72 rounded-md border bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg">
           {message}

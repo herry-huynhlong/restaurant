@@ -3,6 +3,7 @@
 import { Bell, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Notification, NotificationType } from "@prisma/client";
+import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
 
 type NotificationItem = {
   id: string;
@@ -281,6 +282,9 @@ export function NotificationBell({
                   <X className="h-4 w-4" />
                 </button>
               </div>
+            </div>
+            <div className="mt-3">
+              <NotificationEnableButton slug={slug} />
             </div>
           </div>
           <div className="max-h-[calc(70vh-72px)] space-y-2 overflow-y-auto p-3">
