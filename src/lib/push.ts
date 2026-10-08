@@ -15,6 +15,7 @@ export type PushPayload = {
   title: string;
   body: string;
   url: string;
+  type?: string;
   icon?: string;
   badge?: string;
   tag?: string;

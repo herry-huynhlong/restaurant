@@ -177,14 +177,15 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     serviceRequestId: serviceRequest.id
   });
 
-  void sendPushToRestaurantRoles({
+  await sendPushToRestaurantRoles({
     restaurantId: context.restaurant.id,
     roles: getPushTargetsForEvent(eventType),
     payload: {
       title: notificationTitle,
       body: notificationMessage,
       url: parsed.data.requestType === "REQUEST_PAYMENT" ? `/${context.restaurant.slug}/cashier` : `/${context.restaurant.slug}/staff`,
-      tag: `service-${serviceRequest.id}`
+      tag: `service-${serviceRequest.id}`,
+      type: eventType
     }
   });
 

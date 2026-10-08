@@ -21,6 +21,10 @@ function configureWebPush() {
   return true;
 }
 
+function endpointSuffix(endpoint: string) {
+  return endpoint.slice(-18);
+}
+
 export async function sendPushToSubscription(subscriptionId: string, payload: PushPayload) {
   if (!configureWebPush()) {
     return { ok: false, reason: "missing-vapid" };
@@ -32,7 +36,7 @@ export async function sendPushToSubscription(subscriptionId: string, payload: Pu
   }
 
   try {
-    await webPush.sendNotification(
+    const result = await webPush.sendNotification(
       {
         endpoint: subscription.endpoint,
         keys: { p256dh: subscription.p256dh, auth: subscription.auth }
@@ -43,6 +47,15 @@ export async function sendPushToSubscription(subscriptionId: string, payload: Pu
       where: { id: subscription.id },
       data: { lastUsedAt: new Date(), isActive: true }
     });
+    console.info("[push] sent", {
+      subscriptionId: subscription.id,
+      userId: subscription.userId,
+      restaurantId: subscription.restaurantId,
+      endpointSuffix: endpointSuffix(subscription.endpoint),
+      title: payload.title,
+      tag: payload.tag,
+      statusCode: result.statusCode
+    });
     return { ok: true };
   } catch (error) {
     const statusCode = typeof error === "object" && error && "statusCode" in error ? Number((error as { statusCode?: number }).statusCode) : undefined;
@@ -50,7 +63,22 @@ export async function sendPushToSubscription(subscriptionId: string, payload: Pu
       await prisma.pushSubscription.delete({
         where: { id: subscription.id },
       });
+    } else {
+      await prisma.pushSubscription.update({
+        where: { id: subscription.id },
+        data: { lastUsedAt: new Date() }
+      }).catch(() => undefined);
     }
+    console.error("[push] failed", {
+      subscriptionId: subscription.id,
+      userId: subscription.userId,
+      restaurantId: subscription.restaurantId,
+      endpointSuffix: endpointSuffix(subscription.endpoint),
+      title: payload.title,
+      tag: payload.tag,
+      statusCode,
+      reason: error instanceof Error ? error.message : String(error)
+    });
     return { ok: false, reason: `push-error-${statusCode ?? "unknown"}` };
   }
 }

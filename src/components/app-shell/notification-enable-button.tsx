@@ -31,6 +31,11 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
     await navigator.serviceWorker.ready;
     const readyRegistration = await navigator.serviceWorker.ready;
     const existing = await readyRegistration.pushManager.getSubscription();
+    console.info("CURRENT PUSH SUB", existing ? {
+      endpointSuffix: existing.endpoint.slice(-18),
+      hasEndpoint: Boolean(existing.endpoint),
+      hasKeys: Boolean(existing.toJSON().keys?.p256dh && existing.toJSON().keys?.auth)
+    } : null);
     const subscription =
       existing ??
       (await readyRegistration.pushManager.subscribe({
@@ -38,12 +43,11 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
         applicationServerKey: urlBase64ToUint8Array(publicKey)
       }));
 
-    if (process.env.NODE_ENV !== "production") {
-      console.info("PUSH SUBSCRIPTION", {
-        hasEndpoint: Boolean(subscription.endpoint),
-        hasKeys: Boolean(subscription.toJSON().keys?.p256dh && subscription.toJSON().keys?.auth)
-      });
-    }
+    console.info("PUSH SUBSCRIPTION READY", {
+      endpointSuffix: subscription.endpoint.slice(-18),
+      hasEndpoint: Boolean(subscription.endpoint),
+      hasKeys: Boolean(subscription.toJSON().keys?.p256dh && subscription.toJSON().keys?.auth)
+    });
 
     const response = await fetch(`/api/restaurants/${slug}/push/subscribe`, {
       method: "POST",
@@ -165,6 +169,13 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       if ("serviceWorker" in navigator && "PushManager" in window) {
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
+        if (slug && subscription) {
+          await fetch(`/api/restaurants/${slug}/push/subscribe`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: subscription.endpoint })
+          }).catch(() => undefined);
+        }
         await subscription?.unsubscribe();
       }
     } catch {

@@ -48,9 +48,36 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     restaurantId: access.restaurant.id,
     userId: access.user.id,
     subscriptionId: subscription.id,
-    hasEndpoint: Boolean(subscription.endpoint),
+    endpointSuffix: subscription.endpoint.slice(-18),
     hasKeys: Boolean(subscription.p256dh && subscription.auth)
   });
 
   return NextResponse.json({ ok: true, subscriptionId: subscription.id });
+}
+
+export async function DELETE(request: Request, { params }: { params: { rSlug: string } }) {
+  const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "WAITER", "KITCHEN", "CASHIER"]);
+  const body = await request.json().catch(() => ({})) as { endpoint?: string };
+
+  if (!body.endpoint) {
+    return NextResponse.json({ ok: false, error: "Missing endpoint." }, { status: 400 });
+  }
+
+  const result = await prisma.pushSubscription.updateMany({
+    where: {
+      endpoint: body.endpoint,
+      userId: access.user.id,
+      restaurantId: access.restaurant.id
+    },
+    data: { isActive: false }
+  });
+
+  console.info("[push] subscription disabled", {
+    restaurantId: access.restaurant.id,
+    userId: access.user.id,
+    endpointSuffix: body.endpoint.slice(-18),
+    count: result.count
+  });
+
+  return NextResponse.json({ ok: true, count: result.count });
 }

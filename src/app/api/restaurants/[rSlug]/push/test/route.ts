@@ -34,7 +34,8 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     title: "Thông báo thử",
     body: `Thông báo của ${access.restaurant.name} đang hoạt động.`,
     url: `/${access.restaurant.slug}/staff`,
-    tag: `test-${access.restaurant.id}`
+    tag: `test-${access.restaurant.id}`,
+    type: "PUSH_TEST"
   });
 
   if (!result.ok) {

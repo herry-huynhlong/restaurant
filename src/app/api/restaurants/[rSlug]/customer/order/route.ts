@@ -128,14 +128,15 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     orderId: order.id
   });
 
-  void sendPushToRestaurantRoles({
+  await sendPushToRestaurantRoles({
     restaurantId: context.restaurant.id,
     roles: getPushTargetsForEvent("ORDER_CREATED"),
     payload: {
       title: notificationTitle,
       body: notificationMessage,
       url: `/${context.restaurant.slug}/staff`,
-      tag: `order-${order.id}`
+      tag: `order-${order.id}`,
+      type: "ORDER_CREATED"
     }
   });
 

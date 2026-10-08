@@ -31,14 +31,15 @@ export async function updateOrderStatusAction(slug: string, orderId: string, sta
       tableId: order.tableId,
       orderId: order.id
     });
-    void sendPushToRestaurantRoles({
+    await sendPushToRestaurantRoles({
       restaurantId: access.restaurant.id,
       roles: getPushTargetsForEvent("ORDER_READY"),
       payload: {
         title,
         body: message,
         url: `/${access.restaurant.slug}/staff`,
-        tag: `order-ready-${order.id}`
+        tag: `order-ready-${order.id}`,
+        type: "ORDER_READY"
       }
     });
   }
