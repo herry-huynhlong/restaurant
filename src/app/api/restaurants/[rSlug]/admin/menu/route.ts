@@ -65,7 +65,13 @@ async function saveUploadedImage(formData: FormData) {
   const file = formData.get("imageFile");
   if (!(file instanceof File) || file.size === 0) return undefined;
 
-  console.log("MENU IMAGE FILE", { name: file.name, type: file.type, size: file.size });
+  console.log("UPLOAD FILE", {
+    name: file.name,
+    type: file.type,
+    sizeBytes: file.size,
+    sizeKB: file.size / 1024,
+    sizeMB: file.size / 1024 / 1024
+  });
 
   if (!allowedUploadImageTypes.includes(file.type)) {
     return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_TYPE", error: "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP." }, { status: 400 }) };
@@ -74,7 +80,13 @@ async function saveUploadedImage(formData: FormData) {
     return { error: NextResponse.json({ ok: false, code: "INVALID_IMAGE_SIZE", error: "Ảnh tối đa 5MB." }, { status: 413 }) };
   }
 
-  const optimized = await saveOptimizedUploadImage(file, "products");
+  let optimized: Awaited<ReturnType<typeof saveOptimizedUploadImage>>;
+  try {
+    optimized = await saveOptimizedUploadImage(file, "products");
+  } catch (error) {
+    console.error("MENU IMAGE OPTIMIZE ERROR", error);
+    return { error: NextResponse.json({ ok: false, code: "IMAGE_OPTIMIZE_FAILED", error: "Không thể tối ưu ảnh. Vui lòng thử ảnh khác." }, { status: 400 }) };
+  }
   console.log("SAVED MENU IMAGE PATH", optimized?.imageUrl);
   return { imageUrl: optimized?.imageUrl };
 }

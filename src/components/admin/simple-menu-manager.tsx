@@ -74,7 +74,13 @@ function normalizeProduct(raw: unknown): Product | null {
 function logFormData(label: string, formData: FormData) {
   for (const [key, value] of formData.entries()) {
     if (value instanceof File) {
-      console.log(label, key, { name: value.name, type: value.type, size: value.size });
+      console.log(label, key, {
+        name: value.name,
+        type: value.type,
+        sizeBytes: value.size,
+        sizeKB: value.size / 1024,
+        sizeMB: value.size / 1024 / 1024
+      });
     } else {
       console.log(label, key, value);
     }
@@ -107,7 +113,8 @@ async function saveProductRequest(slug: string, formData: FormData, mode: "creat
   });
 
   if (!response.ok) {
-    if (response.status === 413) {
+    const errorCode = data && typeof data === "object" ? (data as { code?: string }).code : undefined;
+    if (errorCode === "INVALID_IMAGE_SIZE") {
       throw new Error("Ảnh tối đa 5MB.");
     }
     throw new Error(resultErrorMessage(data, `Request failed (${response.status})`));
@@ -459,6 +466,14 @@ function ProductImagePicker({
             onImagePreview(fallbackPreviewUrl);
             return;
           }
+
+          console.log("SELECTED FILE", {
+            name: file.name,
+            type: file.type,
+            sizeBytes: file.size,
+            sizeKB: file.size / 1024,
+            sizeMB: file.size / 1024 / 1024
+          });
 
           const imageError = validateMenuImage(file);
           if (imageError) {

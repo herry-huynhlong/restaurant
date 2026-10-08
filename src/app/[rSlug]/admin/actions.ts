@@ -33,6 +33,14 @@ async function saveUploadedImage(formData: FormData, key: string) {
     return undefined;
   }
 
+  console.log("UPLOAD FILE", {
+    name: file.name,
+    type: file.type,
+    sizeBytes: file.size,
+    sizeKB: file.size / 1024,
+    sizeMB: file.size / 1024 / 1024
+  });
+
   if (!allowedUploadImageTypes.includes(file.type)) {
     throw new Error("INVALID_IMAGE_TYPE");
   }
