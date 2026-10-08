@@ -13,7 +13,13 @@ function supportsPushNotifications() {
 function getDeviceName() {
   const userAgentData = navigator as Navigator & { userAgentData?: { platform?: string } };
   const platform = userAgentData.userAgentData?.platform ?? navigator.platform;
-  return platform ? `Thiết bị ${platform}` : "Thiết bị nhân viên";
+  const existingDeviceId = localStorage.getItem("pushDeviceId");
+  const deviceId = existingDeviceId ?? (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  if (!existingDeviceId) {
+    localStorage.setItem("pushDeviceId", deviceId);
+  }
+  const shortId = deviceId.slice(0, 8);
+  return platform ? `Thiết bị ${platform} ${shortId}` : `Thiết bị nhân viên ${shortId}`;
 }
 
 export function NotificationEnableButton({ slug }: { slug?: string }) {
@@ -176,7 +182,6 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
             body: JSON.stringify({ endpoint: subscription.endpoint })
           }).catch(() => undefined);
         }
-        await subscription?.unsubscribe();
       }
     } catch {
       // Local preference still disables in-app sound and foreground notifications.

@@ -44,6 +44,18 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     }
   });
 
+  if (parsed.data.deviceName) {
+    await prisma.pushSubscription.updateMany({
+      where: {
+        userId: access.user.id,
+        restaurantId: access.restaurant.id,
+        deviceName: parsed.data.deviceName,
+        id: { not: subscription.id }
+      },
+      data: { isActive: false }
+    });
+  }
+
   console.info("[push] subscription saved", {
     restaurantId: access.restaurant.id,
     userId: access.user.id,
