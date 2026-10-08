@@ -85,6 +85,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
         items: {
           create: parsed.data.items.map((item) => {
             const product = productMap.get(item.productId)!;
+            const isDrink = product.menuType === "DRINK";
             return {
               restaurantId: context.restaurant.id,
               productId: product.id,
@@ -95,7 +96,9 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
               optionSnapshotJson: undefined,
               optionTotalSnapshot: 0,
               note: item.note || null,
-              subtotal: product.price * item.quantity
+              subtotal: product.price * item.quantity,
+              status: isDrink ? "READY" : "NEW",
+              readyAt: isDrink ? new Date() : undefined
             };
           })
         }

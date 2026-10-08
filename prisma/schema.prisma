@@ -71,6 +71,13 @@ enum OrderStatus {
   SERVED
 }
 
+enum OrderItemStatus {
+  NEW
+  COOKING
+  READY
+  SERVED
+}
+
 enum PaymentMethod {
   CASH
   QR
@@ -432,6 +439,13 @@ model OrderItem {
   optionTotalSnapshot   Int        @default(0)
   note                  String?
   subtotal              Int
+  status                OrderItemStatus @default(NEW)
+  kitchenAssignedToUserId String?
+  kitchenClaimedAt      DateTime?
+  readyAt               DateTime?
+  waiterAssignedToUserId String?
+  waiterClaimedAt       DateTime?
+  servedAt              DateTime?
   createdAt             DateTime   @default(now())
   restaurant            Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   order                 Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -439,6 +453,10 @@ model OrderItem {
 
   @@index([restaurantId, orderId])
   @@index([restaurantId, productId])
+  @@index([restaurantId, status])
+  @@index([restaurantId, kitchenAssignedToUserId])
+  @@index([restaurantId, waiterAssignedToUserId])
+  @@index([restaurantId, readyAt])
 }
 
 model Payment {

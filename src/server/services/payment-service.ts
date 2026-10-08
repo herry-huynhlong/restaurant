@@ -150,6 +150,20 @@ export async function confirmDiningSessionPaid({
       data: { status: "SERVED" }
     });
 
+    await tx.orderItem.updateMany({
+      where: {
+        restaurantId,
+        order: {
+          diningSessionId: session.id
+        },
+        status: { in: ["NEW", "COOKING", "READY"] }
+      },
+      data: {
+        status: "SERVED",
+        servedAt: paidAt
+      }
+    });
+
     await tx.serviceRequest.updateMany({
       where: {
         restaurantId,
