@@ -25,6 +25,7 @@ export const restaurantRoutes = {
   adminOrders: (slug: string) => `/${slug}/admin/orders`,
   adminStaff: (slug: string) => `/${slug}/admin/staff`,
   adminPayments: (slug: string) => `/${slug}/admin/payments`,
+  adminTopItems: (slug: string) => `/${slug}/admin/top-items`,
   adminReports: (slug: string) => `/${slug}/admin/reports`,
   adminSettings: (slug: string) => `/${slug}/admin/settings`,
   locked: (slug: string) => `/${slug}/locked`,

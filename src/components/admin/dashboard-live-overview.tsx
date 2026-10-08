@@ -6,11 +6,10 @@ import { StatCard } from "@/components/ui/stat-card";
 
 type DashboardOverview = {
   revenueToday: number;
-  ordersToday: number;
+  paidTablesToday: number;
   occupiedTables: number;
   availableTables: number;
   pendingRequests: number;
-  topProduct?: string | null;
 };
 
 export function DashboardLiveOverview({ slug, initialOverview }: { slug: string; initialOverview: DashboardOverview }) {
@@ -40,11 +39,10 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard label="Doanh thu hôm nay" value={formatVnd(overview.revenueToday)} />
-        <StatCard label="Order hôm nay" value={overview.ordersToday} />
+        <StatCard label="Bàn đã thanh toán" value={overview.paidTablesToday} />
         <StatCard label="Bàn đang dùng" value={overview.occupiedTables} />
         <StatCard label="Bàn trống" value={overview.availableTables} />
         <StatCard label="Yêu cầu đang chờ" value={overview.pendingRequests} />
-        <StatCard label="Top món hôm nay" value={overview.topProduct ?? "Chưa có"} />
       </div>
     </section>
   );
