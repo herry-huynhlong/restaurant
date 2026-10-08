@@ -32,7 +32,11 @@ self.addEventListener("push", (event) => {
       badge: payload.badge || "/icons/icon-192.svg",
       data: { url: payload.url || "/post-login", type: payload.type },
       tag: payload.tag,
-      renotify: Boolean(payload.tag)
+      renotify: Boolean(payload.tag),
+      requireInteraction: payload.requireInteraction !== false,
+      silent: payload.silent === true,
+      timestamp: Date.now(),
+      vibrate: Array.isArray(payload.vibrate) ? payload.vibrate : [250, 120, 250, 120, 350]
     })
   );
 });

@@ -41,7 +41,16 @@ export async function sendPushToSubscription(subscriptionId: string, payload: Pu
         endpoint: subscription.endpoint,
         keys: { p256dh: subscription.p256dh, auth: subscription.auth }
       },
-      JSON.stringify(payload)
+      JSON.stringify({
+        requireInteraction: true,
+        silent: false,
+        vibrate: [250, 120, 250, 120, 350],
+        ...payload
+      }),
+      {
+        TTL: 120,
+        urgency: "high"
+      }
     );
     await prisma.pushSubscription.update({
       where: { id: subscription.id },

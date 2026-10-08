@@ -19,4 +19,7 @@ export type PushPayload = {
   icon?: string;
   badge?: string;
   tag?: string;
+  requireInteraction?: boolean;
+  silent?: boolean;
+  vibrate?: number[];
 };
