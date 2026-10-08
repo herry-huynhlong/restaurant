@@ -3,23 +3,12 @@
 import { BellRing } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { urlBase64ToUint8Array } from "@/lib/push";
+import { getStaffDeviceId, getStaffDeviceName } from "@/lib/staff-device";
 
 type Status = "idle" | "enabled" | "denied";
 
 function supportsPushNotifications() {
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-}
-
-function getDeviceName() {
-  const userAgentData = navigator as Navigator & { userAgentData?: { platform?: string } };
-  const platform = userAgentData.userAgentData?.platform ?? navigator.platform;
-  const existingDeviceId = localStorage.getItem("pushDeviceId");
-  const deviceId = existingDeviceId ?? (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
-  if (!existingDeviceId) {
-    localStorage.setItem("pushDeviceId", deviceId);
-  }
-  const shortId = deviceId.slice(0, 8);
-  return platform ? `Thiết bị ${platform} ${shortId}` : `Thiết bị nhân viên ${shortId}`;
 }
 
 export function NotificationEnableButton({ slug }: { slug?: string }) {
@@ -60,7 +49,8 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...subscription.toJSON(),
-        deviceName: getDeviceName()
+        deviceId: getStaffDeviceId(),
+        deviceName: getStaffDeviceName()
       })
     });
 

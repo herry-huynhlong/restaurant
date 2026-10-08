@@ -157,11 +157,15 @@ model PushSubscription {
   id           String     @id @default(cuid())
   userId       String
   restaurantId String
+  deviceId     String?
   endpoint     String     @unique
   p256dh       String
   auth         String
   userAgent    String?
   deviceName   String?
+  onShift      Boolean    @default(true)
+  lastShiftStartedAt DateTime?
+  lastShiftEndedAt   DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   lastUsedAt   DateTime?
@@ -171,6 +175,26 @@ model PushSubscription {
 
   @@index([userId, isActive])
   @@index([restaurantId, isActive])
+  @@index([restaurantId, userId, deviceId])
+  @@index([restaurantId, isActive, onShift])
+}
+
+model StaffDeviceSession {
+  id           String         @id @default(cuid())
+  userId       String
+  restaurantId String
+  deviceId     String
+  role         RestaurantRole
+  onShift      Boolean        @default(true)
+  startedAt    DateTime       @default(now())
+  endedAt      DateTime?
+  lastSeenAt   DateTime       @default(now())
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([restaurantId, userId, deviceId])
+  @@index([restaurantId, onShift])
+  @@index([userId, onShift])
 }
 
 model RestaurantUser {

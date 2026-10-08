@@ -9,6 +9,7 @@ const subscriptionSchema = z.object({
     p256dh: z.string().min(1),
     auth: z.string().min(1)
   }),
+  deviceId: z.string().min(8).max(120).optional(),
   deviceName: z.string().max(120).optional()
 });
 
@@ -22,25 +23,55 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
   }
 
   const userAgent = request.headers.get("user-agent");
+  const shiftSession = parsed.data.deviceId
+    ? await prisma.staffDeviceSession.upsert({
+        where: {
+          restaurantId_userId_deviceId: {
+            restaurantId: access.restaurant.id,
+            userId: access.user.id,
+            deviceId: parsed.data.deviceId
+          }
+        },
+        update: {
+          role: access.membership.role,
+          lastSeenAt: new Date()
+        },
+        create: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          deviceId: parsed.data.deviceId,
+          role: access.membership.role,
+          onShift: true
+        }
+      })
+    : null;
   const subscription = await prisma.pushSubscription.upsert({
     where: { endpoint: parsed.data.endpoint },
     update: {
       userId: access.user.id,
       restaurantId: access.restaurant.id,
+      deviceId: parsed.data.deviceId,
       p256dh: parsed.data.keys.p256dh,
       auth: parsed.data.keys.auth,
       userAgent,
       deviceName: parsed.data.deviceName,
+      onShift: shiftSession?.onShift ?? true,
+      lastShiftStartedAt: shiftSession?.onShift ? new Date() : undefined,
+      lastShiftEndedAt: shiftSession && !shiftSession.onShift ? shiftSession.endedAt ?? new Date() : undefined,
       isActive: true
     },
     create: {
       userId: access.user.id,
       restaurantId: access.restaurant.id,
+      deviceId: parsed.data.deviceId,
       endpoint: parsed.data.endpoint,
       p256dh: parsed.data.keys.p256dh,
       auth: parsed.data.keys.auth,
       userAgent,
-      deviceName: parsed.data.deviceName
+      deviceName: parsed.data.deviceName,
+      onShift: shiftSession?.onShift ?? true,
+      lastShiftStartedAt: shiftSession?.onShift ? new Date() : undefined,
+      lastShiftEndedAt: shiftSession && !shiftSession.onShift ? shiftSession.endedAt ?? new Date() : undefined
     }
   });
 

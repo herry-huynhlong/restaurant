@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getStaffDeviceId, isDeviceOnShift } from "@/lib/staff-device";
 
 type NotificationState = {
   unreadCount: number;
@@ -12,10 +13,28 @@ type NotificationState = {
 export function OpsLiveRefresher({ slug }: { slug: string }) {
   const router = useRouter();
   const [status, setStatus] = useState<"live" | "reconnecting">("live");
+  const [onShift, setOnShift] = useState(true);
   const latestIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
 
   useEffect(() => {
+    setOnShift(isDeviceOnShift(slug));
+    function handleShift(event: Event) {
+      const detail = (event as CustomEvent<{ slug?: string; onShift?: boolean }>).detail;
+      if (detail?.slug === slug && typeof detail.onShift === "boolean") {
+        setOnShift(detail.onShift);
+      }
+    }
+    window.addEventListener("staff-shift-changed", handleShift);
+    return () => window.removeEventListener("staff-shift-changed", handleShift);
+  }, [slug]);
+
+  useEffect(() => {
+    if (!onShift) {
+      setStatus("live");
+      return;
+    }
+
     let cancelled = false;
     let refreshTimer: number | null = null;
 
@@ -28,7 +47,7 @@ export function OpsLiveRefresher({ slug }: { slug: string }) {
 
     async function tick() {
       try {
-        const response = await fetch(`/api/restaurants/${slug}/notifications/state`, { cache: "no-store" });
+        const response = await fetch(`/api/restaurants/${slug}/notifications/state?deviceId=${encodeURIComponent(getStaffDeviceId())}`, { cache: "no-store" });
         if (!response.ok) throw new Error("state_failed");
         const data = (await response.json()) as NotificationState;
         setStatus("live");
@@ -46,7 +65,7 @@ export function OpsLiveRefresher({ slug }: { slug: string }) {
     tick();
     let eventSource: EventSource | null = null;
     try {
-      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream`);
+      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream?deviceId=${encodeURIComponent(getStaffDeviceId())}`);
       eventSource.addEventListener("notification", () => {
         setStatus("live");
         void tick();
@@ -67,7 +86,7 @@ export function OpsLiveRefresher({ slug }: { slug: string }) {
       if (refreshTimer) window.clearTimeout(refreshTimer);
       window.clearInterval(interval);
     };
-  }, [router, slug]);
+  }, [onShift, router, slug]);
 
   if (status === "live") return null;
 

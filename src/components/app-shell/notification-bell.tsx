@@ -3,6 +3,7 @@
 import { Bell, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Notification, NotificationType } from "@prisma/client";
+import { getStaffDeviceId, isDeviceOnShift } from "@/lib/staff-device";
 
 type NotificationItem = {
   id: string;
@@ -57,6 +58,7 @@ export function NotificationBell({
   const [unreadCount, setUnreadCount] = useState(() => notifications.filter((item) => !item.isRead).length);
   const [status, setStatus] = useState<"live" | "reconnecting">("live");
   const [open, setOpen] = useState(false);
+  const [onShift, setOnShift] = useState(true);
   const knownIdsRef = useRef(new Set(notifications.map((notification) => notification.id)));
   const initializedRef = useRef(false);
   const lastSoundAtRef = useRef(0);
@@ -68,6 +70,18 @@ export function NotificationBell({
     audioRef.current.preload = "auto";
     audioRef.current.volume = 0.45;
   }, []);
+
+  useEffect(() => {
+    setOnShift(isDeviceOnShift(slug));
+    function handleShift(event: Event) {
+      const detail = (event as CustomEvent<{ slug?: string; onShift?: boolean }>).detail;
+      if (detail?.slug === slug && typeof detail.onShift === "boolean") {
+        setOnShift(detail.onShift);
+      }
+    }
+    window.addEventListener("staff-shift-changed", handleShift);
+    return () => window.removeEventListener("staff-shift-changed", handleShift);
+  }, [slug]);
 
   useEffect(() => {
     if (!open) return;
@@ -104,6 +118,11 @@ export function NotificationBell({
   }
 
   useEffect(() => {
+    if (!onShift) {
+      setStatus("live");
+      return;
+    }
+
     let cancelled = false;
 
     function showSystemNotifications(newItems: NotificationItem[]) {
@@ -164,7 +183,7 @@ export function NotificationBell({
     void fetchNotifications();
     let eventSource: EventSource | null = null;
     try {
-      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream`);
+      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream?deviceId=${encodeURIComponent(getStaffDeviceId())}`);
       eventSource.addEventListener("notification", () => {
         void fetchNotifications();
       });
@@ -183,7 +202,7 @@ export function NotificationBell({
       eventSource?.close();
       window.clearInterval(interval);
     };
-  }, [slug]);
+  }, [onShift, slug]);
 
   async function markOne(notificationId: string) {
     const previousItems = items;

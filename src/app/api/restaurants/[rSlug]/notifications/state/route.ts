@@ -1,9 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 
-export async function GET(_request: Request, { params }: { params: { rSlug: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"]);
+  const deviceId = request.nextUrl.searchParams.get("deviceId");
+  if (deviceId) {
+    const deviceSession = await prisma.staffDeviceSession.findUnique({
+      where: {
+        restaurantId_userId_deviceId: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          deviceId
+        }
+      },
+      select: { onShift: true }
+    });
+
+    if (deviceSession?.onShift === false) {
+      return NextResponse.json({
+        unreadCount: 0,
+        latestNotificationId: null,
+        latestCreatedAt: null,
+        onShift: false
+      });
+    }
+  }
+
   const where = {
     restaurantId: access.restaurant.id,
     OR: [{ recipientUserId: null }, { recipientUserId: access.user.id }]

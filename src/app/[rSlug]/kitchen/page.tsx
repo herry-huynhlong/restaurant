@@ -33,6 +33,7 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
         title="Bếp"
         subtitle={`${access.restaurant.name} · ${getRoleLabel(access.membership.role)}`}
         notificationSlug={access.restaurant.slug}
+        enableShiftControls={access.membership.role === "KITCHEN"}
         actions={
           <>
             <OpsLiveRefresher slug={access.restaurant.slug} />

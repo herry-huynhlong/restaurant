@@ -1,11 +1,30 @@
 import { NextRequest } from "next/server";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { prisma } from "@/lib/db/prisma";
 import { notificationEmitter } from "@/server/services/notification-event-service";
 
 const streamRoles = ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"] as const;
 
 export async function GET(_request: NextRequest, { params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, [...streamRoles]);
+  const deviceId = _request.nextUrl.searchParams.get("deviceId");
+  if (deviceId) {
+    const deviceSession = await prisma.staffDeviceSession.findUnique({
+      where: {
+        restaurantId_userId_deviceId: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          deviceId
+        }
+      },
+      select: { onShift: true }
+    });
+
+    if (deviceSession?.onShift === false) {
+      return new Response(null, { status: 204 });
+    }
+  }
+
   const encoder = new TextEncoder();
   const eventName = `restaurant:${access.restaurant.id}`;
   let keepAlive: ReturnType<typeof setInterval>;

@@ -2,17 +2,20 @@ import type React from "react";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
 import { NotificationAudioUnlocker } from "@/components/app-shell/notification-audio-unlocker";
 import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
+import { StaffShiftControls } from "@/components/app-shell/staff-shift-controls";
 
 export function AppHeader({
   title,
   subtitle,
   actions,
-  notificationSlug
+  notificationSlug,
+  enableShiftControls = false
 }: {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
   notificationSlug?: string;
+  enableShiftControls?: boolean;
 }) {
   return (
     <header className="border-b bg-white">
@@ -23,7 +26,7 @@ export function AppHeader({
           {subtitle ? <p className="mt-1 text-sm text-slate-600">{subtitle}</p> : null}
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <NotificationEnableButton slug={notificationSlug} />
+          {enableShiftControls ? <StaffShiftControls slug={notificationSlug} /> : <NotificationEnableButton slug={notificationSlug} />}
           {actions}
           <SignOutButton />
         </div>

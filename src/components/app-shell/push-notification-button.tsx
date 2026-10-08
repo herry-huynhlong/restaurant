@@ -3,6 +3,7 @@
 import { BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
 import { urlBase64ToUint8Array } from "@/lib/push";
+import { getStaffDeviceId, getStaffDeviceName } from "@/lib/staff-device";
 
 type Status = "checking" | "unsupported" | "denied" | "idle" | "enabled" | "error";
 
@@ -70,7 +71,11 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       const response = await fetch(`/api/restaurants/${slug}/push/subscribe`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(subscription.toJSON())
+        body: JSON.stringify({
+          ...subscription.toJSON(),
+          deviceId: getStaffDeviceId(),
+          deviceName: getStaffDeviceName()
+        })
       });
       if (!response.ok) {
         throw new Error(await response.text());

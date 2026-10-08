@@ -32,7 +32,7 @@ export async function sendPushToSubscription(subscriptionId: string, payload: Pu
   }
 
   const subscription = await prisma.pushSubscription.findUnique({ where: { id: subscriptionId } });
-  if (!subscription?.isActive) {
+  if (!subscription?.isActive || !subscription.onShift) {
     return { ok: false, reason: "inactive" };
   }
 
@@ -113,6 +113,7 @@ export async function sendPushToRestaurantRoles({
     where: {
       restaurantId,
       isActive: true,
+      onShift: true,
       user: {
         memberships: {
           some: {

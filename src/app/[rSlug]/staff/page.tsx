@@ -75,6 +75,7 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
         title="Phục vụ"
         subtitle={`${access.restaurant.name} · ${getRoleLabel(access.membership.role)}`}
         notificationSlug={access.restaurant.slug}
+        enableShiftControls={access.membership.role === "WAITER"}
         actions={
           <>
             <OpsLiveRefresher slug={access.restaurant.slug} />
