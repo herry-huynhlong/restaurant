@@ -28,7 +28,7 @@ export default async function SettingsPage({
   const settings = restaurant.settings;
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Cài đặt" userName={access.user.name} notifications={notifications}>
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Cài đặt" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan}>
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
       <form className="space-y-6" action={updateRestaurantSettingsAction.bind(null, access.restaurant.slug)}>
         <SettingsSection title="Thông tin quán">

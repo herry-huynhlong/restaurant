@@ -11,7 +11,7 @@ import { platformRoutes } from "@/lib/routes";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
-const planSchema = z.enum(["FREE", "BASIC", "PRO"]);
+const planSchema = z.enum(["BASIC", "PRO"]);
 const subscriptionStatusSchema = z.enum(["ACTIVE", "EXPIRED", "SUSPENDED"]);
 const languageSchema = z.enum(["vi", "en"]);
 const resetAdminPasswordSchema = z.object({
@@ -208,7 +208,7 @@ export async function createRestaurantAction(formData: FormData) {
     ownerEmail: readString(formData, "ownerEmail"),
     ownerPassword: readString(formData, "ownerPassword"),
     ownerPhone: optionalString(formData, "ownerPhone"),
-    plan: readString(formData, "plan") || "FREE",
+    plan: readString(formData, "plan") || "BASIC",
     subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
     status: readString(formData, "status") || "INACTIVE"
   });
@@ -397,7 +397,7 @@ export async function updateRestaurantAction(formData: FormData) {
     timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
     primaryLanguage: readString(formData, "primaryLanguage") || "vi",
     currency: readString(formData, "currency") || "VND",
-    plan: readString(formData, "plan") || "FREE",
+    plan: readString(formData, "plan") || "BASIC",
     subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
     status: readString(formData, "status") || "INACTIVE"
   });

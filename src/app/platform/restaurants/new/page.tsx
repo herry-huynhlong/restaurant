@@ -34,7 +34,7 @@ export default async function NewRestaurantPage({
         </FormSection>
 
         <FormSection title="Gói dịch vụ và trạng thái">
-          <SelectField label="Plan" name="plan" options={[["FREE", "FREE"], ["BASIC", "BASIC"], ["PRO", "PRO"]]} />
+          <SelectField label="Plan" name="plan" defaultValue="BASIC" options={[["BASIC", "BASIC"], ["PRO", "PRO"]]} />
           <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" />
           <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" />
           <SelectField label="Subscription status" name="subscriptionStatus" options={[["ACTIVE", "ACTIVE"], ["EXPIRED", "EXPIRED"], ["SUSPENDED", "SUSPENDED"]]} />

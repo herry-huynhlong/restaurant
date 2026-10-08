@@ -3,6 +3,7 @@ import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-sh
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { TablesLivePanel } from "@/components/admin/tables-live-panel";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { hasPlanFeature } from "@/lib/plan/features";
 import { createAreaAction, createTableAction } from "@/app/[rSlug]/admin/actions";
 import { prisma } from "@/lib/db/prisma";
 import { getRecentNotifications } from "@/server/services/notification-service";
@@ -34,6 +35,7 @@ export default async function TablesPage({
       title="Khu vực & Bàn"
       userName={access.user.name}
       notifications={notifications}
+      plan={access.restaurant.plan}
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
 
@@ -62,6 +64,7 @@ export default async function TablesPage({
         slug={access.restaurant.slug}
         restaurantName={access.restaurant.name}
         cashierName={access.user.name}
+        canUsePayment={hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM")}
         initialState={tableState}
         initialSelectedTableId={searchParams?.table}
       />

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAuthenticatedUser } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
+import { canRoleAccessPlan } from "@/lib/plan/features";
 
 export default async function SelectRestaurantPage() {
   const user = await requireAuthenticatedUser();
@@ -17,15 +18,27 @@ export default async function SelectRestaurantPage() {
       <section className="mx-auto max-w-xl rounded-lg border bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold">Chọn nhà hàng</h1>
         <div className="mt-4 space-y-2">
-          {memberships.map((membership) => (
-            <Link
-              key={membership.id}
-              className="block rounded-md border px-4 py-3 text-sm hover:bg-slate-50"
-              href={membership.role === "WAITER" ? restaurantRoutes.staff(membership.restaurant.slug) : membership.role === "KITCHEN" ? restaurantRoutes.kitchen(membership.restaurant.slug) : membership.role === "CASHIER" ? restaurantRoutes.cashier(membership.restaurant.slug) : restaurantRoutes.admin(membership.restaurant.slug)}
-            >
-              {membership.restaurant.name} · {getRoleLabel(membership.role)}
-            </Link>
-          ))}
+          {memberships.map((membership) => {
+            const href = !canRoleAccessPlan(membership.restaurant.plan, membership.role)
+              ? "/unauthorized"
+              : membership.role === "WAITER"
+                ? restaurantRoutes.staff(membership.restaurant.slug)
+                : membership.role === "KITCHEN"
+                  ? restaurantRoutes.kitchen(membership.restaurant.slug)
+                  : membership.role === "CASHIER"
+                    ? restaurantRoutes.cashier(membership.restaurant.slug)
+                    : restaurantRoutes.admin(membership.restaurant.slug);
+
+            return (
+              <Link
+                key={membership.id}
+                className="block rounded-md border px-4 py-3 text-sm hover:bg-slate-50"
+                href={href}
+              >
+                {membership.restaurant.name} · {getRoleLabel(membership.role)}
+              </Link>
+            );
+          })}
         </div>
       </section>
     </main>

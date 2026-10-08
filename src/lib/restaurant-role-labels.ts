@@ -1,4 +1,5 @@
 import type { RestaurantRole } from "@prisma/client";
+import { allowedStaffRolesForPlan } from "@/lib/plan/features";
 
 export const restaurantRoleLabels: Record<RestaurantRole, string> = {
   OWNER: "Chủ quán",
@@ -14,3 +15,7 @@ export function getRoleLabel(role: RestaurantRole | string | null | undefined) {
 }
 
 export const assignableRestaurantRoles: RestaurantRole[] = ["MANAGER", "WAITER", "KITCHEN", "CASHIER"];
+
+export function assignableRestaurantRolesForPlan(plan: string | null | undefined) {
+  return allowedStaffRolesForPlan(plan);
+}

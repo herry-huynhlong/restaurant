@@ -2,6 +2,7 @@ import webPush from "web-push";
 import { prisma } from "@/lib/db/prisma";
 import type { PushPayload } from "@/lib/push";
 import type { RestaurantRole } from "@prisma/client";
+import { allowedStaffRolesForPlan } from "@/lib/plan/features";
 
 function configureWebPush() {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -101,6 +102,13 @@ export async function sendPushToRestaurantRoles({
   roles: RestaurantRole[];
   payload: PushPayload;
 }) {
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { plan: true }
+  });
+  const allowedRoles = new Set<RestaurantRole>(["OWNER", ...allowedStaffRolesForPlan(restaurant?.plan)]);
+  const effectiveRoles = roles.filter((role) => allowedRoles.has(role));
+
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
       restaurantId,
@@ -110,7 +118,7 @@ export async function sendPushToRestaurantRoles({
           some: {
             restaurantId,
             isActive: true,
-            role: { in: roles }
+            role: { in: effectiveRoles }
           }
         }
       }
@@ -119,7 +127,7 @@ export async function sendPushToRestaurantRoles({
 
   console.info("[push] recipients", {
     restaurantId,
-    roles,
+    roles: effectiveRoles,
     count: subscriptions.length,
     title: payload.title
   });

@@ -5,6 +5,7 @@ import { getCustomerContext } from "@/server/services/customer-context";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
 import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
 import { calculateBillSummary } from "@/server/services/billing-service";
+import { hasPlanFeature } from "@/lib/plan/features";
 
 const requestSchema = z.object({
   requestType: z.enum(["CALL_STAFF", "REQUEST_WATER", "REQUEST_UTENSILS", "REQUEST_PAYMENT", "OTHER"]),
@@ -28,6 +29,10 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   const parsed = requestSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
+  }
+
+  if (parsed.data.requestType === "REQUEST_PAYMENT" && !hasPlanFeature(context.restaurant.plan, "CASHIER_FLOW")) {
+    return NextResponse.json({ error: "Gói hiện tại chưa hỗ trợ thanh toán tại bàn." }, { status: 403 });
   }
 
   const eventType = parsed.data.requestType === "REQUEST_PAYMENT" ? "PAYMENT_REQUESTED" : "SERVICE_REQUEST_CREATED";

@@ -19,6 +19,7 @@ export default async function AdminOrdersPage({ params }: { params: { rSlug: str
       title="Order theo bàn"
       userName={access.user.name}
       notifications={notifications}
+      plan={access.restaurant.plan}
     >
       <OrdersByTableBoard slug={access.restaurant.slug} initialTables={tables} />
     </RestaurantAdminShell>

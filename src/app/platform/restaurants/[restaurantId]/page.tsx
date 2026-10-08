@@ -53,8 +53,7 @@ export default async function RestaurantDetailPage({
           <form className="flex flex-wrap gap-2" action={extendSubscriptionAction}>
             <input name="restaurantId" type="hidden" value={restaurant.id} />
             <input className="rounded-md border px-3 py-2 text-sm" name="subscriptionEnd" type="date" />
-            <select className="rounded-md border px-3 py-2 text-sm" name="plan" defaultValue={restaurant.plan}>
-              <option value="FREE">FREE</option>
+            <select className="rounded-md border px-3 py-2 text-sm" name="plan" defaultValue={restaurant.plan === "PRO" ? "PRO" : "BASIC"}>
               <option value="BASIC">BASIC</option>
               <option value="PRO">PRO</option>
             </select>

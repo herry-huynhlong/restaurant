@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { readPaymentMethod } from "@/server/services/billing-service";
 import { confirmDiningSessionPaid } from "@/server/services/payment-service";
+import { hasPlanFeature } from "@/lib/plan/features";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 
 export async function POST(request: Request, { params }: { params: { rSlug: string } }) {
   try {
     const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "CASHIER"]);
+    if (!hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM")) {
+      return NextResponse.json({ ok: false, error: "plan_locked", message: "Gói hiện tại chưa hỗ trợ xác nhận thanh toán." }, { status: 403 });
+    }
     const body = await request.json().catch(() => ({}));
     const diningSessionId = typeof body.diningSessionId === "string" ? body.diningSessionId : "";
 

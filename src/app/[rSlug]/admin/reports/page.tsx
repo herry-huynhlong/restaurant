@@ -5,7 +5,7 @@ import { ReportsAutoRefresh } from "@/components/admin/reports-auto-refresh";
 import { StatCard } from "@/components/ui/stat-card";
 import { formatVnd } from "@/lib/money";
 import { getReportPeriodLabel, normalizeReportPeriod, type ReportPeriod } from "@/lib/period";
-import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { getRestaurantPaymentReport } from "@/server/services/reporting-service";
 
@@ -19,12 +19,13 @@ export default async function AdminReportsPage({
   searchParams: { period?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
+  requireRestaurantFeature(access, "ADVANCED_REPORTS");
   const period = normalizeReportPeriod(searchParams.period);
   const report = await getRestaurantPaymentReport(access.restaurant.id, period);
   const maxBucketAmount = Math.max(...report.buckets.map((bucket) => bucket.amount), 1);
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Báo cáo">
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Báo cáo" plan={access.restaurant.plan}>
       <section className="space-y-5">
         <div className="flex flex-wrap gap-2">
           {periods.map((item) => (

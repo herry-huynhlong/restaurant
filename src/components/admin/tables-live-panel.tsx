@@ -86,12 +86,14 @@ export function TablesLivePanel({
   slug,
   restaurantName,
   cashierName,
+  canUsePayment,
   initialState,
   initialSelectedTableId
 }: {
   slug: string;
   restaurantName: string;
   cashierName?: string | null;
+  canUsePayment: boolean;
   initialState: TableState;
   initialSelectedTableId?: string | null;
 }) {
@@ -199,6 +201,7 @@ export function TablesLivePanel({
         cashierName={cashierName}
         settings={state.settings}
         table={selectedTable}
+        canUsePayment={canUsePayment}
         onConfirmPaid={confirmPaid}
         paymentPending={payingSessionId === selectedTable?.activeSession?.id}
       />
@@ -244,6 +247,7 @@ function TableDetail({
   cashierName,
   settings,
   table,
+  canUsePayment,
   onConfirmPaid,
   paymentPending
 }: {
@@ -251,6 +255,7 @@ function TableDetail({
   cashierName?: string | null;
   settings: TableState["settings"];
   table: LiveTable | null;
+  canUsePayment: boolean;
   onConfirmPaid: (table: LiveTable) => void;
   paymentPending: boolean;
 }) {
@@ -320,7 +325,7 @@ function TableDetail({
             <div className="flex justify-between"><span className="text-sm text-slate-600">Thuế {session.taxRate}%</span><span className="font-semibold">{formatVnd(session.taxAmount)}</span></div>
             <div className="flex justify-between"><span className="font-semibold">Tổng thanh toán</span><span className="text-2xl font-bold text-teal-700">{formatVnd(session.grandTotal)}</span></div>
           </div>
-          <div className="mt-4 grid gap-3 border-t pt-4">
+          {canUsePayment ? <div className="mt-4 grid gap-3 border-t pt-4">
             <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">Phương thức hiện tại: tiền mặt</p>
             <div className="grid grid-cols-2 gap-2">
             <InvoicePrintButton label="In bill" invoice={{
@@ -351,7 +356,7 @@ function TableDetail({
                 {paymentPending ? "Đang lưu..." : "Đã thanh toán"}
               </button>
             </div>
-          </div>
+          </div> : null}
         </>
       ) : (
         <p className="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Bàn đang trống, chưa có phiên phục vụ.</p>

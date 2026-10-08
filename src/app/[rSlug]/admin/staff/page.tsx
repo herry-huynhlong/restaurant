@@ -7,7 +7,8 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
-import { assignableRestaurantRoles, restaurantRoleLabels } from "@/lib/restaurant-role-labels";
+import { departmentLoginRolesForPlan } from "@/lib/plan/features";
+import { assignableRestaurantRolesForPlan, restaurantRoleLabels } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import {
   createStaffAction,
@@ -16,11 +17,11 @@ import {
   updateStaffAction
 } from "@/app/[rSlug]/admin/actions";
 
-const departmentAccess = [
-  { role: "WAITER", title: "Phục vụ", description: "Dành cho nhân viên phục vụ bàn." },
-  { role: "KITCHEN", title: "Bếp", description: "Dành cho bộ phận bếp." },
-  { role: "CASHIER", title: "Thu ngân", description: "Dành cho quầy thu ngân." }
-] as const;
+const departmentLabels: Record<"WAITER" | "KITCHEN" | "CASHIER", { title: string; description: string }> = {
+  WAITER: { title: "Phục vụ", description: "Dành cho nhân viên phục vụ bàn." },
+  KITCHEN: { title: "Bếp", description: "Dành cho bộ phận bếp." },
+  CASHIER: { title: "Thu ngân", description: "Dành cho quầy thu ngân." }
+};
 
 export default async function AdminStaffPage({
   params,
@@ -30,6 +31,11 @@ export default async function AdminStaffPage({
   searchParams?: { error?: string; success?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
+  const assignableRoles = assignableRestaurantRolesForPlan(access.restaurant.plan);
+  const departmentAccess = departmentLoginRolesForPlan(access.restaurant.plan).map((role) => ({
+    role,
+    ...departmentLabels[role as "WAITER" | "KITCHEN" | "CASHIER"]
+  }));
   const origin = getRequestOrigin();
   const loginAccessRows = await Promise.all(departmentAccess.map(async (item) => {
     const url = `${origin}/${access.restaurant.slug}/login?role=${item.role}`;
@@ -43,7 +49,7 @@ export default async function AdminStaffPage({
     prisma.restaurantUser.findMany({
       where: {
         restaurantId: access.restaurant.id,
-        role: { in: assignableRestaurantRoles }
+        role: { in: assignableRoles }
       },
       include: { user: true },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }]
@@ -59,6 +65,7 @@ export default async function AdminStaffPage({
       title="Nhân viên"
       userName={access.user.name}
       notifications={notifications}
+      plan={access.restaurant.plan}
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
 
@@ -100,7 +107,7 @@ export default async function AdminStaffPage({
             </Field>
             <Field label="Vai trò">
               <select className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="role" defaultValue="WAITER">
-                {assignableRestaurantRoles.map((role) => (
+                {assignableRoles.map((role) => (
                   <option key={role} value={role}>{restaurantRoleLabels[role]}</option>
                 ))}
               </select>
@@ -123,7 +130,7 @@ export default async function AdminStaffPage({
               const isSelf = membership.userId === access.user.id;
               const isEnabled = membership.isActive && membership.user.isActive;
               const username = membership.username ?? membership.user.email.split("@")[0];
-              const roleOptions = membership.role === "OWNER" ? ["OWNER" as RestaurantRole] : assignableRestaurantRoles;
+              const roleOptions = membership.role === "OWNER" ? ["OWNER" as RestaurantRole] : assignableRoles;
               const canEditRole = !isSelf && membership.role !== "OWNER";
               const canToggle = !isSelf && membership.role !== "OWNER";
 

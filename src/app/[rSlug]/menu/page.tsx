@@ -18,7 +18,7 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
     orderBy: [{ menuType: "asc" }, { sortOrder: "asc" }, { nameVi: "asc" }]
   });
   return (
-    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName}>
+    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan}>
       <CustomerMenuClient
         slug={restaurant.slug}
         primaryColor={restaurant.settings?.primaryColor ?? "#0f766e"}

@@ -21,7 +21,7 @@ export default async function AdminTopItemsPage({
   const maxQuantity = Math.max(...report.items.map((item) => item.quantity), 1);
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Top món">
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Top món" plan={access.restaurant.plan}>
       <section className="space-y-5">
         <div className="flex flex-wrap gap-2">
           {periods.map((item) => (

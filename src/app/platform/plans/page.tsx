@@ -3,7 +3,7 @@ import { requirePlatformAdmin } from "@/lib/rbac/guards";
 
 export default async function PlatformPlansPage() {
   await requirePlatformAdmin();
-  return <PlatformShell title="Gói dịch vụ"><Placeholder text="FREE, BASIC, PRO đã được hỗ trợ trong database và actions đổi gói." /></PlatformShell>;
+  return <PlatformShell title="Gói dịch vụ"><Placeholder text="Luồng thương mại hiện chỉ dùng BASIC và PRO. BASIC tập trung QR/Menu/Phục vụ; PRO mở thêm Bếp/Thu ngân/Thanh toán/Báo cáo nâng cao." /></PlatformShell>;
 }
 
 function Placeholder({ text }: { text: string }) {

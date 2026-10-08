@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type { RestaurantRole } from "@prisma/client";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
+import { canRoleAccessPlan, hasPlanFeature, type PlanFeature } from "@/lib/plan/features";
 import { hasAnyRestaurantRole } from "@/lib/rbac/roles";
 import { restaurantRoutes } from "@/lib/routes";
 
@@ -36,7 +37,8 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
       name: true,
       slug: true,
       status: true,
-      subscriptionStatus: true
+      subscriptionStatus: true,
+      plan: true
     }
   });
 
@@ -70,5 +72,18 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
     redirect("/unauthorized");
   }
 
+  if (!canRoleAccessPlan(restaurant.plan, membership.role)) {
+    redirect("/unauthorized");
+  }
+
   return { user, restaurant, membership };
+}
+
+export function requireRestaurantFeature(
+  access: Awaited<ReturnType<typeof requireRestaurantAccess>>,
+  feature: PlanFeature
+) {
+  if (!hasPlanFeature(access.restaurant.plan, feature)) {
+    redirect("/unauthorized");
+  }
 }

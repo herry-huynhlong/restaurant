@@ -27,7 +27,7 @@ export default async function WelcomePage({
   const startAction = startCustomerSessionAction.bind(null, restaurant.slug);
 
   return (
-    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={table?.name}>
+    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={table?.name} plan={restaurant.plan}>
       {!canOperate ? (
         <BlockedMessage />
       ) : errorMessage ? (

@@ -43,7 +43,7 @@ export default async function EditRestaurantPage({
         <section>
           <h2 className="text-base font-semibold">Gói dịch vụ</h2>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
-            <SelectField label="Plan" name="plan" defaultValue={restaurant.plan} options={[["FREE", "FREE"], ["BASIC", "BASIC"], ["PRO", "PRO"]]} />
+            <SelectField label="Plan" name="plan" defaultValue={restaurant.plan === "PRO" ? "PRO" : "BASIC"} options={[["BASIC", "BASIC"], ["PRO", "PRO"]]} />
             <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" defaultValue={toDateInput(restaurant.subscriptionStart)} />
             <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" defaultValue={toDateInput(restaurant.subscriptionEnd)} />
             <SelectField label="Subscription status" name="subscriptionStatus" defaultValue={restaurant.subscriptionStatus} options={[["ACTIVE", "ACTIVE"], ["EXPIRED", "EXPIRED"], ["SUSPENDED", "SUSPENDED"]]} />

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { OrderStatus, ServiceRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { restaurantRoutes } from "@/lib/routes";
-import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { createNotificationsForRestaurantRoles } from "@/server/services/notification-service";
 import { publishNotificationRefresh } from "@/server/services/notification-event-service";
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
@@ -13,6 +13,9 @@ import { confirmDiningSessionPaid } from "@/server/services/payment-service";
 
 export async function updateOrderStatusAction(slug: string, orderId: string, status: OrderStatus) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "KITCHEN"]);
+  if (status === "PREPARING" || status === "READY") {
+    requireRestaurantFeature(access, "KITCHEN_FLOW");
+  }
   const order = await prisma.order.update({
     where: { id: orderId, restaurantId: access.restaurant.id },
     data: { status },
@@ -67,6 +70,7 @@ export async function updateServiceRequestStatusAction(slug: string, requestId: 
 
 export async function markDiningSessionPaidAction(slug: string, diningSessionId: string, formData?: FormData) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "CASHIER"]);
+  requireRestaurantFeature(access, "PAYMENT_CONFIRM");
   const paymentMethod = readPaymentMethod(formData?.get("paymentMethod") ?? null);
   await confirmDiningSessionPaid({
     restaurantId: access.restaurant.id,

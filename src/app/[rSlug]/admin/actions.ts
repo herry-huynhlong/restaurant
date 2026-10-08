@@ -12,6 +12,7 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { parseVndInteger } from "@/lib/money";
 import { assignableRestaurantRoles } from "@/lib/restaurant-role-labels";
+import { allowedStaffRolesForPlan } from "@/lib/plan/features";
 import { isValidUsername, makeInternalStaffEmail, normalizeUsername, usernameValidationMessage } from "@/lib/username";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
@@ -801,6 +802,9 @@ function staffActionErrorMessage(error: unknown) {
   if (error instanceof Error && error.message === "OWNER_NOT_STAFF") {
     return "Không thể chỉnh sửa chủ quán từ trang nhân viên.";
   }
+  if (error instanceof Error && error.message === "INVALID_STAFF_ROLE") {
+    return "Gói hiện tại chỉ cho phép tạo và quản lý vai trò được hỗ trợ.";
+  }
   if (error instanceof z.ZodError) {
     return error.issues[0]?.message ?? "Dữ liệu nhân viên không hợp lệ.";
   }
@@ -826,7 +830,8 @@ export async function createStaffAction(slug: string, formData: FormData) {
       password: readString(formData, "password")
     });
 
-    if (!assignableRestaurantRoles.includes(parsed.role)) {
+    const allowedRoles = allowedStaffRolesForPlan(access.restaurant.plan);
+    if (!assignableRestaurantRoles.includes(parsed.role) || !allowedRoles.includes(parsed.role)) {
       throw new Error("INVALID_STAFF_ROLE");
     }
 
@@ -898,6 +903,10 @@ export async function updateStaffAction(slug: string, formData: FormData) {
     const membership = await getManagedStaffMembership(access.restaurant.id, parsed.membershipId);
     if (!membership) throw new Error("STAFF_NOT_FOUND");
     if (membership.role === "OWNER") throw new Error("OWNER_NOT_STAFF");
+    const allowedRoles = allowedStaffRolesForPlan(access.restaurant.plan);
+    if (!assignableRestaurantRoles.includes(parsed.role) || !allowedRoles.includes(parsed.role)) {
+      throw new Error("INVALID_STAFF_ROLE");
+    }
     ensureCanMutateStaff(access, membership, parsed.role, parsed.isActive);
 
     await prisma.$transaction([

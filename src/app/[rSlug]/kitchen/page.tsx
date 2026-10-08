@@ -3,13 +3,14 @@ import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
 import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/db/prisma";
-import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { updateOrderStatusAction } from "@/app/[rSlug]/ops/actions";
 
 export default async function KitchenPage({ params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "KITCHEN"]);
+  requireRestaurantFeature(access, "KITCHEN_FLOW");
   const [orders, notifications] = await Promise.all([
     prisma.order.findMany({
       where: {

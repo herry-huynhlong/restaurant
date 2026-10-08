@@ -7,6 +7,7 @@ import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { NotificationAudioUnlocker } from "@/components/app-shell/notification-audio-unlocker";
 import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
+import { hasPlanFeature } from "@/lib/plan/features";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { restaurantRoutes } from "@/lib/routes";
 
@@ -15,10 +16,10 @@ export function RestaurantAdminShell({
   restaurantName,
   role,
   children,
-  title
-  ,
+  title,
   userName,
-  notifications = []
+  notifications = [],
+  plan = "BASIC"
 }: {
   slug: string;
   restaurantName: string;
@@ -27,6 +28,7 @@ export function RestaurantAdminShell({
   title: string;
   userName?: string | null;
   notifications?: Notification[];
+  plan?: string | null;
 }) {
   const roleLabel = getRoleLabel(role);
   const navItems = [
@@ -35,9 +37,9 @@ export function RestaurantAdminShell({
     ["Khu vực & Bàn", restaurantRoutes.adminTables(slug), Grid3X3],
     ["Order", restaurantRoutes.adminOrders(slug), ListOrdered],
     ["Nhân viên", restaurantRoutes.adminStaff(slug), Users],
-    ["Thanh toán", restaurantRoutes.adminPayments(slug), CreditCard],
+    ...(hasPlanFeature(plan, "CASHIER_FLOW") ? [["Thanh toán", restaurantRoutes.adminPayments(slug), CreditCard] as const] : []),
     ["Top món", restaurantRoutes.adminTopItems(slug), Trophy],
-    ["Báo cáo", restaurantRoutes.adminReports(slug), BarChart3],
+    ...(hasPlanFeature(plan, "ADVANCED_REPORTS") ? [["Báo cáo", restaurantRoutes.adminReports(slug), BarChart3] as const] : []),
     ["Cài đặt", restaurantRoutes.adminSettings(slug), Settings]
   ] as const;
 

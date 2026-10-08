@@ -6,7 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { formatVnd } from "@/lib/money";
-import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { markDiningSessionPaidAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
@@ -24,6 +24,7 @@ function getSessionCustomerName(session: {
 
 export default async function CashierPage({ params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "CASHIER"]);
+  requireRestaurantFeature(access, "CASHIER_FLOW");
   const [sessions, paymentRequests, notifications, settings] = await Promise.all([
     prisma.diningSession.findMany({
       where: {

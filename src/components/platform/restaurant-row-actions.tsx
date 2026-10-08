@@ -53,8 +53,7 @@ export function PlatformRestaurantActions({
       <form className="flex gap-1" action={changePlanAction}>
         <input name="restaurantId" type="hidden" value={restaurantId} />
         <input name="returnTo" type="hidden" value={returnTo} />
-        <select className="rounded-md border px-1 py-1 text-sm" name="plan" defaultValue={plan} aria-label="Gói dịch vụ">
-          <option value="FREE">FREE</option>
+        <select className="rounded-md border px-1 py-1 text-sm" name="plan" defaultValue={plan === "PRO" ? "PRO" : "BASIC"} aria-label="Gói dịch vụ">
           <option value="BASIC">BASIC</option>
           <option value="PRO">PRO</option>
         </select>

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { canRoleAccessPlan } from "@/lib/plan/features";
 import { platformRoutes, restaurantRoutes } from "@/lib/routes";
 
 export async function getPostLoginPath(userId: string, platformRole: string) {
@@ -10,7 +11,7 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
     where: { userId, isActive: true },
     include: {
       restaurant: {
-        select: { slug: true, status: true }
+        select: { slug: true, status: true, plan: true }
       }
     },
     orderBy: { createdAt: "asc" }
@@ -23,6 +24,10 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
   const membership = memberships[0];
   if (membership.restaurant.status !== "ACTIVE") {
     return restaurantRoutes.locked(membership.restaurant.slug);
+  }
+
+  if (!canRoleAccessPlan(membership.restaurant.plan, membership.role)) {
+    return "/unauthorized";
   }
 
   const slug = membership.restaurant.slug;
