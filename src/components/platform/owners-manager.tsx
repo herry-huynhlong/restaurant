@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { resetOwnerPasswordAction, updateOwnerNameAction } from "@/app/platform/restaurants/actions";
 
 type OwnerRow = {
@@ -96,9 +97,18 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
 }
 
 function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }) {
+  const searchParams = useSearchParams();
   const resetDialogRef = useRef<HTMLDialogElement>(null);
   const editDialogRef = useRef<HTMLDialogElement>(null);
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    if (!searchParams.get("success")) return;
+    resetDialogRef.current?.close();
+    setPassword("");
+    setConfirmPassword("");
+  }, [searchParams]);
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -165,9 +175,15 @@ function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }
               required
               pattern={escapePattern(password)}
               title="Xác nhận mật khẩu phải khớp."
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.currentTarget.value)}
             />
           </label>
-          <DialogActions close={() => resetDialogRef.current?.close()} submitLabel="Lưu mật khẩu mới" />
+          <DialogActions close={() => {
+            resetDialogRef.current?.close();
+            setPassword("");
+            setConfirmPassword("");
+          }} submitLabel="Lưu mật khẩu mới" />
         </form>
       </dialog>
     </div>

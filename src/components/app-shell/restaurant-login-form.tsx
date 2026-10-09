@@ -4,16 +4,18 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-export function RestaurantLoginForm({ slug }: { slug: string }) {
+export function RestaurantLoginForm({ slug, initialError }: { slug: string; initialError?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState(initialError ?? null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     setError(null);
+    setPageError(null);
 
     const formData = new FormData(event.currentTarget);
     const username = String(formData.get("username") ?? "").trim();
@@ -62,6 +64,7 @@ export function RestaurantLoginForm({ slug }: { slug: string }) {
           required
         />
       </label>
+      {pageError ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{pageError}</p> : null}
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <button
         className="h-11 w-full rounded-md bg-teal-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"

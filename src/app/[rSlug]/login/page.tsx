@@ -34,11 +34,8 @@ export default async function RestaurantLoginPage({
           <h1 className="mt-2 text-2xl font-semibold tracking-normal">Đăng nhập {roleLoginLabels[searchParams?.role ?? ""] ?? "nhân viên"}</h1>
           <p className="mt-2 text-sm text-slate-600">Dùng tên đăng nhập do chủ quán hoặc quản lý tạo.</p>
         </div>
-        {searchParams?.error ? (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{searchParams.error}</p>
-        ) : null}
         {restaurant.status === "ACTIVE" ? (
-          <RestaurantLoginForm slug={restaurant.slug} />
+          <RestaurantLoginForm slug={restaurant.slug} initialError={searchParams?.error} />
         ) : (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Nhà hàng hiện đang bị khóa. Vui lòng liên hệ quản trị hệ thống.
