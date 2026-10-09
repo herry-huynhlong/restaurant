@@ -193,6 +193,7 @@ export default async function AdminStaffPage({
               const isSelf = membership.userId === access.user.id;
               const isEnabled = membership.isActive && membership.user.isActive;
               const username = membership.username ?? membership.user.email.split("@")[0];
+              const displayName = membership.user.name.trim() || username;
               const roleOptions = membership.role === "OWNER" ? ["OWNER" as RestaurantRole] : assignableRoles;
               const canEditRole = !isSelf && membership.role !== "OWNER";
               const canToggle = !isSelf && membership.role !== "OWNER";
@@ -201,7 +202,7 @@ export default async function AdminStaffPage({
                 <article key={membership.id} className="min-w-0 rounded-lg border bg-white p-3 shadow-sm">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="truncate text-base font-semibold">{membership.user.name}</h3>
+                      <h3 className="truncate text-base font-semibold">{displayName}</h3>
                       <p className="text-sm font-medium text-slate-700">{restaurantRoleLabels[membership.role]}</p>
                       <p className="mt-1 break-all text-sm text-slate-600">Tên đăng nhập: <span className="font-semibold">{username}</span></p>
                     </div>
@@ -217,7 +218,7 @@ export default async function AdminStaffPage({
                         <input name="membershipId" type="hidden" value={membership.id} />
                         <div className="grid gap-3 sm:grid-cols-2">
                           <Field label="Tên">
-                            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="name" defaultValue={membership.user.name} required />
+                            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="name" defaultValue={displayName} required />
                           </Field>
                           <Field label="Tên đăng nhập">
                             <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="username" defaultValue={username} pattern="[a-z0-9_-]{3,30}" required />
@@ -258,7 +259,7 @@ export default async function AdminStaffPage({
                         <ConfirmSubmitButton
                           className={`w-full rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${isEnabled ? "border-red-200 text-red-700" : "border-teal-200 text-teal-700"}`}
                           disabled={!canToggle}
-                          message={`${isEnabled ? "Ngừng sử dụng" : "Kích hoạt"} ${membership.user.name}?`}
+                          message={`${isEnabled ? "Ngừng sử dụng" : "Kích hoạt"} ${displayName}?`}
                         >
                           {isEnabled ? "Ngừng sử dụng" : "Kích hoạt"}
                         </ConfirmSubmitButton>
