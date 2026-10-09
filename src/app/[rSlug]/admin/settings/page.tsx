@@ -62,6 +62,28 @@ export default async function SettingsPage({
           <div className="md:col-span-2">
             <SettingsImageUpload name="paymentQrFile" label="Ảnh mã QR thanh toán" currentUrl={paymentQrUrl} previewClassName="h-32 w-32" />
           </div>
+          <Text name="bankName" label="Tên ngân hàng" defaultValue={settings?.bankName} />
+          <Text name="accountNumber" label="Số tài khoản" defaultValue={settings?.accountNumber} />
+          <Text name="accountHolder" label="Chủ tài khoản" defaultValue={settings?.accountHolder} />
+          <Text name="paymentTransferContent" label="Nội dung chuyển khoản mặc định" defaultValue={settings?.paymentTransferContent} />
+        </SettingsSection>
+
+        <SettingsSection title="Thuế & hóa đơn">
+          <Check name="taxEnabled" label="Áp dụng VAT" defaultChecked={settings?.taxEnabled ?? false} />
+          <label className="block text-sm font-medium">
+            Thuế suất VAT
+            <select className="mt-1 h-10 w-full rounded-md border bg-white px-3" name="taxRate" defaultValue={String(Number(settings?.taxRate ?? 0))}>
+              <option value="0">0%</option>
+              <option value="5">5%</option>
+              <option value="8">8%</option>
+              <option value="10">10%</option>
+            </select>
+          </label>
+          <Text name="invoiceBusinessName" label="Tên công ty / đơn vị" defaultValue={settings?.invoiceBusinessName ?? settings?.invoiceDisplayName ?? settings?.restaurantName ?? restaurant.name} />
+          <Text name="invoiceTaxCode" label="Mã số thuế" defaultValue={settings?.invoiceTaxCode} />
+          <Text name="invoiceAddress" label="Địa chỉ xuất hóa đơn" defaultValue={settings?.invoiceAddress ?? settings?.address} />
+          <Text name="invoicePhone" label="Số điện thoại" defaultValue={settings?.invoicePhone ?? settings?.phone} />
+          <Text name="invoiceEmail" label="Email" defaultValue={settings?.invoiceEmail} type="email" />
         </SettingsSection>
 
         <SettingsSection title="Thông báo">

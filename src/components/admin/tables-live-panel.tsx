@@ -15,6 +15,12 @@ type TableState = {
     invoiceDisplayName: string | null;
     address: string | null;
     phone: string | null;
+    qrPaymentEnabled: boolean;
+    paymentQrImage: string | null;
+    bankName: string | null;
+    accountNumber: string | null;
+    accountHolder: string | null;
+    paymentTransferContent: string | null;
   };
   areas: Array<{
     id: string;
@@ -334,7 +340,7 @@ function TableDetail({
           {canUsePayment ? <div className="mt-4 grid gap-3 border-t pt-4">
             <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">Phương thức hiện tại: tiền mặt</p>
             <div className="grid grid-cols-2 gap-2">
-            <InvoicePrintButton label="In bill" invoice={{
+            <InvoicePrintButton label={session.paymentStatus === "PAID" ? "In phiếu thanh toán" : "In phiếu tạm tính"} invoice={{
               restaurantName,
               businessName: settings.invoiceBusinessName ?? restaurantName,
               taxCode: settings.invoiceTaxCode,
@@ -343,7 +349,9 @@ function TableDetail({
               email: settings.invoiceEmail,
               invoiceNumber: null,
               tableName: table.name,
+              areaName: table.areaName,
               cashierName,
+              openedAt: new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(new Date(session.openedAt)),
               paidAt: null,
               status: session.paymentStatus === "PENDING" ? "PENDING" : "UNPAID",
               paymentMethod: null,
@@ -351,7 +359,15 @@ function TableDetail({
               taxRate: session.taxRate,
               taxAmount: session.taxAmount,
               grandTotal: session.grandTotal,
-              items: session.orders.flatMap((order) => order.items)
+              items: session.orders.flatMap((order) => order.items),
+              paymentQr: {
+                enabled: settings.qrPaymentEnabled,
+                imageUrl: settings.paymentQrImage,
+                bankName: settings.bankName,
+                accountNumber: settings.accountNumber,
+                accountHolder: settings.accountHolder,
+                transferContent: settings.paymentTransferContent || `Bàn ${table.name}`
+              }
             }} />
               <button
                 className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"

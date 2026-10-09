@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { formatVnd } from "@/lib/money";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
@@ -182,8 +183,8 @@ function PaymentActions({ slug, session, settings, restaurantName, cashierName }
     restaurantName,
     businessName: settings?.invoiceBusinessName ?? restaurantName,
     taxCode: settings?.invoiceTaxCode ?? null,
-    address: settings?.address ?? null,
-    phone: settings?.phone ?? null,
+    address: settings?.invoiceAddress ?? settings?.address ?? null,
+    phone: settings?.invoicePhone ?? settings?.phone ?? null,
     email: settings?.invoiceEmail ?? null,
     invoiceNumber: null,
     tableName: session.table.name,
@@ -195,6 +196,14 @@ function PaymentActions({ slug, session, settings, restaurantName, cashierName }
     taxRate: bill.taxRate,
     taxAmount: bill.taxAmount,
     grandTotal: bill.grandTotal,
+    paymentQr: {
+      enabled: settings?.qrPaymentEnabled ?? false,
+      imageUrl: servedUploadUrl(settings?.paymentQrImage),
+      bankName: settings?.bankName ?? null,
+      accountNumber: settings?.accountNumber ?? null,
+      accountHolder: settings?.accountHolder ?? null,
+      transferContent: settings?.paymentTransferContent || `Bàn ${session.table.name}`
+    },
     items: session.orders.flatMap((order: any) => order.items.map((item: any) => ({
       id: item.id,
       name: item.productNameViSnapshot,
@@ -206,7 +215,7 @@ function PaymentActions({ slug, session, settings, restaurantName, cashierName }
 
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      <InvoicePrintButton label="In bill" invoice={invoice} />
+      <InvoicePrintButton label="In phiếu tạm tính" invoice={invoice} />
       <form className="flex flex-wrap gap-2" action={markDiningSessionPaidAction.bind(null, slug, session.id)}>
         <input name="paymentMethod" type="hidden" value="CASH" />
         <ConfirmSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" message={`Xác nhận bàn ${session.table.name} đã thanh toán ${formatVnd(bill.grandTotal)}?`}>

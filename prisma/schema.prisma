@@ -252,11 +252,14 @@ model RestaurantSetting {
   bankCode        String?
   accountNumber   String?
   accountHolder   String?
+  paymentTransferContent String?
   paymentQrImage  String?
   cashEnabled     Boolean    @default(true)
   qrPaymentEnabled Boolean   @default(true)
   invoiceBusinessName String?
   invoiceTaxCode  String?
+  invoiceAddress  String?
+  invoicePhone    String?
   invoiceEmail    String?
   invoiceDisplayName String?
   taxEnabled      Boolean    @default(false)

@@ -1,6 +1,7 @@
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db/prisma";
 import { getTableQrUrl } from "@/lib/qr";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { calculateBillSummary } from "@/server/services/billing-service";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
@@ -43,8 +44,14 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
       invoiceTaxCode: settings?.invoiceTaxCode ?? null,
       invoiceEmail: settings?.invoiceEmail ?? null,
       invoiceDisplayName: settings?.invoiceDisplayName ?? null,
-      address: settings?.address ?? null,
-      phone: settings?.phone ?? null
+      address: settings?.invoiceAddress ?? settings?.address ?? null,
+      phone: settings?.invoicePhone ?? settings?.phone ?? null,
+      qrPaymentEnabled: settings?.qrPaymentEnabled ?? false,
+      paymentQrImage: servedUploadUrl(settings?.paymentQrImage),
+      bankName: settings?.bankName ?? null,
+      accountNumber: settings?.accountNumber ?? null,
+      accountHolder: settings?.accountHolder ?? null,
+      paymentTransferContent: settings?.paymentTransferContent ?? null
     },
     areas: await Promise.all(areas.map(async (area) => ({
       id: area.id,
