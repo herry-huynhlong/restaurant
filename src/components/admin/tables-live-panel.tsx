@@ -180,7 +180,7 @@ export function TablesLivePanel({
           <section key={area.id} className="space-y-3">
             <h2 className="text-base font-semibold">{area.name}</h2>
             {area.tables.length ? (
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                 {area.tables.map((table) => (
                   <TableSummaryCard
                     key={table.id}
@@ -213,31 +213,31 @@ export function TablesLivePanel({
 
 function TableSummaryCard({ table, selected, onSelect }: { table: LiveTable; selected: boolean; onSelect: () => void }) {
   const label = !table.isActive ? "Ngừng sử dụng" : tableStatusLabels[table.status] ?? table.status;
-  const paymentLabel = table.activeSession?.paymentStatus === "PENDING" ? "Chờ xác nhận" : table.activeSession?.paymentStatus === "PAID" ? "Đã thanh toán" : "Chưa thanh toán";
+  const itemCount = table.activeSession?.orders.reduce(
+    (total, order) => total + order.items.reduce((sum, item) => sum + item.quantity, 0),
+    0
+  ) ?? 0;
   const badgeClass = !table.isActive
-    ? "bg-slate-100 text-slate-600"
+    ? "border-slate-200 bg-slate-50 text-slate-600"
     : table.status === "PAYMENT_REQUESTED"
-      ? "bg-amber-50 text-amber-700"
+      ? "border-amber-200 bg-amber-50 text-amber-700"
       : table.status === "AVAILABLE"
-        ? "bg-slate-100 text-slate-700"
-        : "bg-teal-50 text-teal-700";
+        ? "border-slate-200 bg-slate-50 text-slate-700"
+        : "border-teal-200 bg-teal-50 text-teal-700";
+  const summary = !table.activeSession
+    ? "Chưa có khách"
+    : table.status === "PAYMENT_REQUESTED"
+      ? `Tổng: ${formatVnd(table.activeSession.grandTotal)}`
+      : `${itemCount} món · ${formatVnd(table.activeSession.grandTotal)}`;
 
   return (
-    <article className={`rounded-lg border bg-white p-4 shadow-sm ${selected ? "ring-2 ring-teal-600" : ""}`}>
+    <article className={`flex min-h-36 flex-col rounded-xl border bg-white p-4 transition hover:border-slate-300 hover:shadow-sm ${selected ? "border-teal-300 bg-teal-50/30" : "border-slate-200"}`}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold">Bàn {table.name}</h3>
-          <p className="text-sm text-slate-600">{table.areaName}</p>
-        </div>
-        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
+        <h3 className="min-w-0 truncate text-lg font-semibold">Bàn {table.name}</h3>
+        <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
       </div>
-      {table.activeSession ? (
-        <div className="mt-4 space-y-1 text-sm text-slate-600">
-          <p>Thanh toán: <span className="font-semibold">{paymentLabel}</span></p>
-          <p>Tổng: <span className="font-bold text-teal-700">{formatVnd(table.activeSession.grandTotal)}</span></p>
-        </div>
-      ) : null}
-      <button className="mt-4 rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onSelect}>
+      <p className={`mt-4 text-sm ${table.activeSession ? "font-semibold text-slate-800" : "text-slate-500"}`}>{summary}</p>
+      <button className="mt-auto w-fit rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onSelect}>
         Xem bàn
       </button>
     </article>
