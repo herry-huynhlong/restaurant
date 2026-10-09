@@ -10,7 +10,7 @@ export const allowedUploadImageTypes = ["image/jpeg", "image/png", "image/webp"]
 const MAX_OUTPUT_SIZE = 1024 * 1024;
 const THUMBNAIL_MAX_OUTPUT_SIZE = 150 * 1024;
 
-type UploadFolder = "products" | "logos";
+type UploadFolder = "products" | "logos" | "payments";
 
 type ProcessedImage = {
   imageUrl: string;

@@ -28,7 +28,7 @@ function readBoolean(formData: FormData, key: string) {
   return formData.get(key) === "on" || formData.get(key) === "true";
 }
 
-async function saveUploadedImage(formData: FormData, key: string) {
+async function saveUploadedImage(formData: FormData, key: string, folder: "products" | "logos" | "payments" = "products") {
   const file = formData.get(key);
   if (!(file instanceof File) || file.size === 0) {
     return undefined;
@@ -49,8 +49,18 @@ async function saveUploadedImage(formData: FormData, key: string) {
     throw new Error("INVALID_IMAGE_SIZE");
   }
 
-  const optimized = await saveOptimizedUploadImage(file, "products");
+  const optimized = await saveOptimizedUploadImage(file, folder);
   return optimized?.imageUrl;
+}
+
+function uploadImageErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message === "INVALID_IMAGE_TYPE") {
+    return "Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP.";
+  }
+  if (error instanceof Error && error.message === "INVALID_IMAGE_SIZE") {
+    return "Ảnh tối đa 5MB.";
+  }
+  return null;
 }
 
 function actionError(code: string, error: string, fieldErrors?: Record<string, string[]>) {
@@ -654,87 +664,106 @@ export async function toggleSoldOutAction(slug: string, formData: FormData) {
 
 const settingsSchema = z.object({
   restaurantName: z.string().trim().min(1).max(160),
-  logoUrl: z.string().trim().max(500).optional(),
   address: z.string().trim().max(300).optional(),
   phone: z.string().trim().max(50).optional(),
   timezone: z.string().trim().min(1).max(80),
   currency: z.string().trim().min(1).max(10),
-  primaryColor: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
   primaryLanguage: z.enum(["vi", "en"]),
-  bankName: z.string().trim().max(120).optional(),
-  bankCode: z.string().trim().max(50).optional(),
-  accountNumber: z.string().trim().max(80).optional(),
-  accountHolder: z.string().trim().max(160).optional(),
-  paymentQrImage: z.string().trim().max(500).optional(),
   cashEnabled: z.boolean(),
   qrPaymentEnabled: z.boolean(),
-  invoiceBusinessName: z.string().trim().max(200).optional(),
-  invoiceTaxCode: z.string().trim().max(80).optional(),
-  invoiceEmail: z.string().trim().email().max(160).optional(),
-  invoiceDisplayName: z.string().trim().max(200).optional(),
-  taxEnabled: z.boolean(),
-  taxRate: z.number().min(0).max(100),
-  notificationSoundEnabled: z.boolean(),
-  notifyNewOrder: z.boolean(),
-  notifyServiceRequest: z.boolean(),
-  notifyPaymentRequest: z.boolean()
+  notificationEnabled: z.boolean(),
+  notificationSoundEnabled: z.boolean()
 });
 
 export async function updateRestaurantSettingsAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminSettings(slug);
-  const parsed = settingsSchema.safeParse({
-    restaurantName: readString(formData, "restaurantName"),
-    logoUrl: readString(formData, "logoUrl") || undefined,
-    address: readString(formData, "address") || undefined,
-    phone: readString(formData, "phone") || undefined,
-    timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
-    currency: readString(formData, "currency") || "VND",
-    primaryColor: readString(formData, "primaryColor") || "#0f766e",
-    primaryLanguage: readString(formData, "primaryLanguage") || "vi",
-    bankName: readString(formData, "bankName") || undefined,
-    bankCode: readString(formData, "bankCode") || undefined,
-    accountNumber: readString(formData, "accountNumber") || undefined,
-    accountHolder: readString(formData, "accountHolder") || undefined,
-    paymentQrImage: readString(formData, "paymentQrImage") || undefined,
-    cashEnabled: readBoolean(formData, "cashEnabled"),
-    qrPaymentEnabled: readBoolean(formData, "qrPaymentEnabled"),
-    invoiceBusinessName: readString(formData, "invoiceBusinessName") || undefined,
-    invoiceTaxCode: readString(formData, "invoiceTaxCode") || undefined,
-    invoiceEmail: readString(formData, "invoiceEmail") || undefined,
-    invoiceDisplayName: readString(formData, "invoiceDisplayName") || undefined,
-    taxEnabled: readBoolean(formData, "taxEnabled"),
-    taxRate: Number.parseFloat(readString(formData, "taxRate") || "0"),
-    notificationSoundEnabled: readBoolean(formData, "notificationSoundEnabled"),
-    notifyNewOrder: readBoolean(formData, "notifyNewOrder"),
-    notifyServiceRequest: readBoolean(formData, "notifyServiceRequest"),
-    notifyPaymentRequest: readBoolean(formData, "notifyPaymentRequest")
-  });
-  if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu cài đặt không hợp lệ.");
+  try {
+    const parsed = settingsSchema.safeParse({
+      restaurantName: readString(formData, "restaurantName"),
+      address: readString(formData, "address") || undefined,
+      phone: readString(formData, "phone") || undefined,
+      timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
+      currency: readString(formData, "currency") || "VND",
+      primaryLanguage: readString(formData, "primaryLanguage") || "vi",
+      cashEnabled: readBoolean(formData, "cashEnabled"),
+      qrPaymentEnabled: readBoolean(formData, "qrPaymentEnabled"),
+      notificationEnabled: readBoolean(formData, "notificationEnabled"),
+      notificationSoundEnabled: readBoolean(formData, "notificationSoundEnabled")
+    });
+    if (!parsed.success) redirectWithMessage(path, "error", "Dữ liệu cài đặt không hợp lệ.");
 
-  await prisma.$transaction([
-    prisma.restaurant.update({
-      where: { id: access.restaurant.id },
-      data: { name: parsed.data.restaurantName, logoUrl: parsed.data.logoUrl || null }
-    }),
-    prisma.restaurantSetting.upsert({
-      where: { restaurantId: access.restaurant.id },
-      update: parsed.data,
-      create: { restaurantId: access.restaurant.id, ...parsed.data }
-    }),
-    prisma.auditLog.create({
-      data: {
-        restaurantId: access.restaurant.id,
-        userId: access.user.id,
-        action: "SETTINGS_UPDATED",
-        entityType: "RestaurantSetting",
-        entityId: access.restaurant.id,
-        metadataJson: { sections: ["info", "appearance", "language", "payment", "notification"] }
-      }
-    })
-  ]);
-  revalidatePath(path);
-  redirectWithMessage(path, "success", "Đã lưu cài đặt nhà hàng.");
+    const [currentSettings, currentRestaurant] = await Promise.all([
+      prisma.restaurantSetting.findUnique({
+        where: { restaurantId: access.restaurant.id }
+      }),
+      prisma.restaurant.findUnique({
+        where: { id: access.restaurant.id },
+        select: { logoUrl: true }
+      })
+    ]);
+    const [uploadedLogoUrl, uploadedPaymentQrUrl] = await Promise.all([
+      saveUploadedImage(formData, "logoFile", "logos"),
+      saveUploadedImage(formData, "paymentQrFile", "payments")
+    ]);
+    const logoUrl = uploadedLogoUrl ?? currentSettings?.logoUrl ?? currentRestaurant?.logoUrl ?? null;
+    const paymentQrImage = uploadedPaymentQrUrl ?? currentSettings?.paymentQrImage ?? null;
+    const notificationEnabled = parsed.data.notificationEnabled;
+    const settingsData = {
+      restaurantName: parsed.data.restaurantName,
+      logoUrl,
+      address: parsed.data.address,
+      phone: parsed.data.phone,
+      timezone: parsed.data.timezone,
+      currency: parsed.data.currency,
+      primaryLanguage: parsed.data.primaryLanguage,
+      primaryColor: currentSettings?.primaryColor ?? "#0f766e",
+      bankName: currentSettings?.bankName ?? null,
+      bankCode: currentSettings?.bankCode ?? null,
+      accountNumber: currentSettings?.accountNumber ?? null,
+      accountHolder: currentSettings?.accountHolder ?? null,
+      paymentQrImage,
+      cashEnabled: parsed.data.cashEnabled,
+      qrPaymentEnabled: parsed.data.qrPaymentEnabled,
+      invoiceBusinessName: currentSettings?.invoiceBusinessName ?? parsed.data.restaurantName,
+      invoiceTaxCode: currentSettings?.invoiceTaxCode ?? null,
+      invoiceEmail: currentSettings?.invoiceEmail ?? null,
+      invoiceDisplayName: currentSettings?.invoiceDisplayName ?? parsed.data.restaurantName,
+      taxEnabled: currentSettings?.taxEnabled ?? false,
+      taxRate: currentSettings?.taxRate ?? 0,
+      notificationSoundEnabled: parsed.data.notificationSoundEnabled,
+      notifyNewOrder: notificationEnabled,
+      notifyServiceRequest: notificationEnabled,
+      notifyPaymentRequest: notificationEnabled
+    };
+
+    await prisma.$transaction([
+      prisma.restaurant.update({
+        where: { id: access.restaurant.id },
+        data: { name: parsed.data.restaurantName, logoUrl }
+      }),
+      prisma.restaurantSetting.upsert({
+        where: { restaurantId: access.restaurant.id },
+        update: settingsData,
+        create: { restaurantId: access.restaurant.id, ...settingsData }
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: "SETTINGS_UPDATED",
+          entityType: "RestaurantSetting",
+          entityId: access.restaurant.id,
+          metadataJson: { sections: ["info", "language", "payment", "notification"] }
+        }
+      })
+    ]);
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã lưu cài đặt nhà hàng.");
+  } catch (error) {
+    rethrowNextRedirect(error);
+    redirectWithMessage(path, "error", uploadImageErrorMessage(error) ?? "Không lưu được cài đặt nhà hàng.");
+  }
 }
 
 const createStaffSchema = z.object({

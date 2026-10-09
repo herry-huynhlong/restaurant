@@ -11,7 +11,7 @@ const contentTypes: Record<string, string> = {
   ".webp": "image/webp"
 };
 
-const allowedFolders = new Set(["products", "logos"]);
+const allowedFolders = new Set(["products", "logos", "payments"]);
 
 export async function GET(_request: Request, { params }: { params: { path: string[] } }) {
   const segments = params.path ?? [];

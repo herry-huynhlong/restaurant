@@ -1,10 +1,10 @@
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
-import { InstallAppButton } from "@/components/app-shell/install-app-button";
-import { SoundUnlockButton } from "@/components/app-shell/sound-unlock-button";
 import { PushNotificationButton } from "@/components/app-shell/push-notification-button";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { SettingsImageUpload } from "@/components/admin/settings-image-upload";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
+import { servedUploadUrl } from "@/lib/upload-url";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { updateRestaurantSettingsAction } from "@/app/[rSlug]/admin/actions";
 
@@ -26,28 +26,23 @@ export default async function SettingsPage({
 
   if (!restaurant) return null;
   const settings = restaurant.settings;
+  const logoUrl = servedUploadUrl(settings?.logoUrl ?? restaurant.logoUrl);
+  const paymentQrUrl = servedUploadUrl(settings?.paymentQrImage);
+  const notificationEnabled = settings
+    ? settings.notifyNewOrder || settings.notifyServiceRequest || settings.notifyPaymentRequest
+    : true;
 
   return (
     <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Cài đặt" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
-      <form className="space-y-6" action={updateRestaurantSettingsAction.bind(null, access.restaurant.slug)}>
+      <form className="space-y-6" action={updateRestaurantSettingsAction.bind(null, access.restaurant.slug)} encType="multipart/form-data">
         <SettingsSection title="Thông tin quán">
           <Text name="restaurantName" label="Tên quán" defaultValue={settings?.restaurantName ?? restaurant.name} required />
-          <Text name="logoUrl" label="Logo URL" defaultValue={settings?.logoUrl ?? restaurant.logoUrl} />
+          <SettingsImageUpload name="logoFile" label="Logo quán" currentUrl={logoUrl} />
           <Text name="address" label="Địa chỉ" defaultValue={settings?.address} />
           <Text name="phone" label="Số điện thoại" defaultValue={settings?.phone} />
           <Text name="timezone" label="Timezone" defaultValue={settings?.timezone ?? "Asia/Ho_Chi_Minh"} required />
           <Text name="currency" label="Currency" defaultValue={settings?.currency ?? "VND"} required />
-        </SettingsSection>
-
-        <SettingsSection title="Giao diện">
-          <Text name="primaryColor" label="Primary Color" type="color" defaultValue={settings?.primaryColor ?? "#0f766e"} required />
-          <div className="rounded-md border p-4">
-            <p className="text-sm text-slate-600">Preview button</p>
-            <button className="mt-2 rounded-md px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: settings?.primaryColor ?? "#0f766e" }} type="button">
-              Gọi món
-            </button>
-          </div>
         </SettingsSection>
 
         <SettingsSection title="Ngôn ngữ">
@@ -58,46 +53,24 @@ export default async function SettingsPage({
               <option value="en">English</option>
             </select>
           </label>
-          <div className="rounded-md border p-4 text-sm text-slate-600">Customer luôn có switch VI | EN. Nếu tên EN trống, UI fallback về tên VI.</div>
+          <div className="rounded-md border p-4 text-sm text-slate-600">Ngôn ngữ mặc định của quán.</div>
         </SettingsSection>
 
         <SettingsSection title="Thanh toán">
-          <Check name="cashEnabled" label="Cash enabled" defaultChecked={settings?.cashEnabled ?? true} />
-          <Check name="qrPaymentEnabled" label="QR payment enabled" defaultChecked={settings?.qrPaymentEnabled ?? true} />
-          <Text name="bankName" label="Bank name" defaultValue={settings?.bankName} />
-          <Text name="bankCode" label="Bank code" defaultValue={settings?.bankCode} />
-          <Text name="accountNumber" label="Account number" defaultValue={settings?.accountNumber} />
-          <Text name="accountHolder" label="Account holder" defaultValue={settings?.accountHolder} />
-          <Text name="paymentQrImage" label="QR image URL" defaultValue={settings?.paymentQrImage} />
-        </SettingsSection>
-
-        <SettingsSection title="Hóa đơn & Thuế">
-          <Text name="invoiceBusinessName" label="Tên doanh nghiệp / tên quán" defaultValue={settings?.invoiceBusinessName ?? settings?.restaurantName ?? restaurant.name} />
-          <Text name="invoiceDisplayName" label="Tên hiển thị trên hóa đơn" defaultValue={settings?.invoiceDisplayName ?? settings?.restaurantName ?? restaurant.name} />
-          <Text name="invoiceTaxCode" label="Mã số thuế" defaultValue={settings?.invoiceTaxCode} />
-          <Text name="invoiceEmail" label="Email hóa đơn" type="email" defaultValue={settings?.invoiceEmail} />
-          <Check name="taxEnabled" label="Áp dụng thuế" defaultChecked={settings?.taxEnabled ?? false} />
-          <Text name="taxRate" label="Thuế suất (%)" type="number" step="0.01" min="0" max="100" defaultValue={settings?.taxRate ? String(settings.taxRate) : "0"} />
+          <Check name="cashEnabled" label="Tiền mặt" defaultChecked={settings?.cashEnabled ?? true} />
+          <Check name="qrPaymentEnabled" label="Mã QR" defaultChecked={settings?.qrPaymentEnabled ?? true} />
+          <div className="md:col-span-2">
+            <SettingsImageUpload name="paymentQrFile" label="Ảnh mã QR thanh toán" currentUrl={paymentQrUrl} previewClassName="h-32 w-32" />
+          </div>
         </SettingsSection>
 
         <SettingsSection title="Thông báo">
           <div className="rounded-md border p-3">
-            <p className="mb-2 text-sm font-medium">Thông báo đẩy</p>
+            <p className="mb-2 text-sm font-medium">Cho phép thông báo trên thiết bị này</p>
             <PushNotificationButton slug={access.restaurant.slug} />
           </div>
-          <Check name="notificationSoundEnabled" label="Âm thanh thông báo ON/OFF" defaultChecked={settings?.notificationSoundEnabled ?? true} />
-          <Check name="notifyNewOrder" label="Thông báo order mới" defaultChecked={settings?.notifyNewOrder ?? true} />
-          <Check name="notifyServiceRequest" label="Thông báo khách gọi nhân viên" defaultChecked={settings?.notifyServiceRequest ?? true} />
-          <Check name="notifyPaymentRequest" label="Thông báo yêu cầu thanh toán" defaultChecked={settings?.notifyPaymentRequest ?? true} />
-          <SoundUnlockButton />
-        </SettingsSection>
-
-        <SettingsSection title="Ứng dụng">
-          <div className="rounded-md border p-4">
-            <h3 className="font-semibold">Cài đặt ứng dụng</h3>
-            <p className="mt-1 text-sm text-slate-600">Cài ứng dụng lên thiết bị để mở nhanh như app.</p>
-            <div className="mt-3"><InstallAppButton compact /></div>
-          </div>
+          <Check name="notificationEnabled" label="Thông báo hệ thống" defaultChecked={notificationEnabled} />
+          <Check name="notificationSoundEnabled" label="Âm thanh" defaultChecked={settings?.notificationSoundEnabled ?? true} />
         </SettingsSection>
 
         <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">
