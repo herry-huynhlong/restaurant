@@ -12,8 +12,8 @@ import { assignableRestaurantRolesForPlan, restaurantRoleLabels } from "@/lib/re
 import { getRecentNotifications } from "@/server/services/notification-service";
 import {
   createStaffAction,
-  revokeStaffDeviceSessionAction,
   resetStaffPasswordAction,
+  revokeStaffDeviceSessionAction,
   toggleStaffActiveAction,
   updateStaffAction
 } from "@/app/[rSlug]/admin/actions";
@@ -22,6 +22,38 @@ const departmentLabels: Record<"WAITER" | "KITCHEN" | "CASHIER", { title: string
   WAITER: { title: "Phục vụ", description: "Dành cho nhân viên phục vụ bàn." },
   KITCHEN: { title: "Bếp", description: "Dành cho bộ phận bếp." },
   CASHIER: { title: "Thu ngân", description: "Dành cho quầy thu ngân." }
+};
+
+const staffRoleOrder: RestaurantRole[] = ["WAITER", "KITCHEN", "CASHIER", "MANAGER"];
+const staffGroupTitles: Record<RestaurantRole, string> = {
+  OWNER: "Chủ quán",
+  WAITER: "Phục vụ",
+  KITCHEN: "Bếp",
+  CASHIER: "Thu ngân",
+  MANAGER: "Quản lý"
+};
+const staffStatusRank = { WORKING: 0, OFF_SHIFT: 1, LOCKED: 2 };
+
+type StaffStatus = keyof typeof staffStatusRank;
+type StaffViewModel = {
+  id: string;
+  userId: string;
+  name: string;
+  username: string;
+  phone: string;
+  role: RestaurantRole;
+  accountActive: boolean;
+  status: StaffStatus;
+  devices: StaffDeviceViewModel[];
+};
+type StaffDeviceViewModel = {
+  id: string;
+  name: string;
+  operatorName: string;
+  onShift: boolean;
+  isActive: boolean;
+  revokedAt: Date | null;
+  lastSeenAt: Date;
 };
 
 export default async function AdminStaffPage({
@@ -46,7 +78,7 @@ export default async function AdminStaffPage({
       qrDataUrl: await QRCode.toDataURL(url, { margin: 1, width: 112 })
     };
   }));
-  const [staff, activeDeviceSessions, notifications] = await Promise.all([
+  const [staffMemberships, notifications] = await Promise.all([
     prisma.restaurantUser.findMany({
       where: {
         restaurantId: access.restaurant.id,
@@ -55,28 +87,59 @@ export default async function AdminStaffPage({
       include: { user: true },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }]
     }),
-    prisma.staffDeviceSession.findMany({
-      where: {
-        restaurantId: access.restaurant.id,
-        isActive: true,
-        operatorName: { not: null }
-      },
-      orderBy: [{ onShift: "desc" }, { lastSeenAt: "desc" }],
-      take: 50
-    }),
     getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
-  const activeDeviceUserIds = Array.from(new Set(activeDeviceSessions.map((session) => session.userId)));
-  const activeDeviceMemberships = activeDeviceUserIds.length
-    ? await prisma.restaurantUser.findMany({
+  const staffUserIds = staffMemberships.map((membership) => membership.userId);
+  const deviceSessions = staffUserIds.length
+    ? await prisma.staffDeviceSession.findMany({
         where: {
           restaurantId: access.restaurant.id,
-          userId: { in: activeDeviceUserIds }
+          userId: { in: staffUserIds }
         },
-        include: { user: { select: { name: true } } }
+        orderBy: [{ isActive: "desc" }, { onShift: "desc" }, { lastSeenAt: "desc" }],
+        take: 200
       })
     : [];
-  const activeDeviceMembershipMap = new Map(activeDeviceMemberships.map((membership) => [membership.userId, membership]));
+  const deviceSessionsByUserId = new Map<string, typeof deviceSessions>();
+  for (const session of deviceSessions) {
+    const list = deviceSessionsByUserId.get(session.userId) ?? [];
+    list.push(session);
+    deviceSessionsByUserId.set(session.userId, list);
+  }
+  const staffRows: StaffViewModel[] = staffMemberships.map((membership) => {
+    const username = membership.username ?? membership.user.email.split("@")[0];
+    const name = membership.user.name.trim() || username;
+    const devices = (deviceSessionsByUserId.get(membership.userId) ?? []).map((session) => ({
+      id: session.id,
+      name: session.deviceName ?? "Không rõ thiết bị",
+      operatorName: session.operatorName ?? name,
+      onShift: session.onShift,
+      isActive: session.isActive,
+      revokedAt: session.revokedAt,
+      lastSeenAt: session.lastSeenAt
+    }));
+    const accountActive = membership.isActive && membership.user.isActive;
+    const isWorking = accountActive && devices.some((device) => device.isActive && device.onShift && !device.revokedAt);
+    const status: StaffStatus = !accountActive ? "LOCKED" : isWorking ? "WORKING" : "OFF_SHIFT";
+    return {
+      id: membership.id,
+      userId: membership.userId,
+      name,
+      username,
+      phone: membership.user.phone ?? "",
+      role: membership.role,
+      accountActive,
+      status,
+      devices
+    };
+  }).sort(compareStaffRows);
+  const groupedStaff = staffRoleOrder
+    .filter((role) => assignableRoles.includes(role))
+    .map((role) => ({
+      role,
+      title: staffGroupTitles[role],
+      rows: staffRows.filter((row) => row.role === role)
+    }));
 
   return (
     <RestaurantAdminShell
@@ -115,47 +178,6 @@ export default async function AdminStaffPage({
       </section>
 
       <section className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold">Thiết bị / người đang làm</h2>
-        {activeDeviceSessions.length ? (
-          <div className="mt-3 grid gap-3 lg:grid-cols-3">
-            {activeDeviceSessions.map((session) => {
-              const membership = activeDeviceMembershipMap.get(session.userId);
-              const username = membership?.username ?? membership?.user.name ?? "unknown";
-              return (
-                <article key={session.id} className="rounded-lg border p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate font-semibold">{session.operatorName}</h3>
-                      <p className="text-sm text-slate-600">{membership ? restaurantRoleLabels[membership.role] : restaurantRoleLabels[session.role]}</p>
-                    </div>
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${session.onShift ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700"}`}>
-                      {session.onShift ? "Trong ca" : "Ngoài ca"}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-1 text-sm text-slate-600">
-                    <p>Tài khoản: <span className="font-semibold">{username}</span></p>
-                    <p>Thiết bị: <span className="font-semibold">{session.deviceName ?? "Không rõ thiết bị"}</span></p>
-                    <p>Hoạt động gần nhất: {formatTime(session.lastSeenAt)}</p>
-                  </div>
-                  <form className="mt-3" action={revokeStaffDeviceSessionAction.bind(null, access.restaurant.slug)}>
-                    <input name="deviceSessionId" type="hidden" value={session.id} />
-                    <ConfirmSubmitButton
-                      className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700"
-                      message={`Khóa thiết bị của ${session.operatorName}? Thiết bị này sẽ bị đăng xuất và không thể tiếp tục sử dụng phiên hiện tại.`}
-                    >
-                      Khóa thiết bị
-                    </ConfirmSubmitButton>
-                  </form>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Chưa có thiết bị nhân viên đang hoạt động.</p>
-        )}
-      </section>
-
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
         <form action={createStaffAction.bind(null, access.restaurant.slug)}>
           <h2 className="text-base font-semibold">+ Thêm nhân viên</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -185,93 +207,32 @@ export default async function AdminStaffPage({
         </form>
       </section>
 
-      <section className="mt-6">
-        <h2 className="text-base font-semibold">Danh sách nhân viên</h2>
-        {staff.length ? (
-          <div className="mt-3 grid gap-3 lg:grid-cols-3">
-            {staff.map((membership) => {
-              const isSelf = membership.userId === access.user.id;
-              const isEnabled = membership.isActive && membership.user.isActive;
-              const username = membership.username ?? membership.user.email.split("@")[0];
-              const displayName = membership.user.name.trim() || username;
-              const roleOptions = membership.role === "OWNER" ? ["OWNER" as RestaurantRole] : assignableRoles;
-              const canEditRole = !isSelf && membership.role !== "OWNER";
-              const canToggle = !isSelf && membership.role !== "OWNER";
-
-              return (
-                <article key={membership.id} className="min-w-0 rounded-lg border bg-white p-3 shadow-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-base font-semibold">{displayName}</h3>
-                      <p className="text-sm font-medium text-slate-700">{restaurantRoleLabels[membership.role]}</p>
-                      <p className="mt-1 break-all text-sm text-slate-600">Tên đăng nhập: <span className="font-semibold">{username}</span></p>
-                    </div>
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isEnabled ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500"}`}>
-                      {isEnabled ? "Đang hoạt động" : "Ngừng sử dụng"}
-                    </span>
-                  </div>
-
-                  <details className="mt-4 rounded-md border">
-                    <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold hover:bg-slate-50">Chỉnh sửa</summary>
-                    <div className="border-t p-3">
-                      <form className="grid gap-3" action={updateStaffAction.bind(null, access.restaurant.slug)}>
-                        <input name="membershipId" type="hidden" value={membership.id} />
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <Field label="Tên">
-                            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="name" defaultValue={displayName} required />
-                          </Field>
-                          <Field label="Tên đăng nhập">
-                            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="username" defaultValue={username} pattern="[a-z0-9_-]{3,30}" required />
-                          </Field>
-                          <Field label="SĐT">
-                            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="phone" defaultValue={membership.user.phone ?? ""} />
-                          </Field>
-                          <Field label="Vai trò">
-                            <select className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="role" defaultValue={membership.role} disabled={!canEditRole}>
-                              {roleOptions.map((role) => (
-                                <option key={role} value={role}>{restaurantRoleLabels[role]}</option>
-                              ))}
-                            </select>
-                          </Field>
-                        </div>
-                        {!canEditRole ? <input name="role" type="hidden" value={membership.role} /> : null}
-                        <label className="flex items-center gap-2 text-sm">
-                          <input defaultChecked={isEnabled} disabled={isSelf} name="isActive" type="checkbox" />
-                          Active
-                        </label>
-                        {isSelf ? <input name="isActive" type="hidden" value="true" /> : null}
-                        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
-                          Lưu thay đổi
-                        </button>
-                      </form>
-
-                      <form className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]" action={resetStaffPasswordAction.bind(null, access.restaurant.slug)}>
-                        <input name="membershipId" type="hidden" value={membership.id} />
-                        <Field label="Mật khẩu mới">
-                          <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" minLength={8} name="password" placeholder="Mật khẩu mới" required type="password" />
-                        </Field>
-                        <button className="self-end rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đổi mật khẩu</button>
-                      </form>
-
-                      <form className="mt-3" action={toggleStaffActiveAction.bind(null, access.restaurant.slug)}>
-                        <input name="membershipId" type="hidden" value={membership.id} />
-                        <input name="isActive" type="hidden" value={isEnabled ? "false" : "true"} />
-                        <ConfirmSubmitButton
-                          className={`w-full rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${isEnabled ? "border-red-200 text-red-700" : "border-teal-200 text-teal-700"}`}
-                          disabled={!canToggle}
-                          message={`${isEnabled ? "Ngừng sử dụng" : "Kích hoạt"} ${displayName}?`}
-                        >
-                          {isEnabled ? "Ngừng sử dụng" : "Kích hoạt"}
-                        </ConfirmSubmitButton>
-                      </form>
-                    </div>
-                  </details>
-                </article>
-              );
-            })}
-          </div>
-        ) : (
-          <section className="mt-3 rounded-lg border bg-white p-8 text-center shadow-sm">
+      <section className="mt-6 space-y-5">
+        <h2 className="text-base font-semibold">Danh sách nhân sự</h2>
+        {staffRows.length ? groupedStaff.map((group) => (
+          <section key={group.role} className="space-y-3">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">{group.title}</h3>
+              <p className="text-xs text-slate-500">{restaurantRoleLabels[group.role]}</p>
+            </div>
+            {group.rows.length ? (
+              <div className="space-y-3">
+                {group.rows.map((staff) => (
+                  <StaffRow
+                    key={staff.id}
+                    staff={staff}
+                    slug={access.restaurant.slug}
+                    assignableRoles={assignableRoles}
+                    isSelf={staff.userId === access.user.id}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed bg-white p-4 text-sm text-slate-500">Chưa có nhân sự trong bộ phận này.</p>
+            )}
+          </section>
+        )) : (
+          <section className="rounded-lg border bg-white p-8 text-center shadow-sm">
             <h2 className="text-lg font-semibold">Chưa có nhân viên</h2>
             <p className="mt-2 text-sm text-slate-600">Tạo tài khoản đầu tiên để nhân viên đăng nhập đúng giao diện theo vai trò.</p>
           </section>
@@ -281,6 +242,215 @@ export default async function AdminStaffPage({
   );
 }
 
+function StaffRow({
+  staff,
+  slug,
+  assignableRoles,
+  isSelf
+}: {
+  staff: StaffViewModel;
+  slug: string;
+  assignableRoles: RestaurantRole[];
+  isSelf: boolean;
+}) {
+  const canEditRole = !isSelf;
+  const canToggle = !isSelf;
+  const activeDevices = staff.devices.filter((device) => device.isActive && !device.revokedAt);
+  const workingDevices = activeDevices.filter((device) => device.onShift);
+
+  return (
+    <article className="rounded-lg border bg-white p-4 shadow-sm transition hover:border-slate-300">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)_auto] lg:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2 lg:block">
+            <div className="min-w-0">
+              <h4 className="truncate text-base font-semibold">{staff.name}</h4>
+              <p className="text-sm font-medium text-slate-700">{restaurantRoleLabels[staff.role]}</p>
+            </div>
+            <StatusBadge status={staff.status} />
+          </div>
+          <p className="mt-2 break-all text-sm text-slate-600">Tên đăng nhập: <span className="font-semibold">{staff.username}</span></p>
+        </div>
+
+        <div className="space-y-1 text-sm text-slate-600">
+          <p><span className="font-medium text-slate-800">Thiết bị:</span> {deviceSummary(staff, activeDevices, workingDevices)}</p>
+          <p><span className="font-medium text-slate-800">Hoạt động gần nhất:</span> {lastSeenSummary(staff.devices)}</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Chỉnh sửa</summary>
+            <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-lg lg:absolute lg:right-0 lg:z-10 lg:w-[520px]">
+              <EditStaffForms staff={staff} slug={slug} assignableRoles={assignableRoles} canEditRole={canEditRole} canToggle={canToggle} isSelf={isSelf} />
+            </div>
+          </details>
+          {activeDevices.length === 1 ? (
+            <RevokeDeviceForm slug={slug} device={activeDevices[0]} staffName={staff.name} compact />
+          ) : activeDevices.length > 1 ? (
+            <details className="relative">
+              <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem thiết bị</summary>
+              <DeviceList slug={slug} staffName={staff.name} devices={activeDevices} />
+            </details>
+          ) : null}
+        </div>
+      </div>
+
+      {staff.devices.length > 0 ? (
+        <div className="mt-3 border-t pt-3">
+          <DevicePreview slug={slug} staffName={staff.name} devices={staff.devices} />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function EditStaffForms({
+  staff,
+  slug,
+  assignableRoles,
+  canEditRole,
+  canToggle,
+  isSelf
+}: {
+  staff: StaffViewModel;
+  slug: string;
+  assignableRoles: RestaurantRole[];
+  canEditRole: boolean;
+  canToggle: boolean;
+  isSelf: boolean;
+}) {
+  return (
+    <div>
+      <form className="grid gap-3" action={updateStaffAction.bind(null, slug)}>
+        <input name="membershipId" type="hidden" value={staff.id} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Tên">
+            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="name" defaultValue={staff.name} required />
+          </Field>
+          <Field label="Tên đăng nhập">
+            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="username" defaultValue={staff.username} pattern="[a-z0-9_-]{3,30}" required />
+          </Field>
+          <Field label="SĐT">
+            <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="phone" defaultValue={staff.phone} />
+          </Field>
+          <Field label="Vai trò">
+            <select className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="role" defaultValue={staff.role} disabled={!canEditRole}>
+              {assignableRoles.map((role) => (
+                <option key={role} value={role}>{restaurantRoleLabels[role]}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        {!canEditRole ? <input name="role" type="hidden" value={staff.role} /> : null}
+        <label className="flex items-center gap-2 text-sm">
+          <input defaultChecked={staff.accountActive} disabled={isSelf} name="isActive" type="checkbox" />
+          Active
+        </label>
+        {isSelf ? <input name="isActive" type="hidden" value="true" /> : null}
+        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+          Lưu thay đổi
+        </button>
+      </form>
+
+      <form className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]" action={resetStaffPasswordAction.bind(null, slug)}>
+        <input name="membershipId" type="hidden" value={staff.id} />
+        <Field label="Mật khẩu mới">
+          <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" minLength={8} name="password" placeholder="Mật khẩu mới" required type="password" />
+        </Field>
+        <button className="self-end rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đổi mật khẩu</button>
+      </form>
+
+      <form className="mt-3" action={toggleStaffActiveAction.bind(null, slug)}>
+        <input name="membershipId" type="hidden" value={staff.id} />
+        <input name="isActive" type="hidden" value={staff.accountActive ? "false" : "true"} />
+        <ConfirmSubmitButton
+          className={`w-full rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${staff.accountActive ? "border-red-200 text-red-700" : "border-teal-200 text-teal-700"}`}
+          disabled={!canToggle}
+          message={`${staff.accountActive ? "Ngừng sử dụng" : "Kích hoạt"} ${staff.name}?`}
+        >
+          {staff.accountActive ? "Ngừng sử dụng" : "Kích hoạt"}
+        </ConfirmSubmitButton>
+      </form>
+    </div>
+  );
+}
+
+function DevicePreview({ slug, staffName, devices }: { slug: string; staffName: string; devices: StaffDeviceViewModel[] }) {
+  const previewDevices = devices.slice(0, 2);
+  return (
+    <div className="grid gap-2 md:grid-cols-2">
+      {previewDevices.map((device) => (
+        <DeviceLine key={device.id} slug={slug} staffName={staffName} device={device} />
+      ))}
+      {devices.length > 2 ? <p className="text-sm text-slate-500">+ {devices.length - 2} thiết bị khác</p> : null}
+    </div>
+  );
+}
+
+function DeviceList({ slug, staffName, devices }: { slug: string; staffName: string; devices: StaffDeviceViewModel[] }) {
+  return (
+    <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-lg lg:absolute lg:right-0 lg:z-10 lg:w-[420px]">
+      <div className="space-y-2">
+        {devices.map((device) => (
+          <DeviceLine key={device.id} slug={slug} staffName={staffName} device={device} forceAction />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DeviceLine({
+  slug,
+  staffName,
+  device,
+  forceAction
+}: {
+  slug: string;
+  staffName: string;
+  device: StaffDeviceViewModel;
+  forceAction?: boolean;
+}) {
+  const canRevoke = device.isActive && !device.revokedAt;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-slate-900">{device.name}</p>
+        <p className="text-xs text-slate-500">{deviceStatusLabel(device)} · {formatTime(device.lastSeenAt)}</p>
+      </div>
+      {canRevoke && forceAction ? <RevokeDeviceForm slug={slug} device={device} staffName={staffName} /> : null}
+    </div>
+  );
+}
+
+function RevokeDeviceForm({ slug, device, staffName, compact }: { slug: string; device: StaffDeviceViewModel; staffName: string; compact?: boolean }) {
+  return (
+    <form action={revokeStaffDeviceSessionAction.bind(null, slug)}>
+      <input name="deviceSessionId" type="hidden" value={device.id} />
+      <ConfirmSubmitButton
+        className={`${compact ? "" : "w-full"} rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50`}
+        message={`Khóa thiết bị của ${staffName}? Thiết bị này sẽ bị đăng xuất và không thể tiếp tục sử dụng phiên hiện tại.`}
+      >
+        Khóa thiết bị
+      </ConfirmSubmitButton>
+    </form>
+  );
+}
+
+function StatusBadge({ status }: { status: StaffStatus }) {
+  const styles: Record<StaffStatus, string> = {
+    WORKING: "bg-teal-50 text-teal-700",
+    OFF_SHIFT: "bg-amber-50 text-amber-700",
+    LOCKED: "bg-slate-100 text-slate-500"
+  };
+  return <span className={`rounded-full px-2 py-1 text-xs font-semibold ${styles[status]}`}>{staffStatusLabel(status)}</span>;
+}
+
+function compareStaffRows(a: StaffViewModel, b: StaffViewModel) {
+  const statusDiff = staffStatusRank[a.status] - staffStatusRank[b.status];
+  if (statusDiff !== 0) return statusDiff;
+  return a.name.localeCompare(b.name, "vi");
+}
+
 function getRequestOrigin() {
   const headerList = headers();
   const host = headerList.get("host");
@@ -288,8 +458,33 @@ function getRequestOrigin() {
   return process.env.NEXTAUTH_URL ?? (host ? `${protocol}://${host}` : "http://localhost:3000");
 }
 
+function staffStatusLabel(status: StaffStatus) {
+  if (status === "WORKING") return "Đang làm";
+  if (status === "LOCKED") return "Đã khóa";
+  return "Ngoài ca";
+}
+
+function deviceStatusLabel(device: StaffDeviceViewModel) {
+  if (device.revokedAt || !device.isActive) return "Đã khóa";
+  return device.onShift ? "Trong ca" : "Ngoài ca";
+}
+
+function deviceSummary(staff: StaffViewModel, activeDevices: StaffDeviceViewModel[], workingDevices: StaffDeviceViewModel[]) {
+  if (staff.status === "LOCKED") return "Tài khoản đã khóa";
+  if (workingDevices.length > 1) return `${workingDevices.length} thiết bị đang hoạt động`;
+  if (workingDevices.length === 1) return workingDevices[0].name;
+  if (activeDevices.length > 1) return `${activeDevices.length} thiết bị ngoài ca`;
+  if (activeDevices.length === 1) return `${activeDevices[0].name} · ngoài ca`;
+  return "Chưa có thiết bị đang trong ca";
+}
+
+function lastSeenSummary(devices: StaffDeviceViewModel[]) {
+  const latest = devices[0]?.lastSeenAt;
+  return latest ? formatTime(latest) : "Chưa có";
+}
+
 function formatTime(value: Date) {
-  return new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(value);
+  return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(value);
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
