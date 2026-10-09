@@ -12,9 +12,9 @@ import { assignableRestaurantRolesForPlan, restaurantRoleLabels } from "@/lib/re
 import { getRecentNotifications } from "@/server/services/notification-service";
 import {
   createStaffAction,
+  deleteStaffAccountAction,
   resetStaffPasswordAction,
   revokeStaffDeviceSessionAction,
-  toggleStaffActiveAction,
   updateStaffAction
 } from "@/app/[rSlug]/admin/actions";
 
@@ -89,6 +89,8 @@ export default async function AdminStaffPage({
     }),
     getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
+  const shouldCloseEditPanel = searchParams?.success === "Đã lưu nhân viên.";
+  const closeEditKey = shouldCloseEditPanel ? `${searchParams?.success}-${Date.now()}` : "";
   const staffUserIds = staffMemberships.map((membership) => membership.userId);
   const deviceSessions = staffUserIds.length
     ? await prisma.staffDeviceSession.findMany({
@@ -224,6 +226,7 @@ export default async function AdminStaffPage({
                     slug={access.restaurant.slug}
                     assignableRoles={assignableRoles}
                     isSelf={staff.userId === access.user.id}
+                    closeEditKey={closeEditKey}
                   />
                 ))}
               </div>
@@ -246,15 +249,16 @@ function StaffRow({
   staff,
   slug,
   assignableRoles,
-  isSelf
+  isSelf,
+  closeEditKey
 }: {
   staff: StaffViewModel;
   slug: string;
   assignableRoles: RestaurantRole[];
   isSelf: boolean;
+  closeEditKey: string;
 }) {
   const canEditRole = !isSelf;
-  const canToggle = !isSelf;
   const activeDevices = staff.devices.filter((device) => device.isActive && !device.revokedAt);
   const workingDevices = activeDevices.filter((device) => device.onShift);
 
@@ -278,10 +282,10 @@ function StaffRow({
         </div>
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
-          <details className="relative">
+          <details key={`${staff.id}-${closeEditKey}`} className="relative">
             <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Chỉnh sửa</summary>
             <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-lg lg:absolute lg:right-0 lg:z-10 lg:w-[520px]">
-              <EditStaffForms staff={staff} slug={slug} assignableRoles={assignableRoles} canEditRole={canEditRole} canToggle={canToggle} isSelf={isSelf} />
+              <EditStaffForms staff={staff} slug={slug} assignableRoles={assignableRoles} canEditRole={canEditRole} isSelf={isSelf} />
             </div>
           </details>
           {activeDevices.length === 1 ? (
@@ -309,14 +313,12 @@ function EditStaffForms({
   slug,
   assignableRoles,
   canEditRole,
-  canToggle,
   isSelf
 }: {
   staff: StaffViewModel;
   slug: string;
   assignableRoles: RestaurantRole[];
   canEditRole: boolean;
-  canToggle: boolean;
   isSelf: boolean;
 }) {
   return (
@@ -344,7 +346,7 @@ function EditStaffForms({
         {!canEditRole ? <input name="role" type="hidden" value={staff.role} /> : null}
         <label className="flex items-center gap-2 text-sm">
           <input defaultChecked={staff.accountActive} disabled={isSelf} name="isActive" type="checkbox" />
-          Active
+          Tài khoản đang hoạt động
         </label>
         {isSelf ? <input name="isActive" type="hidden" value="true" /> : null}
         <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
@@ -360,17 +362,19 @@ function EditStaffForms({
         <button className="self-end rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đổi mật khẩu</button>
       </form>
 
-      <form className="mt-3" action={toggleStaffActiveAction.bind(null, slug)}>
-        <input name="membershipId" type="hidden" value={staff.id} />
-        <input name="isActive" type="hidden" value={staff.accountActive ? "false" : "true"} />
-        <ConfirmSubmitButton
-          className={`w-full rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${staff.accountActive ? "border-red-200 text-red-700" : "border-teal-200 text-teal-700"}`}
-          disabled={!canToggle}
-          message={`${staff.accountActive ? "Ngừng sử dụng" : "Kích hoạt"} ${staff.name}?`}
-        >
-          {staff.accountActive ? "Ngừng sử dụng" : "Kích hoạt"}
-        </ConfirmSubmitButton>
-      </form>
+      <div className="mt-4 border-t pt-3">
+        <form action={deleteStaffAccountAction.bind(null, slug)}>
+          <input name="membershipId" type="hidden" value={staff.id} />
+          <ConfirmSubmitButton
+            className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+            disabled={isSelf}
+            message="Xóa tài khoản nhân viên này?"
+            description="Tài khoản sẽ không thể đăng nhập lại. Các lịch sử order, món đã nhận, ca làm việc và audit liên quan vẫn được giữ."
+          >
+            Xóa tài khoản
+          </ConfirmSubmitButton>
+        </form>
+      </div>
     </div>
   );
 }

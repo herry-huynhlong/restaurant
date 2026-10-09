@@ -1086,6 +1086,73 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
   }
 }
 
+export async function deleteStaffAccountAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminStaff(slug);
+
+  try {
+    const membershipId = readString(formData, "membershipId");
+    const membership = await getManagedStaffMembership(access.restaurant.id, membershipId);
+    if (!membership) throw new Error("STAFF_NOT_FOUND");
+    if (membership.role === "OWNER") throw new Error("OWNER_NOT_STAFF");
+    ensureCanMutateStaff(access, membership, undefined, false);
+
+    const now = new Date();
+    await prisma.$transaction([
+      prisma.restaurantUser.update({
+        where: { id: membership.id },
+        data: { isActive: false }
+      }),
+      prisma.staffDeviceSession.updateMany({
+        where: {
+          restaurantId: access.restaurant.id,
+          userId: membership.userId,
+          isActive: true
+        },
+        data: {
+          isActive: false,
+          onShift: false,
+          endedAt: now,
+          revokedAt: now,
+          revokedByUserId: access.user.id
+        }
+      }),
+      prisma.pushSubscription.updateMany({
+        where: {
+          restaurantId: access.restaurant.id,
+          userId: membership.userId
+        },
+        data: {
+          isActive: false,
+          onShift: false,
+          lastShiftEndedAt: now
+        }
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: "STAFF_ACCOUNT_DELETED",
+          entityType: "RestaurantUser",
+          entityId: membership.id,
+          metadataJson: {
+            staffUserId: membership.userId,
+            username: membership.username,
+            role: membership.role,
+            softDelete: true
+          }
+        }
+      })
+    ]);
+
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã xóa tài khoản nhân viên.");
+  } catch (error) {
+    rethrowNextRedirect(error);
+    redirectWithMessage(path, "error", staffActionErrorMessage(error));
+  }
+}
+
 export async function revokeStaffDeviceSessionAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminStaff(slug);
