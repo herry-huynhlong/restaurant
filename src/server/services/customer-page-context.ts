@@ -31,7 +31,7 @@ export async function requireCustomerPageContext(slug: string) {
     include: { table: true }
   });
 
-  if (!diningSession || !diningSession.table.isActive || diningSession.table.qrToken !== customerSession.qrToken) {
+  if (!diningSession || !diningSession.table.isActive) {
     redirect(`${restaurantRoutes.welcome(restaurant.slug)}?t=${encodeURIComponent(customerSession.qrToken)}&error=${encodeURIComponent("Phiên gọi món không hợp lệ. Vui lòng nhập lại tên.")}`);
   }
 

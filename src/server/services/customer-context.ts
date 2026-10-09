@@ -21,7 +21,7 @@ export async function getCustomerContext(request: NextRequest, slug: string) {
     }
   });
 
-  if (!diningSession || !diningSession.table.isActive || diningSession.table.qrToken !== session.qrToken) {
+  if (!diningSession || !diningSession.table.isActive) {
     return null;
   }
 

@@ -197,12 +197,14 @@ export function TablesLivePanel({
         ))}
       </div>
       <TableDetail
+        slug={slug}
         restaurantName={restaurantName}
         cashierName={cashierName}
         settings={state.settings}
         table={selectedTable}
         canUsePayment={canUsePayment}
         onConfirmPaid={confirmPaid}
+        onRefresh={refreshTables}
         paymentPending={payingSessionId === selectedTable?.activeSession?.id}
       />
     </section>
@@ -243,20 +245,24 @@ function TableSummaryCard({ table, selected, onSelect }: { table: LiveTable; sel
 }
 
 function TableDetail({
+  slug,
   restaurantName,
   cashierName,
   settings,
   table,
   canUsePayment,
   onConfirmPaid,
+  onRefresh,
   paymentPending
 }: {
+  slug: string;
   restaurantName: string;
   cashierName?: string | null;
   settings: TableState["settings"];
   table: LiveTable | null;
   canUsePayment: boolean;
   onConfirmPaid: (table: LiveTable) => void;
+  onRefresh: () => Promise<void>;
   paymentPending: boolean;
 }) {
   if (!table) {
@@ -365,7 +371,15 @@ function TableDetail({
       <details className="mt-5">
         <summary className="cursor-pointer rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem QR / Tải / In</summary>
         <div className="mt-3">
-          <QrCard restaurantName={restaurantName} tableName={table.name} qrDataUrl={table.qrDataUrl} qrUrl={table.qrUrl} />
+          <QrCard
+            restaurantName={restaurantName}
+            tableName={table.name}
+            tableId={table.id}
+            slug={slug}
+            qrDataUrl={table.qrDataUrl}
+            qrUrl={table.qrUrl}
+            onRegenerated={onRefresh}
+          />
         </div>
       </details>
     </aside>

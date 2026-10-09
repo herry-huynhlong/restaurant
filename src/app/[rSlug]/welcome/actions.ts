@@ -44,7 +44,7 @@ export async function startCustomerSessionAction(slug: string, formData: FormDat
   });
 
   if (!table) {
-    redirect(`${restaurantRoutes.welcome(slug)}?error=${encodeURIComponent("QR không hợp lệ.")}`);
+    redirect(`${restaurantRoutes.welcome(slug)}?error=${encodeURIComponent("Mã QR này không còn hiệu lực. Vui lòng quét mã QR mới tại bàn.")}`);
   }
 
   if (!table.isActive) {

@@ -23,7 +23,8 @@ export default async function WelcomePage({
       })
     : null;
   const canUseTable = Boolean(table?.isActive);
-  const errorMessage = searchParams?.error ?? (!qrToken ? "QR không hợp lệ." : !table ? "QR không hợp lệ." : !canUseTable ? "Bàn này hiện không hoạt động." : null);
+  const invalidQrMessage = "Mã QR này không còn hiệu lực. Vui lòng quét mã QR mới tại bàn.";
+  const errorMessage = searchParams?.error ?? (!qrToken ? "QR không hợp lệ." : !table ? invalidQrMessage : !canUseTable ? "Bàn này hiện không hoạt động." : null);
   const startAction = startCustomerSessionAction.bind(null, restaurant.slug);
 
   return (
