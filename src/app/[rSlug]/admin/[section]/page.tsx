@@ -21,7 +21,7 @@ export default async function RestaurantAdminSectionPage({
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
   if (params.section === "payments") requireRestaurantFeature(access, "CASHIER_FLOW");
-  if (params.section === "reports") requireRestaurantFeature(access, "ADVANCED_REPORTS");
+  if (params.section === "reports") requireRestaurantFeature(access, "REPORTS");
   const title = titles[params.section] ?? "Admin";
 
   return (

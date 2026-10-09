@@ -19,7 +19,7 @@ export default async function AdminReportsPage({
   searchParams: { period?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
-  requireRestaurantFeature(access, "ADVANCED_REPORTS");
+  requireRestaurantFeature(access, "REPORTS");
   const period = normalizeReportPeriod(searchParams.period);
   const report = await getRestaurantPaymentReport(access.restaurant.id, period);
   const maxBucketAmount = Math.max(...report.buckets.map((bucket) => bucket.amount), 1);

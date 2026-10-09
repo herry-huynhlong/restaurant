@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { RestaurantRole } from "@prisma/client";
-import { BarChart3, CreditCard, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Trophy, Users } from "lucide-react";
+import { BarChart3, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Trophy, Users } from "lucide-react";
 import type { Notification } from "@prisma/client";
 import { InstallAppButton } from "@/components/app-shell/install-app-button";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
@@ -43,9 +43,8 @@ export function RestaurantAdminShell({
     ["Khu vực & Bàn", restaurantRoutes.adminTables(slug), Grid3X3],
     ["Order", restaurantRoutes.adminOrders(slug), ListOrdered],
     ["Nhân viên", restaurantRoutes.adminStaff(slug), Users],
-    ...(hasPlanFeature(plan, "CASHIER_FLOW", businessType) ? [["Thanh toán", restaurantRoutes.adminPayments(slug), CreditCard] as const] : []),
     ["Top món", restaurantRoutes.adminTopItems(slug), Trophy],
-    ...(hasPlanFeature(plan, "ADVANCED_REPORTS", businessType) ? [["Báo cáo", restaurantRoutes.adminReports(slug), BarChart3] as const] : []),
+    ...(hasPlanFeature(plan, "REPORTS", businessType) ? [["Báo cáo", restaurantRoutes.adminReports(slug), BarChart3] as const] : []),
     ["Cài đặt", restaurantRoutes.adminSettings(slug), Settings]
   ] as const;
 

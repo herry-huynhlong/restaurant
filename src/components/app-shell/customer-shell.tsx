@@ -19,7 +19,7 @@ export function CustomerShell({
   businessType?: string | null;
   children: React.ReactNode;
 }) {
-  const canUsePayment = hasPlanFeature(plan, "CASHIER_FLOW", businessType);
+  const canUsePayment = hasPlanFeature(plan, "PAYMENT_REQUEST", businessType);
   const navColumns = canUsePayment ? "grid-cols-3" : "grid-cols-2";
 
   return (

@@ -5,7 +5,7 @@ import { requireCustomerPageContext } from "@/server/services/customer-page-cont
 
 export default async function CustomerPaymentPage({ params }: { params: { rSlug: string } }) {
   const { restaurant, customerSession, diningSession } = await requireCustomerPageContext(params.rSlug);
-  if (!hasPlanFeature(restaurant.plan, "CASHIER_FLOW", restaurant.businessType)) {
+  if (!hasPlanFeature(restaurant.plan, "PAYMENT_REQUEST", restaurant.businessType)) {
     return (
       <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan} businessType={restaurant.businessType}>
         <section className="rounded-lg border bg-white p-5 text-center shadow-sm">
