@@ -14,7 +14,11 @@ export type PlanFeature =
   | "ADVANCED_REPORTS";
 
 const basicFeatures = new Set<PlanFeature>([
-  "WAITER_ACCESS"
+  "WAITER_ACCESS",
+  "CASHIER_ACCESS",
+  "CASHIER_FLOW",
+  "PAYMENT_CONFIRM",
+  "BILL_PRINT"
 ]);
 
 const proFeatures = new Set<PlanFeature>([
@@ -47,7 +51,7 @@ export function hasPlanFeature(plan: RestaurantPlan | string | null | undefined,
 export function allowedStaffRolesForPlan(plan: RestaurantPlan | string | null | undefined, businessType?: BusinessType | string | null): RestaurantRole[] {
   return effectiveCommercialPlan(plan, businessType) === "PRO"
     ? ["MANAGER", "WAITER", "KITCHEN", "CASHIER"]
-    : ["WAITER"];
+    : ["WAITER", "CASHIER"];
 }
 
 export function canRoleAccessPlan(plan: RestaurantPlan | string | null | undefined, role: RestaurantRole, businessType?: BusinessType | string | null) {
@@ -58,5 +62,5 @@ export function canRoleAccessPlan(plan: RestaurantPlan | string | null | undefin
 export function departmentLoginRolesForPlan(plan: RestaurantPlan | string | null | undefined, businessType?: BusinessType | string | null): RestaurantRole[] {
   return effectiveCommercialPlan(plan, businessType) === "PRO"
     ? ["WAITER", "KITCHEN", "CASHIER"]
-    : ["WAITER"];
+    : ["WAITER", "CASHIER"];
 }
