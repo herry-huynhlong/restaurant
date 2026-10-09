@@ -33,6 +33,10 @@ export function RestaurantAdminShell({
   businessType?: string | null;
 }) {
   const roleLabel = getRoleLabel(role);
+  const planLabel = plan === "PRO" ? "PRO" : "BASIC";
+  const planBadgeClass = planLabel === "PRO"
+    ? "border-teal-200 bg-teal-50 text-teal-700"
+    : "border-slate-200 bg-slate-50 text-slate-700";
   const navItems = [
     ["Tổng quan", restaurantRoutes.admin(slug), Home],
     ["Menu", restaurantRoutes.adminMenu(slug), MenuIcon],
@@ -52,6 +56,11 @@ export function RestaurantAdminShell({
         <aside className="hidden w-64 shrink-0 rounded-lg border bg-white p-3 shadow-sm md:flex md:min-h-[calc(100vh-3rem)] md:flex-col">
           <p className="px-3 py-2 text-sm font-semibold text-teal-700">{restaurantName}</p>
           <p className="px-3 text-xs text-slate-500">Vai trò: {roleLabel}</p>
+          <div className="px-3 pt-2">
+            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${planBadgeClass}`}>
+              {planLabel}
+            </span>
+          </div>
           <nav className="mt-3 space-y-1">
             {navItems.map(([label, href, Icon]) => (
               <Link key={href} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-slate-100" href={href}>
