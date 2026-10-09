@@ -313,7 +313,7 @@ export async function createRestaurantAction(formData: FormData) {
         data: {
           restaurantId: createdRestaurant.id,
           userId: owner.id,
-          username: "owner",
+          username: parsed.data.ownerEmail,
           role: "OWNER"
         }
       });

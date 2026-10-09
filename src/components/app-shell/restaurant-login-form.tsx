@@ -45,13 +45,12 @@ export function RestaurantLoginForm({ slug, initialError }: { slug: string; init
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
       <label className="block text-sm font-medium">
-        Tên đăng nhập
+        Tên đăng nhập / Email
         <input
           className="mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"
           name="username"
           type="text"
-          pattern="@?[a-zA-Z0-9_-]{3,30}"
-          title="Nhập tên đăng nhập, ví dụ owner hoặc waiter01. Không dùng email."
+          title="Nhập email chủ quán hoặc username nhân viên."
           autoComplete="username"
           required
         />

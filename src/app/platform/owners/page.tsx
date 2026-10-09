@@ -24,7 +24,7 @@ export default async function PlatformOwnersPage({
           restaurantStatus: owner.restaurant.status,
           ownerUserId: owner.userId,
           name: owner.user.name,
-          username: owner.username ?? "owner",
+          username: owner.username && owner.username !== "owner" ? owner.username : owner.user.email,
           email: owner.user.email,
           isActive: owner.isActive && owner.user.isActive
         }))}

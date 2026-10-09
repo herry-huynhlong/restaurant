@@ -128,7 +128,15 @@ async function getTenantLoginContext(restaurantSlug: string, submittedUsername: 
     ? await prisma.restaurantUser.findFirst({
       where: {
         restaurantId: restaurant.id,
-        username: normalizedUsername
+        OR: normalizedUsername.includes("@")
+          ? [
+            { username: normalizedUsername },
+            {
+              role: "OWNER",
+              user: { email: normalizedUsername }
+            }
+          ]
+          : [{ username: normalizedUsername }]
       },
       select: {
         username: true,
