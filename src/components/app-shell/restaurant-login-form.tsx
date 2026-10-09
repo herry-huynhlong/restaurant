@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { normalizeUsername } from "@/lib/username";
 
 export function RestaurantLoginForm({ slug, initialError }: { slug: string; initialError?: string }) {
   const router = useRouter();
@@ -18,7 +19,7 @@ export function RestaurantLoginForm({ slug, initialError }: { slug: string; init
     setPageError(null);
 
     const formData = new FormData(event.currentTarget);
-    const username = String(formData.get("username") ?? "").trim();
+    const username = normalizeUsername(String(formData.get("username") ?? ""));
     const password = String(formData.get("password") ?? "");
     const callbackUrl = searchParams.get("callbackUrl") ?? "/post-login";
 
@@ -49,7 +50,8 @@ export function RestaurantLoginForm({ slug, initialError }: { slug: string; init
           className="mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"
           name="username"
           type="text"
-          pattern="[a-z0-9_-]{3,30}"
+          pattern="@?[a-zA-Z0-9_-]{3,30}"
+          title="Nhập tên đăng nhập, ví dụ owner hoặc waiter01. Không dùng email."
           autoComplete="username"
           required
         />

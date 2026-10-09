@@ -59,7 +59,7 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
                   <p className="font-medium">{owner.name}</p>
                   <p className="mt-1 text-xs text-slate-500">{owner.email}</p>
                 </td>
-                <td className="px-3 py-3">@{owner.username}</td>
+                <td className="px-3 py-3">{owner.username}</td>
                 <td className="px-3 py-3">
                   <p>{owner.restaurantName}</p>
                   {owner.restaurantStatus !== "ACTIVE" ? <p className="mt-1 text-xs text-amber-700">Nhà hàng đã khóa</p> : null}
@@ -79,7 +79,7 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
         {filteredOwners.map((owner) => (
           <article key={owner.membershipId} className="rounded-lg border bg-white p-4 shadow-sm">
             <p className="text-base font-semibold">{owner.name}</p>
-            <p className="mt-1 text-sm text-slate-600">@{owner.username}</p>
+            <p className="mt-1 text-sm text-slate-600">{owner.username}</p>
             <div className="mt-4 grid gap-2 text-sm">
               <Info label="Nhà hàng" value={owner.restaurantName} />
               <Info label="Trạng thái" value={owner.isActive ? "Đang hoạt động" : "Ngừng sử dụng"} />
@@ -126,7 +126,7 @@ function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }
           <input name="returnTo" type="hidden" value={returnTo} />
           <div>
             <h2 className="text-lg font-semibold">Sửa chủ quán</h2>
-            <p className="mt-1 text-sm text-slate-600">{owner.restaurantName} · @{owner.username}</p>
+            <p className="mt-1 text-sm text-slate-600">{owner.restaurantName} · {owner.username}</p>
           </div>
           <label className="block text-sm font-medium">
             Họ tên
@@ -149,7 +149,7 @@ function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }
           <div>
             <h2 className="text-lg font-semibold">Reset mật khẩu</h2>
             <p className="mt-1 text-sm text-slate-600">Nhà hàng: {owner.restaurantName}</p>
-            <p className="mt-1 text-sm text-slate-600">Tài khoản: @{owner.username}</p>
+            <p className="mt-1 text-sm text-slate-600">Tài khoản: {owner.username}</p>
           </div>
           <label className="block text-sm font-medium">
             Mật khẩu mới
