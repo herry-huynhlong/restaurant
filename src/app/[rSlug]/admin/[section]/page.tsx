@@ -25,7 +25,7 @@ export default async function RestaurantAdminSectionPage({
   const title = titles[params.section] ?? "Admin";
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title={title} plan={access.restaurant.plan}>
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title={title} plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
       <EmptyState title={`${title} chưa có dữ liệu`} description="Khu vực này hiện chưa phát sinh dữ liệu để hiển thị." />
     </RestaurantAdminShell>
   );

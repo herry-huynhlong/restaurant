@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     return NextResponse.json({ error: "Yêu cầu không hợp lệ." }, { status: 400 });
   }
 
-  if (parsed.data.requestType === "REQUEST_PAYMENT" && !hasPlanFeature(context.restaurant.plan, "CASHIER_FLOW")) {
+  if (parsed.data.requestType === "REQUEST_PAYMENT" && !hasPlanFeature(context.restaurant.plan, "CASHIER_FLOW", context.restaurant.businessType)) {
     return NextResponse.json({ error: "Gói hiện tại chưa hỗ trợ thanh toán tại bàn." }, { status: 403 });
   }
 

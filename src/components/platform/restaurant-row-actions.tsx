@@ -8,6 +8,7 @@ type RestaurantActionProps = {
   restaurantName: string;
   status: string;
   plan: string;
+  businessType?: string | null;
   returnTo: string;
   compact?: boolean;
 };
@@ -17,6 +18,7 @@ export function PlatformRestaurantActions({
   restaurantName,
   status,
   plan,
+  businessType,
   returnTo,
   compact = false
 }: RestaurantActionProps) {
@@ -27,6 +29,7 @@ export function PlatformRestaurantActions({
   const isLocked = status === "SUSPENDED";
   const nextStatus = isLocked ? "ACTIVE" : "SUSPENDED";
   const statusLabel = isLocked ? "Mở" : "Khóa";
+  const isDrinkShop = businessType === "DRINK_SHOP";
   const confirmMessage = isLocked
     ? `Mở lại nhà hàng ${restaurantName}?`
     : `Khóa nhà hàng ${restaurantName}?\n\nTất cả tài khoản thuộc nhà hàng này sẽ không thể đăng nhập hoặc sử dụng hệ thống cho đến khi được mở lại.`;
@@ -53,10 +56,11 @@ export function PlatformRestaurantActions({
       <form className="flex gap-1" action={changePlanAction}>
         <input name="restaurantId" type="hidden" value={restaurantId} />
         <input name="returnTo" type="hidden" value={returnTo} />
-        <select className="rounded-md border px-1 py-1 text-sm" name="plan" defaultValue={plan === "PRO" ? "PRO" : "BASIC"} aria-label="Gói dịch vụ">
+        <select className="rounded-md border px-1 py-1 text-sm disabled:bg-slate-100" name="plan" defaultValue={isDrinkShop ? "BASIC" : plan === "PRO" ? "PRO" : "BASIC"} disabled={isDrinkShop} aria-label="Gói dịch vụ">
           <option value="BASIC">BASIC</option>
-          <option value="PRO">PRO</option>
+          {!isDrinkShop ? <option value="PRO">PRO</option> : null}
         </select>
+        {isDrinkShop ? <input name="plan" type="hidden" value="BASIC" /> : null}
         <button className="rounded-md border px-2 py-1 text-sm" type="submit">Đổi gói</button>
       </form>
 

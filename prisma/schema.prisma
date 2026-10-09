@@ -32,6 +32,11 @@ enum RestaurantPlan {
   PRO
 }
 
+enum BusinessType {
+  RESTAURANT
+  DRINK_SHOP
+}
+
 enum SubscriptionStatus {
   ACTIVE
   EXPIRED
@@ -133,6 +138,7 @@ model Restaurant {
   logoUrl            String?
   status             RestaurantStatus   @default(ACTIVE)
   plan               RestaurantPlan     @default(FREE)
+  businessType       BusinessType       @default(RESTAURANT)
   subscriptionStatus SubscriptionStatus @default(ACTIVE)
   subscriptionStart  DateTime?
   subscriptionEnd    DateTime?
@@ -157,6 +163,7 @@ model Restaurant {
 
   @@index([status])
   @@index([plan])
+  @@index([businessType])
   @@index([createdAt])
 }
 

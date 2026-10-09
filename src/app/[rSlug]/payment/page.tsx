@@ -5,9 +5,9 @@ import { requireCustomerPageContext } from "@/server/services/customer-page-cont
 
 export default async function CustomerPaymentPage({ params }: { params: { rSlug: string } }) {
   const { restaurant, customerSession, diningSession } = await requireCustomerPageContext(params.rSlug);
-  if (!hasPlanFeature(restaurant.plan, "CASHIER_FLOW")) {
+  if (!hasPlanFeature(restaurant.plan, "CASHIER_FLOW", restaurant.businessType)) {
     return (
-      <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan}>
+      <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan} businessType={restaurant.businessType}>
         <section className="rounded-lg border bg-white p-5 text-center shadow-sm">
           <h2 className="text-lg font-semibold">Chưa hỗ trợ thanh toán tại bàn</h2>
           <p className="mt-2 text-sm text-slate-600">Vui lòng gọi nhân viên để được hỗ trợ.</p>
@@ -16,7 +16,7 @@ export default async function CustomerPaymentPage({ params }: { params: { rSlug:
     );
   }
   return (
-    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan}>
+    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan} businessType={restaurant.businessType}>
       <CustomerBillClient slug={restaurant.slug} mode="payment" />
     </CustomerShell>
   );

@@ -8,10 +8,12 @@ import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { platformRoutes } from "@/lib/routes";
+import { enforceBusinessPlan } from "@/lib/business-type";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 const planSchema = z.enum(["BASIC", "PRO"]);
+const businessTypeSchema = z.enum(["RESTAURANT", "DRINK_SHOP"]);
 const subscriptionStatusSchema = z.enum(["ACTIVE", "EXPIRED", "SUSPENDED"]);
 const languageSchema = z.enum(["vi", "en"]);
 const resetAdminPasswordSchema = z.object({
@@ -109,6 +111,7 @@ const createRestaurantSchema = z.object({
   ownerEmail: z.string().email("Email owner không hợp lệ.").transform((value) => value.toLowerCase()),
   ownerPassword: z.string().min(8, "Password phải có ít nhất 8 ký tự."),
   ownerPhone: z.string().optional(),
+  businessType: businessTypeSchema,
   plan: planSchema,
   subscriptionStatus: subscriptionStatusSchema,
   status: statusSchema
@@ -208,7 +211,8 @@ export async function createRestaurantAction(formData: FormData) {
     ownerEmail: readString(formData, "ownerEmail"),
     ownerPassword: readString(formData, "ownerPassword"),
     ownerPhone: optionalString(formData, "ownerPhone"),
-    plan: readString(formData, "plan") || "BASIC",
+    businessType: readString(formData, "businessType") || "RESTAURANT",
+    plan: enforceBusinessPlan(readString(formData, "businessType") || "RESTAURANT", readString(formData, "plan") || "BASIC"),
     subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
     status: readString(formData, "status") || "INACTIVE"
   });
@@ -231,6 +235,7 @@ export async function createRestaurantAction(formData: FormData) {
     ownerName: parsed.data.ownerName,
     ownerEmail: parsed.data.ownerEmail,
     ownerPhone: parsed.data.ownerPhone,
+    businessType: parsed.data.businessType,
     plan: parsed.data.plan,
     subscriptionStatus: parsed.data.subscriptionStatus,
     status: parsed.data.status
@@ -282,6 +287,7 @@ export async function createRestaurantAction(formData: FormData) {
           slug: parsed.data.slug,
           logoUrl: parsed.data.logoUrl ?? null,
           status: parsed.data.status,
+          businessType: parsed.data.businessType,
           plan: parsed.data.plan,
           subscriptionStatus: parsed.data.subscriptionStatus,
           subscriptionStart,
@@ -340,7 +346,7 @@ export async function createRestaurantAction(formData: FormData) {
             action: "RESTAURANT_CREATED",
             entityType: "Restaurant",
             entityId: createdRestaurant.id,
-            metadataJson: { slug: createdRestaurant.slug, plan: createdRestaurant.plan }
+            metadataJson: { slug: createdRestaurant.slug, plan: createdRestaurant.plan, businessType: createdRestaurant.businessType }
           },
           {
             restaurantId: createdRestaurant.id,
@@ -397,7 +403,8 @@ export async function updateRestaurantAction(formData: FormData) {
     timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
     primaryLanguage: readString(formData, "primaryLanguage") || "vi",
     currency: readString(formData, "currency") || "VND",
-    plan: readString(formData, "plan") || "BASIC",
+    businessType: readString(formData, "businessType") || "RESTAURANT",
+    plan: enforceBusinessPlan(readString(formData, "businessType") || "RESTAURANT", readString(formData, "plan") || "BASIC"),
     subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
     status: readString(formData, "status") || "INACTIVE"
   });
@@ -420,6 +427,7 @@ export async function updateRestaurantAction(formData: FormData) {
           slug: parsed.data.slug,
           logoUrl: parsed.data.logoUrl ?? null,
           status: parsed.data.status,
+          businessType: parsed.data.businessType,
           plan: parsed.data.plan,
           subscriptionStatus: parsed.data.subscriptionStatus,
           subscriptionStart,
@@ -457,7 +465,7 @@ export async function updateRestaurantAction(formData: FormData) {
           action: "RESTAURANT_UPDATED",
           entityType: "Restaurant",
           entityId: parsed.data.restaurantId,
-          metadataJson: { slug: parsed.data.slug, plan: parsed.data.plan }
+          metadataJson: { slug: parsed.data.slug, plan: parsed.data.plan, businessType: parsed.data.businessType }
         }
       });
     });
@@ -503,7 +511,11 @@ export async function extendSubscriptionAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
   const restaurantId = readString(formData, "restaurantId");
   const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
-  const plan = planSchema.parse(readString(formData, "plan"));
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { businessType: true }
+  });
+  const plan = planSchema.parse(enforceBusinessPlan(restaurant?.businessType, readString(formData, "plan")));
 
   await prisma.$transaction([
     prisma.restaurant.update({
@@ -532,7 +544,11 @@ export async function extendSubscriptionAction(formData: FormData) {
 export async function changePlanAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
   const restaurantId = readString(formData, "restaurantId");
-  const plan = planSchema.parse(readString(formData, "plan"));
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { businessType: true }
+  });
+  const plan = planSchema.parse(enforceBusinessPlan(restaurant?.businessType, readString(formData, "plan")));
   const returnTo = readPlatformReturnPath(formData);
 
   await prisma.$transaction([

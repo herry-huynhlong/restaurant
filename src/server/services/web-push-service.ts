@@ -104,9 +104,9 @@ export async function sendPushToRestaurantRoles({
 }) {
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
-    select: { plan: true }
+    select: { plan: true, businessType: true }
   });
-  const allowedRoles = new Set<RestaurantRole>(["OWNER", ...allowedStaffRolesForPlan(restaurant?.plan)]);
+  const allowedRoles = new Set<RestaurantRole>(["OWNER", ...allowedStaffRolesForPlan(restaurant?.plan, restaurant?.businessType)]);
   const effectiveRoles = roles.filter((role) => allowedRoles.has(role));
 
   const subscriptions = await prisma.pushSubscription.findMany({

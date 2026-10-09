@@ -6,6 +6,7 @@ import { PlatformRestaurantActions } from "@/components/platform/restaurant-row-
 import { StatCard } from "@/components/ui/stat-card";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
+import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getPlatformRestaurantDetail } from "@/server/services/platform-service";
@@ -33,6 +34,7 @@ export default async function RestaurantDetailPage({
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
       <section className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Trạng thái" value={restaurantStatusLabel(restaurant.status)} />
+        <StatCard label="Loại hình" value={getBusinessTypeLabel(restaurant.businessType)} />
         <StatCard label="Gói" value={restaurant.plan} />
         <StatCard label="Subscription" value={subscriptionStatusLabel(restaurant.subscriptionStatus)} />
         <StatCard label="Hết hạn" value={formatDate(restaurant.subscriptionEnd)} />
@@ -48,15 +50,17 @@ export default async function RestaurantDetailPage({
             restaurantName={restaurant.name}
             status={restaurant.status}
             plan={restaurant.plan}
+            businessType={restaurant.businessType}
             returnTo={platformRoutes.restaurantDetail(restaurant.id)}
           />
           <form className="flex flex-wrap gap-2" action={extendSubscriptionAction}>
             <input name="restaurantId" type="hidden" value={restaurant.id} />
             <input className="rounded-md border px-3 py-2 text-sm" name="subscriptionEnd" type="date" />
-            <select className="rounded-md border px-3 py-2 text-sm" name="plan" defaultValue={restaurant.plan === "PRO" ? "PRO" : "BASIC"}>
+            <select className="rounded-md border px-3 py-2 text-sm disabled:bg-slate-100" name="plan" defaultValue={restaurant.businessType === "DRINK_SHOP" ? "BASIC" : restaurant.plan === "PRO" ? "PRO" : "BASIC"} disabled={restaurant.businessType === "DRINK_SHOP"}>
               <option value="BASIC">BASIC</option>
-              <option value="PRO">PRO</option>
+              {restaurant.businessType !== "DRINK_SHOP" ? <option value="PRO">PRO</option> : null}
             </select>
+            {restaurant.businessType === "DRINK_SHOP" ? <input name="plan" type="hidden" value="BASIC" /> : null}
             <button className="rounded-md border px-3 py-2 text-sm" type="submit">Gia hạn</button>
           </form>
         </div>
@@ -65,6 +69,7 @@ export default async function RestaurantDetailPage({
       <section className="grid gap-4 lg:grid-cols-2">
         <Panel title="Thông tin">
           <Info label="Slug" value={restaurant.slug} />
+          <Info label="Loại hình" value={getBusinessTypeLabel(restaurant.businessType)} />
           <Info label="Điện thoại" value={restaurant.settings?.phone} />
           <Info label="Địa chỉ" value={restaurant.settings?.address} />
           <Info label="Timezone" value={restaurant.settings?.timezone} />

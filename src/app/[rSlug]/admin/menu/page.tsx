@@ -19,7 +19,7 @@ export default async function MenuPage({ params }: { params: { rSlug: string } }
   ]);
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Menu" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan}>
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Menu" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
       <SimpleMenuManager
         slug={access.restaurant.slug}
         initialProducts={products.map((product) => ({

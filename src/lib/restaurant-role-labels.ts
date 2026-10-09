@@ -16,6 +16,6 @@ export function getRoleLabel(role: RestaurantRole | string | null | undefined) {
 
 export const assignableRestaurantRoles: RestaurantRole[] = ["MANAGER", "WAITER", "KITCHEN", "CASHIER"];
 
-export function assignableRestaurantRolesForPlan(plan: string | null | undefined) {
-  return allowedStaffRolesForPlan(plan);
+export function assignableRestaurantRolesForPlan(plan: string | null | undefined, businessType?: string | null) {
+  return allowedStaffRolesForPlan(plan, businessType);
 }

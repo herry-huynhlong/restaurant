@@ -11,7 +11,7 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
     where: { userId, isActive: true },
     include: {
       restaurant: {
-        select: { slug: true, status: true, plan: true }
+        select: { slug: true, status: true, plan: true, businessType: true }
       }
     },
     orderBy: { createdAt: "asc" }
@@ -26,7 +26,7 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
     return restaurantRoutes.locked(membership.restaurant.slug);
   }
 
-  if (!canRoleAccessPlan(membership.restaurant.plan, membership.role)) {
+  if (!canRoleAccessPlan(membership.restaurant.plan, membership.role, membership.restaurant.businessType)) {
     return "/unauthorized";
   }
 

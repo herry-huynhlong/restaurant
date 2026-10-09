@@ -830,7 +830,7 @@ export async function createStaffAction(slug: string, formData: FormData) {
       password: readString(formData, "password")
     });
 
-    const allowedRoles = allowedStaffRolesForPlan(access.restaurant.plan);
+    const allowedRoles = allowedStaffRolesForPlan(access.restaurant.plan, access.restaurant.businessType);
     if (!assignableRestaurantRoles.includes(parsed.role) || !allowedRoles.includes(parsed.role)) {
       throw new Error("INVALID_STAFF_ROLE");
     }
@@ -903,7 +903,7 @@ export async function updateStaffAction(slug: string, formData: FormData) {
     const membership = await getManagedStaffMembership(access.restaurant.id, parsed.membershipId);
     if (!membership) throw new Error("STAFF_NOT_FOUND");
     if (membership.role === "OWNER") throw new Error("OWNER_NOT_STAFF");
-    const allowedRoles = allowedStaffRolesForPlan(access.restaurant.plan);
+    const allowedRoles = allowedStaffRolesForPlan(access.restaurant.plan, access.restaurant.businessType);
     if (!assignableRestaurantRoles.includes(parsed.role) || !allowedRoles.includes(parsed.role)) {
       throw new Error("INVALID_STAFF_ROLE");
     }

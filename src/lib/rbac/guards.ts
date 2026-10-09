@@ -38,7 +38,8 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
       slug: true,
       status: true,
       subscriptionStatus: true,
-      plan: true
+      plan: true,
+      businessType: true
     }
   });
 
@@ -72,7 +73,7 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
     redirect("/unauthorized");
   }
 
-  if (!canRoleAccessPlan(restaurant.plan, membership.role)) {
+  if (!canRoleAccessPlan(restaurant.plan, membership.role, restaurant.businessType)) {
     redirect("/unauthorized");
   }
 
@@ -83,7 +84,7 @@ export function requireRestaurantFeature(
   access: Awaited<ReturnType<typeof requireRestaurantAccess>>,
   feature: PlanFeature
 ) {
-  if (!hasPlanFeature(access.restaurant.plan, feature)) {
+  if (!hasPlanFeature(access.restaurant.plan, feature, access.restaurant.businessType)) {
     redirect("/unauthorized");
   }
 }

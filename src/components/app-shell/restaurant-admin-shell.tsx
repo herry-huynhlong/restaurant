@@ -19,7 +19,8 @@ export function RestaurantAdminShell({
   title,
   userName,
   notifications = [],
-  plan = "BASIC"
+  plan = "BASIC",
+  businessType = "RESTAURANT"
 }: {
   slug: string;
   restaurantName: string;
@@ -29,6 +30,7 @@ export function RestaurantAdminShell({
   userName?: string | null;
   notifications?: Notification[];
   plan?: string | null;
+  businessType?: string | null;
 }) {
   const roleLabel = getRoleLabel(role);
   const navItems = [
@@ -37,9 +39,9 @@ export function RestaurantAdminShell({
     ["Khu vực & Bàn", restaurantRoutes.adminTables(slug), Grid3X3],
     ["Order", restaurantRoutes.adminOrders(slug), ListOrdered],
     ["Nhân viên", restaurantRoutes.adminStaff(slug), Users],
-    ...(hasPlanFeature(plan, "CASHIER_FLOW") ? [["Thanh toán", restaurantRoutes.adminPayments(slug), CreditCard] as const] : []),
+    ...(hasPlanFeature(plan, "CASHIER_FLOW", businessType) ? [["Thanh toán", restaurantRoutes.adminPayments(slug), CreditCard] as const] : []),
     ["Top món", restaurantRoutes.adminTopItems(slug), Trophy],
-    ...(hasPlanFeature(plan, "ADVANCED_REPORTS") ? [["Báo cáo", restaurantRoutes.adminReports(slug), BarChart3] as const] : []),
+    ...(hasPlanFeature(plan, "ADVANCED_REPORTS", businessType) ? [["Báo cáo", restaurantRoutes.adminReports(slug), BarChart3] as const] : []),
     ["Cài đặt", restaurantRoutes.adminSettings(slug), Settings]
   ] as const;
 

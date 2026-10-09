@@ -20,6 +20,7 @@ export default async function AdminOrdersPage({ params }: { params: { rSlug: str
       userName={access.user.name}
       notifications={notifications}
       plan={access.restaurant.plan}
+      businessType={access.restaurant.businessType}
     >
       <OrdersByTableBoard slug={access.restaurant.slug} initialTables={tables} />
     </RestaurantAdminShell>

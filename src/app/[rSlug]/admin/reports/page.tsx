@@ -25,7 +25,7 @@ export default async function AdminReportsPage({
   const maxBucketAmount = Math.max(...report.buckets.map((bucket) => bucket.amount), 1);
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Báo cáo" plan={access.restaurant.plan}>
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Báo cáo" plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
       <section className="space-y-5">
         <div className="flex flex-wrap gap-2">
           {periods.map((item) => (

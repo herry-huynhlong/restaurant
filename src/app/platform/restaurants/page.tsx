@@ -4,6 +4,7 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformRestaurantActions } from "@/components/platform/restaurant-row-actions";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
+import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
 import { getPlatformRestaurants } from "@/server/services/platform-service";
 
@@ -25,7 +26,7 @@ export default async function PlatformRestaurantsPage({
         <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
-              {["Nhà hàng", "Slug", "Trạng thái", "Gói", "Bắt đầu", "Hết hạn", "Bàn", "Nhân viên", "Ngày tạo", "Thao tác"].map((item) => (
+              {["Cơ sở", "Slug", "Loại", "Trạng thái", "Gói", "Bắt đầu", "Hết hạn", "Bàn", "Nhân viên", "Ngày tạo", "Thao tác"].map((item) => (
                 <th key={item} className="px-3 py-3 font-medium">{item}</th>
               ))}
             </tr>
@@ -40,6 +41,9 @@ export default async function PlatformRestaurantsPage({
                     <p className="mt-1 text-xs text-slate-500">{owner ? `${owner.name} · ${owner.email}` : "Chưa có admin"}</p>
                   </td>
                   <td className="px-3 py-3">{restaurant.slug}</td>
+                  <td className="px-3 py-3">
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{getBusinessTypeLabel(restaurant.businessType)}</span>
+                  </td>
                   <td className="px-3 py-3">
                     <p>{restaurantStatusLabel(restaurant.status)}</p>
                     <p className="mt-1 text-xs text-slate-500">{subscriptionStatusLabel(restaurant.subscriptionStatus)}</p>
@@ -58,6 +62,7 @@ export default async function PlatformRestaurantsPage({
                         restaurantName={restaurant.name}
                         status={restaurant.status}
                         plan={restaurant.plan}
+                        businessType={restaurant.businessType}
                         returnTo={platformRoutes.restaurants}
                         compact
                       />

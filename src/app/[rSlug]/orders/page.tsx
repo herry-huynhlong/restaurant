@@ -5,7 +5,7 @@ import { requireCustomerPageContext } from "@/server/services/customer-page-cont
 export default async function CustomerOrdersPage({ params }: { params: { rSlug: string } }) {
   const { restaurant, customerSession, diningSession } = await requireCustomerPageContext(params.rSlug);
   return (
-    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan}>
+    <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan} businessType={restaurant.businessType}>
       <CustomerBillClient slug={restaurant.slug} mode="orders" />
     </CustomerShell>
   );

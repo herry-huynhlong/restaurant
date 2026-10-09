@@ -10,7 +10,7 @@ export default async function RestaurantAdminPage({ params }: { params: { rSlug:
   const overview = await getRestaurantAdminOverview(access.restaurant.id);
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Tổng quan" plan={access.restaurant.plan}>
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Tổng quan" plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
       <DashboardLiveOverview slug={access.restaurant.slug} initialOverview={overview} />
       <section className="mt-6 rounded-lg border bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Quick actions</h2>
