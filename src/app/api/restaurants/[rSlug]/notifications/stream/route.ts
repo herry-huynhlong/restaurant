@@ -2,13 +2,14 @@ import { NextRequest } from "next/server";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { notificationEmitter } from "@/server/services/notification-event-service";
+import { isStaffDeviceRole } from "@/server/services/staff-device-session-service";
 
 const streamRoles = ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"] as const;
 
 export async function GET(_request: NextRequest, { params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, [...streamRoles]);
   const deviceId = _request.nextUrl.searchParams.get("deviceId");
-  if (deviceId) {
+  if (isStaffDeviceRole(access.membership.role) && deviceId) {
     const deviceSession = await prisma.staffDeviceSession.findUnique({
       where: {
         restaurantId_userId_deviceId: {

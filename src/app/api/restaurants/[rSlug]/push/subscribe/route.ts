@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
+import { isStaffDeviceRole } from "@/server/services/staff-device-session-service";
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url(),
@@ -24,7 +25,7 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
 
   const userAgent = request.headers.get("user-agent");
   let shiftSession = null;
-  if (parsed.data.deviceId) {
+  if (isStaffDeviceRole(access.membership.role) && parsed.data.deviceId) {
     shiftSession = await prisma.staffDeviceSession.findUnique({
         where: {
           restaurantId_userId_deviceId: {
