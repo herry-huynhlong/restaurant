@@ -37,11 +37,11 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
     case "MANAGER":
       return restaurantRoutes.admin(slug);
     case "WAITER":
-      return restaurantRoutes.staff(slug);
+      return `${restaurantRoutes.deviceSetup(slug)}?next=${encodeURIComponent(restaurantRoutes.staff(slug))}`;
     case "KITCHEN":
-      return restaurantRoutes.kitchen(slug);
+      return `${restaurantRoutes.deviceSetup(slug)}?next=${encodeURIComponent(restaurantRoutes.kitchen(slug))}`;
     case "CASHIER":
-      return restaurantRoutes.cashier(slug);
+      return `${restaurantRoutes.deviceSetup(slug)}?next=${encodeURIComponent(restaurantRoutes.cashier(slug))}`;
     default:
       return "/unauthorized";
   }

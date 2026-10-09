@@ -15,7 +15,7 @@ export default async function RestaurantLoginPage({
   searchParams
 }: {
   params: { rSlug: string };
-  searchParams?: { role?: string };
+  searchParams?: { role?: string; error?: string };
 }) {
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug: params.rSlug },
@@ -34,6 +34,9 @@ export default async function RestaurantLoginPage({
           <h1 className="mt-2 text-2xl font-semibold tracking-normal">Đăng nhập {roleLoginLabels[searchParams?.role ?? ""] ?? "nhân viên"}</h1>
           <p className="mt-2 text-sm text-slate-600">Dùng tên đăng nhập do chủ quán hoặc quản lý tạo.</p>
         </div>
+        {searchParams?.error ? (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{searchParams.error}</p>
+        ) : null}
         {restaurant.status === "ACTIVE" ? (
           <RestaurantLoginForm slug={restaurant.slug} />
         ) : (

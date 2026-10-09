@@ -14,8 +14,12 @@ export async function GET(request: NextRequest, { params }: { params: { rSlug: s
           deviceId
         }
       },
-      select: { onShift: true }
+      select: { onShift: true, isActive: true, revokedAt: true, operatorName: true }
     });
+
+    if (!deviceSession?.operatorName || !deviceSession.isActive || deviceSession.revokedAt) {
+      return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+    }
 
     if (deviceSession?.onShift === false) {
       return NextResponse.json({

@@ -54,6 +54,11 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       })
     });
 
+    if (response.status === 403) {
+      window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
+      return false;
+    }
+
     if (!response.ok) {
       throw new Error("push_subscribe_failed");
     }

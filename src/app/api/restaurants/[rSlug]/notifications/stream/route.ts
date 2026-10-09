@@ -17,8 +17,12 @@ export async function GET(_request: NextRequest, { params }: { params: { rSlug: 
           deviceId
         }
       },
-      select: { onShift: true }
+      select: { onShift: true, isActive: true, revokedAt: true, operatorName: true }
     });
+
+    if (!deviceSession?.operatorName || !deviceSession.isActive || deviceSession.revokedAt) {
+      return new Response(JSON.stringify({ ok: false, code: "DEVICE_REVOKED" }), { status: 403 });
+    }
 
     if (deviceSession?.onShift === false) {
       return new Response(null, { status: 204 });

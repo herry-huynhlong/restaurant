@@ -10,6 +10,7 @@ import { publishNotificationRefresh } from "@/server/services/notification-event
 import { getPushTargetsForEvent, sendPushToRestaurantRoles } from "@/server/services/web-push-service";
 import { readPaymentMethod } from "@/server/services/billing-service";
 import { confirmDiningSessionPaid } from "@/server/services/payment-service";
+import { assertActiveStaffDeviceForAction } from "@/server/services/staff-device-session-service";
 
 export async function updateOrderStatusAction(slug: string, orderId: string, status: OrderStatus) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "KITCHEN"]);
@@ -56,6 +57,12 @@ export async function updateOrderStatusAction(slug: string, orderId: string, sta
 export async function claimKitchenItemAction(slug: string, orderItemId: string) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "KITCHEN"]);
   requireRestaurantFeature(access, "KITCHEN_FLOW");
+  const deviceSession = await assertActiveStaffDeviceForAction({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role
+  });
   const now = new Date();
   const result = await prisma.orderItem.updateMany({
     where: {
@@ -68,6 +75,7 @@ export async function claimKitchenItemAction(slug: string, orderItemId: string) 
     data: {
       status: "COOKING",
       kitchenAssignedToUserId: access.user.id,
+      kitchenAssignedDeviceSessionId: deviceSession?.id,
       kitchenClaimedAt: now
     }
   });
@@ -84,6 +92,12 @@ export async function claimKitchenItemAction(slug: string, orderItemId: string) 
 export async function markKitchenItemReadyAction(slug: string, orderItemId: string) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "KITCHEN"]);
   requireRestaurantFeature(access, "KITCHEN_FLOW");
+  const deviceSession = await assertActiveStaffDeviceForAction({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role
+  });
   const now = new Date();
   const item = await prisma.orderItem.findFirst({
     where: {
@@ -92,8 +106,9 @@ export async function markKitchenItemReadyAction(slug: string, orderItemId: stri
       status: "COOKING",
       product: { menuType: { in: ["MAIN", "EXTRA"] } },
       OR: [
-        { kitchenAssignedToUserId: access.user.id },
-        { kitchenAssignedToUserId: null }
+        ...(deviceSession ? [{ kitchenAssignedDeviceSessionId: deviceSession.id }] : []),
+        { kitchenAssignedToUserId: access.user.id, kitchenAssignedDeviceSessionId: null },
+        { kitchenAssignedToUserId: null },
       ]
     },
     include: {
@@ -144,6 +159,12 @@ export async function markKitchenItemReadyAction(slug: string, orderItemId: stri
 
 export async function claimWaiterItemAction(slug: string, orderItemId: string) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER"]);
+  const deviceSession = await assertActiveStaffDeviceForAction({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role
+  });
   const now = new Date();
   const result = await prisma.orderItem.updateMany({
     where: {
@@ -154,6 +175,7 @@ export async function claimWaiterItemAction(slug: string, orderItemId: string) {
     },
     data: {
       waiterAssignedToUserId: access.user.id,
+      waiterAssignedDeviceSessionId: deviceSession?.id,
       waiterClaimedAt: now
     }
   });
@@ -169,13 +191,20 @@ export async function claimWaiterItemAction(slug: string, orderItemId: string) {
 
 export async function markWaiterItemServedAction(slug: string, orderItemId: string) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER"]);
+  const deviceSession = await assertActiveStaffDeviceForAction({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role
+  });
   const now = new Date();
   const result = await prisma.orderItem.updateMany({
     where: {
       id: orderItemId,
       restaurantId: access.restaurant.id,
       status: "READY",
-      waiterAssignedToUserId: access.user.id
+      waiterAssignedToUserId: access.user.id,
+      ...(deviceSession ? { waiterAssignedDeviceSessionId: deviceSession.id } : {})
     },
     data: {
       status: "SERVED",
@@ -195,6 +224,12 @@ export async function markWaiterItemServedAction(slug: string, orderItemId: stri
 
 export async function updateServiceRequestStatusAction(slug: string, requestId: string, status: ServiceRequestStatus) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "WAITER", "CASHIER"]);
+  await assertActiveStaffDeviceForAction({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role
+  });
   await prisma.serviceRequest.update({
     where: { id: requestId, restaurantId: access.restaurant.id },
     data: {
@@ -211,6 +246,12 @@ export async function updateServiceRequestStatusAction(slug: string, requestId: 
 export async function markDiningSessionPaidAction(slug: string, diningSessionId: string, formData?: FormData) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER", "CASHIER"]);
   requireRestaurantFeature(access, "PAYMENT_CONFIRM");
+  await assertActiveStaffDeviceForAction({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role
+  });
   const paymentMethod = readPaymentMethod(formData?.get("paymentMethod") ?? null);
   await confirmDiningSessionPaid({
     restaurantId: access.restaurant.id,

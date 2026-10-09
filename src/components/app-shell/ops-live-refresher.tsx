@@ -48,6 +48,10 @@ export function OpsLiveRefresher({ slug }: { slug: string }) {
     async function tick() {
       try {
         const response = await fetch(`/api/restaurants/${slug}/notifications/state?deviceId=${encodeURIComponent(getStaffDeviceId())}`, { cache: "no-store" });
+        if (response.status === 403) {
+          window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
+          return;
+        }
         if (!response.ok) throw new Error("state_failed");
         const data = (await response.json()) as NotificationState;
         setStatus("live");

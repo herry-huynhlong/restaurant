@@ -4,6 +4,7 @@ import { readPaymentMethod } from "@/server/services/billing-service";
 import { confirmDiningSessionPaid } from "@/server/services/payment-service";
 import { hasPlanFeature } from "@/lib/plan/features";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { assertActiveStaffDeviceForAction } from "@/server/services/staff-device-session-service";
 
 export async function POST(request: Request, { params }: { params: { rSlug: string } }) {
   try {
@@ -11,6 +12,11 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     if (!hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM")) {
       return NextResponse.json({ ok: false, error: "plan_locked", message: "Gói hiện tại chưa hỗ trợ xác nhận thanh toán." }, { status: 403 });
     }
+    await assertActiveStaffDeviceForAction({
+      restaurantId: access.restaurant.id,
+      userId: access.user.id,
+      role: access.membership.role
+    });
     const body = await request.json().catch(() => ({}));
     const diningSessionId = typeof body.diningSessionId === "string" ? body.diningSessionId : "";
 
@@ -44,6 +50,9 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     });
   } catch (error) {
     console.error("CONFIRM PAYMENT ERROR", error);
+    if (error instanceof Error && error.message === "DEVICE_REVOKED") {
+      return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", message: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       console.error("PRISMA CODE", error.code);
       console.error("PRISMA META", error.meta);

@@ -23,28 +23,32 @@ export async function GET(request: NextRequest, { params }: { params: { rSlug: s
     return NextResponse.json({ ok: false, error: "Thiếu deviceId." }, { status: 400 });
   }
 
-  const session = await prisma.staffDeviceSession.upsert({
+  const session = await prisma.staffDeviceSession.findUnique({
     where: {
       restaurantId_userId_deviceId: {
         restaurantId: access.restaurant.id,
         userId: access.user.id,
         deviceId: parsed.data.deviceId
       }
-    },
-    update: {
-      role: access.membership.role,
-      lastSeenAt: new Date()
-    },
-    create: {
-      restaurantId: access.restaurant.id,
-      userId: access.user.id,
-      deviceId: parsed.data.deviceId,
-      role: access.membership.role,
-      onShift: true
     }
   });
 
-  return NextResponse.json({ ok: true, onShift: session.onShift });
+  if (!session?.operatorName) {
+    return NextResponse.json({ ok: false, code: "DEVICE_NEEDS_OPERATOR", error: "Vui lòng nhập họ tên người sử dụng." }, { status: 403 });
+  }
+  if (!session.isActive || session.revokedAt) {
+    return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+  }
+
+  await prisma.staffDeviceSession.update({
+    where: { id: session.id },
+    data: {
+      role: access.membership.role,
+      lastSeenAt: new Date()
+    }
+  });
+
+  return NextResponse.json({ ok: true, onShift: session.onShift, operatorName: session.operatorName });
 }
 
 export async function POST(request: NextRequest, { params }: { params: { rSlug: string } }) {
@@ -58,65 +62,70 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   const now = new Date();
   const onShift = parsed.data.action === "START";
 
-  const session = await prisma.$transaction(async (tx) => {
-    const deviceSession = await tx.staffDeviceSession.upsert({
-      where: {
-        restaurantId_userId_deviceId: {
+  try {
+    const session = await prisma.$transaction(async (tx) => {
+      const existing = await tx.staffDeviceSession.findUnique({
+        where: {
+          restaurantId_userId_deviceId: {
+            restaurantId: access.restaurant.id,
+            userId: access.user.id,
+            deviceId: parsed.data.deviceId
+          }
+        }
+      });
+
+      if (!existing?.operatorName || !existing.isActive || existing.revokedAt) {
+        throw new Error("DEVICE_REVOKED");
+      }
+
+      const deviceSession = await tx.staffDeviceSession.update({
+        where: { id: existing.id },
+        data: {
+          role: access.membership.role,
+          onShift,
+          lastSeenAt: now,
+          startedAt: onShift ? now : undefined,
+          endedAt: onShift ? null : now
+        }
+      });
+
+      await tx.pushSubscription.updateMany({
+        where: {
           restaurantId: access.restaurant.id,
           userId: access.user.id,
           deviceId: parsed.data.deviceId
+        },
+        data: {
+          onShift,
+          isActive: onShift ? true : undefined,
+          lastShiftStartedAt: onShift ? now : undefined,
+          lastShiftEndedAt: onShift ? null : now
         }
-      },
-      update: {
-        role: access.membership.role,
-        onShift,
-        lastSeenAt: now,
-        startedAt: onShift ? now : undefined,
-        endedAt: onShift ? null : now
-      },
-      create: {
-        restaurantId: access.restaurant.id,
-        userId: access.user.id,
-        deviceId: parsed.data.deviceId,
-        role: access.membership.role,
-        onShift,
-        startedAt: now,
-        endedAt: onShift ? null : now,
-        lastSeenAt: now
-      }
-    });
+      });
 
-    await tx.pushSubscription.updateMany({
-      where: {
-        restaurantId: access.restaurant.id,
-        userId: access.user.id,
-        deviceId: parsed.data.deviceId
-      },
-      data: {
-        onShift,
-        isActive: onShift ? true : undefined,
-        lastShiftStartedAt: onShift ? now : undefined,
-        lastShiftEndedAt: onShift ? null : now
-      }
-    });
-
-    await tx.auditLog.create({
-      data: {
-        restaurantId: access.restaurant.id,
-        userId: access.user.id,
-        action: onShift ? "SHIFT_STARTED" : "SHIFT_ENDED",
-        entityType: "StaffDeviceSession",
-        entityId: deviceSession.id,
-        metadataJson: {
-          deviceId: parsed.data.deviceId,
-          role: access.membership.role,
-          onShift
+      await tx.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: onShift ? "SHIFT_STARTED" : "SHIFT_ENDED",
+          entityType: "StaffDeviceSession",
+          entityId: deviceSession.id,
+          metadataJson: {
+            deviceId: parsed.data.deviceId,
+            role: access.membership.role,
+            onShift
+          }
         }
-      }
+      });
+
+      return deviceSession;
     });
 
-    return deviceSession;
-  });
-
-  return NextResponse.json({ ok: true, onShift: session.onShift });
+    return NextResponse.json({ ok: true, onShift: session.onShift });
+  } catch (error) {
+    if (error instanceof Error && error.message === "DEVICE_REVOKED") {
+      return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+    }
+    throw error;
+  }
 }

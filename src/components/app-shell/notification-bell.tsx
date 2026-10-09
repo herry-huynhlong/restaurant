@@ -149,7 +149,11 @@ export function NotificationBell({
 
     async function fetchNotifications() {
       try {
-        const response = await fetch(`/api/restaurants/${slug}/notifications`, { cache: "no-store" });
+        const response = await fetch(`/api/restaurants/${slug}/notifications?deviceId=${encodeURIComponent(getStaffDeviceId())}`, { cache: "no-store" });
+        if (response.status === 403) {
+          window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
+          return;
+        }
         if (!response.ok) throw new Error("notifications_failed");
         const data = (await response.json()) as NotificationResponse;
         if (cancelled) return;
@@ -210,7 +214,7 @@ export function NotificationBell({
     setItems((current) => current.map((item) => item.id === notificationId ? { ...item, isRead: true } : item));
     setUnreadCount((current) => Math.max(0, current - 1));
 
-    const response = await fetch(`/api/restaurants/${slug}/notifications`, {
+    const response = await fetch(`/api/restaurants/${slug}/notifications?deviceId=${encodeURIComponent(getStaffDeviceId())}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notificationId })
@@ -230,7 +234,7 @@ export function NotificationBell({
     setItems((current) => current.map((item) => ({ ...item, isRead: true })));
     setUnreadCount(0);
 
-    const response = await fetch(`/api/restaurants/${slug}/notifications`, {
+    const response = await fetch(`/api/restaurants/${slug}/notifications?deviceId=${encodeURIComponent(getStaffDeviceId())}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ markAll: true })

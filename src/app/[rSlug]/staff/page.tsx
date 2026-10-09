@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
+import { requireActiveStaffDeviceSession } from "@/server/services/staff-device-session-service";
 import { claimWaiterItemAction, markWaiterItemServedAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 
 const serviceLabels: Record<string, string> = {
@@ -46,6 +47,13 @@ async function getWaiterItems(restaurantId: string) {
 
 export default async function StaffPage({ params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "WAITER"]);
+  const currentDeviceSession = await requireActiveStaffDeviceSession({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role,
+    nextPath: `/${access.restaurant.slug}/staff`
+  });
   const [readyItems, serviceRequests, notifications, assignedUsers] = await Promise.all([
     getWaiterItems(access.restaurant.id),
     prisma.serviceRequest.findMany({
@@ -67,6 +75,14 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
     })
   ]);
   const userNameMap = new Map(assignedUsers.map((user) => [user.id, user.name]));
+  const assignedSessionIds = readyItems.map((item) => item.waiterAssignedDeviceSessionId).filter(Boolean) as string[];
+  const assignedSessions = assignedSessionIds.length
+    ? await prisma.staffDeviceSession.findMany({
+        where: { restaurantId: access.restaurant.id, id: { in: assignedSessionIds } },
+        select: { id: true, operatorName: true }
+      })
+    : [];
+  const operatorNameMap = new Map(assignedSessions.map((session) => [session.id, session.operatorName ?? "Nhân viên"]));
   const sortedReadyItems = readyItems.sort((a, b) => {
     const mineA = a.waiterAssignedToUserId === access.user.id ? 0 : a.waiterAssignedToUserId ? 1 : -1;
     const mineB = b.waiterAssignedToUserId === access.user.id ? 0 : b.waiterAssignedToUserId ? 1 : -1;
@@ -97,7 +113,9 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
                 item={item}
                 slug={access.restaurant.slug}
                 currentUserId={access.user.id}
+                currentDeviceSessionId={currentDeviceSession?.id ?? null}
                 userNameMap={userNameMap}
+                operatorNameMap={operatorNameMap}
               />
             ))
           ) : (
@@ -138,15 +156,22 @@ function WaiterItemCard({
   item,
   slug,
   currentUserId,
-  userNameMap
+  currentDeviceSessionId,
+  userNameMap,
+  operatorNameMap
 }: {
   item: WaiterItem;
   slug: string;
   currentUserId: string;
+  currentDeviceSessionId: string | null;
   userNameMap: Map<string, string>;
+  operatorNameMap: Map<string, string>;
 }) {
-  const assigneeName = item.waiterAssignedToUserId ? userNameMap.get(item.waiterAssignedToUserId) ?? "Nhân viên khác" : null;
-  const isMine = item.waiterAssignedToUserId === currentUserId;
+  const isMine = item.waiterAssignedDeviceSessionId
+    ? item.waiterAssignedDeviceSessionId === currentDeviceSessionId
+    : item.waiterAssignedToUserId === currentUserId;
+  const operatorName = item.waiterAssignedDeviceSessionId ? operatorNameMap.get(item.waiterAssignedDeviceSessionId) : null;
+  const assigneeName = item.waiterAssignedToUserId ? operatorName ?? userNameMap.get(item.waiterAssignedToUserId) ?? "Nhân viên khác" : null;
   const readyLabel = item.product.menuType === "DRINK" ? "Đồ uống" : "Bếp đã xong";
 
   return (

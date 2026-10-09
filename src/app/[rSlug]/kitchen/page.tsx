@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
+import { requireActiveStaffDeviceSession } from "@/server/services/staff-device-session-service";
 import { claimKitchenItemAction, markKitchenItemReadyAction } from "@/app/[rSlug]/ops/actions";
 
 function formatTime(value: Date) {
@@ -40,6 +41,13 @@ async function getKitchenItems(restaurantId: string) {
 export default async function KitchenPage({ params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "KITCHEN"]);
   requireRestaurantFeature(access, "KITCHEN_FLOW");
+  const currentDeviceSession = await requireActiveStaffDeviceSession({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role,
+    nextPath: `/${access.restaurant.slug}/kitchen`
+  });
   const [items, notifications, assignedUsers] = await Promise.all([
     getKitchenItems(access.restaurant.id),
     getRecentNotifications(access.restaurant.id, access.user.id),
@@ -51,6 +59,14 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
     })
   ]);
   const userNameMap = new Map(assignedUsers.map((user) => [user.id, user.name]));
+  const assignedSessionIds = items.map((item) => item.kitchenAssignedDeviceSessionId).filter(Boolean) as string[];
+  const assignedSessions = assignedSessionIds.length
+    ? await prisma.staffDeviceSession.findMany({
+        where: { restaurantId: access.restaurant.id, id: { in: assignedSessionIds } },
+        select: { id: true, operatorName: true }
+      })
+    : [];
+  const operatorNameMap = new Map(assignedSessions.map((session) => [session.id, session.operatorName ?? "Nhân viên"]));
   const waitingItems = items.filter((item) => item.status === "NEW");
   const cookingItems = items.filter((item) => item.status === "COOKING").sort((a, b) => {
     const mineA = a.kitchenAssignedToUserId === access.user.id ? 0 : 1;
@@ -80,7 +96,9 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
           items={waitingItems}
           slug={access.restaurant.slug}
           currentUserId={access.user.id}
+          currentDeviceSessionId={currentDeviceSession?.id ?? null}
           userNameMap={userNameMap}
+          operatorNameMap={operatorNameMap}
           mode="waiting"
         />
         <QueueSection
@@ -90,7 +108,9 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
           items={cookingItems}
           slug={access.restaurant.slug}
           currentUserId={access.user.id}
+          currentDeviceSessionId={currentDeviceSession?.id ?? null}
           userNameMap={userNameMap}
+          operatorNameMap={operatorNameMap}
           mode="cooking"
         />
       </section>
@@ -105,7 +125,9 @@ function QueueSection({
   items,
   slug,
   currentUserId,
+  currentDeviceSessionId,
   userNameMap,
+  operatorNameMap,
   mode
 }: {
   title: string;
@@ -114,7 +136,9 @@ function QueueSection({
   items: KitchenItem[];
   slug: string;
   currentUserId: string;
+  currentDeviceSessionId: string | null;
   userNameMap: Map<string, string>;
+  operatorNameMap: Map<string, string>;
   mode: "waiting" | "cooking";
 }) {
   return (
@@ -127,7 +151,9 @@ function QueueSection({
             item={item}
             slug={slug}
             currentUserId={currentUserId}
+            currentDeviceSessionId={currentDeviceSessionId}
             userNameMap={userNameMap}
+            operatorNameMap={operatorNameMap}
             mode={mode}
           />
         ))
@@ -142,17 +168,24 @@ function KitchenItemCard({
   item,
   slug,
   currentUserId,
+  currentDeviceSessionId,
   userNameMap,
+  operatorNameMap,
   mode
 }: {
   item: KitchenItem;
   slug: string;
   currentUserId: string;
+  currentDeviceSessionId: string | null;
   userNameMap: Map<string, string>;
+  operatorNameMap: Map<string, string>;
   mode: "waiting" | "cooking";
 }) {
-  const assigneeName = item.kitchenAssignedToUserId ? userNameMap.get(item.kitchenAssignedToUserId) ?? "Bếp khác" : null;
-  const isMine = item.kitchenAssignedToUserId === currentUserId;
+  const isMine = item.kitchenAssignedDeviceSessionId
+    ? item.kitchenAssignedDeviceSessionId === currentDeviceSessionId
+    : item.kitchenAssignedToUserId === currentUserId;
+  const operatorName = item.kitchenAssignedDeviceSessionId ? operatorNameMap.get(item.kitchenAssignedDeviceSessionId) : null;
+  const assigneeName = item.kitchenAssignedToUserId ? operatorName ?? userNameMap.get(item.kitchenAssignedToUserId) ?? "Bếp khác" : null;
 
   return (
     <article className="rounded-lg border bg-white p-4 shadow-sm">

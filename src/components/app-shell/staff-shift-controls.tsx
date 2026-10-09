@@ -18,6 +18,11 @@ export function StaffShiftControls({ slug }: { slug?: string }) {
     let cancelled = false;
     async function syncShiftState() {
       const response = await fetch(`/api/restaurants/${activeSlug}/shift?deviceId=${encodeURIComponent(deviceId)}`, { cache: "no-store" });
+      if (response.status === 403) {
+        localStorage.removeItem(`staffOnShift:${activeSlug}`);
+        window.location.href = `/${activeSlug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
+        return;
+      }
       if (!response.ok) return;
       const data = (await response.json()) as { onShift?: boolean };
       if (cancelled || typeof data.onShift !== "boolean") return;
@@ -45,6 +50,11 @@ export function StaffShiftControls({ slug }: { slug?: string }) {
           action: nextOnShift ? "START" : "END"
         })
       });
+      if (response.status === 403) {
+        localStorage.removeItem(`staffOnShift:${slug}`);
+        window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
+        return;
+      }
       if (!response.ok) throw new Error("shift_failed");
 
       setOnShift(nextOnShift);

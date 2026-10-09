@@ -1002,11 +1002,41 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
     if (membership.role === "OWNER") throw new Error("OWNER_NOT_STAFF");
     ensureCanMutateStaff(access, membership, undefined, isActive);
 
+    const now = new Date();
     await prisma.$transaction([
       prisma.restaurantUser.update({
         where: { id: membership.id },
         data: { isActive }
       }),
+      ...(!isActive
+        ? [
+            prisma.staffDeviceSession.updateMany({
+              where: {
+                restaurantId: access.restaurant.id,
+                userId: membership.userId,
+                isActive: true
+              },
+              data: {
+                isActive: false,
+                onShift: false,
+                endedAt: now,
+                revokedAt: now,
+                revokedByUserId: access.user.id
+              }
+            }),
+            prisma.pushSubscription.updateMany({
+              where: {
+                restaurantId: access.restaurant.id,
+                userId: membership.userId
+              },
+              data: {
+                isActive: false,
+                onShift: false,
+                lastShiftEndedAt: now
+              }
+            })
+          ]
+        : []),
       prisma.auditLog.create({
         data: {
           restaurantId: access.restaurant.id,
@@ -1024,6 +1054,68 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
   } catch (error) {
     rethrowNextRedirect(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
+  }
+}
+
+export async function revokeStaffDeviceSessionAction(slug: string, formData: FormData) {
+  const access = await requireAdminContext(slug);
+  const path = restaurantRoutes.adminStaff(slug);
+
+  try {
+    const deviceSessionId = readString(formData, "deviceSessionId");
+    const now = new Date();
+    const deviceSession = await prisma.staffDeviceSession.findFirst({
+      where: {
+        id: deviceSessionId,
+        restaurantId: access.restaurant.id
+      }
+    });
+    if (!deviceSession) throw new Error("DEVICE_SESSION_NOT_FOUND");
+
+    await prisma.$transaction([
+      prisma.staffDeviceSession.update({
+        where: { id: deviceSession.id },
+        data: {
+          isActive: false,
+          onShift: false,
+          endedAt: now,
+          revokedAt: now,
+          revokedByUserId: access.user.id
+        }
+      }),
+      prisma.pushSubscription.updateMany({
+        where: {
+          restaurantId: access.restaurant.id,
+          userId: deviceSession.userId,
+          deviceId: deviceSession.deviceId
+        },
+        data: {
+          isActive: false,
+          onShift: false,
+          lastShiftEndedAt: now
+        }
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: "STAFF_DEVICE_REVOKED",
+          entityType: "StaffDeviceSession",
+          entityId: deviceSession.id,
+          metadataJson: {
+            staffUserId: deviceSession.userId,
+            role: deviceSession.role,
+            operatorName: deviceSession.operatorName
+          }
+        }
+      })
+    ]);
+
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã khóa thiết bị nhân viên.");
+  } catch (error) {
+    rethrowNextRedirect(error);
+    redirectWithMessage(path, "error", "Không khóa được thiết bị.");
   }
 }
 

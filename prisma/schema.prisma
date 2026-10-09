@@ -191,8 +191,13 @@ model StaffDeviceSession {
   userId       String
   restaurantId String
   deviceId     String
+  deviceName   String?
+  operatorName String?
   role         RestaurantRole
   onShift      Boolean        @default(true)
+  isActive     Boolean        @default(true)
+  revokedAt    DateTime?
+  revokedByUserId String?
   startedAt    DateTime       @default(now())
   endedAt      DateTime?
   lastSeenAt   DateTime       @default(now())
@@ -201,7 +206,9 @@ model StaffDeviceSession {
 
   @@unique([restaurantId, userId, deviceId])
   @@index([restaurantId, onShift])
+  @@index([restaurantId, isActive, onShift])
   @@index([userId, onShift])
+  @@index([restaurantId, userId, isActive])
 }
 
 model RestaurantUser {
@@ -441,9 +448,11 @@ model OrderItem {
   subtotal              Int
   status                OrderItemStatus @default(NEW)
   kitchenAssignedToUserId String?
+  kitchenAssignedDeviceSessionId String?
   kitchenClaimedAt      DateTime?
   readyAt               DateTime?
   waiterAssignedToUserId String?
+  waiterAssignedDeviceSessionId String?
   waiterClaimedAt       DateTime?
   servedAt              DateTime?
   createdAt             DateTime   @default(now())
@@ -455,7 +464,9 @@ model OrderItem {
   @@index([restaurantId, productId])
   @@index([restaurantId, status])
   @@index([restaurantId, kitchenAssignedToUserId])
+  @@index([restaurantId, kitchenAssignedDeviceSessionId])
   @@index([restaurantId, waiterAssignedToUserId])
+  @@index([restaurantId, waiterAssignedDeviceSessionId])
   @@index([restaurantId, readyAt])
 }
 

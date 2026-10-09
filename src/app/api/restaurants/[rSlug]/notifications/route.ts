@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
+import { isStaffDeviceRole } from "@/server/services/staff-device-session-service";
 
 const notificationAccessRoles = ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"] as const;
 
@@ -28,8 +29,32 @@ function notificationPayload(notification: {
   };
 }
 
-export async function GET(_request: NextRequest, { params }: { params: { rSlug: string } }) {
+async function ensureDeviceAllowed(request: NextRequest, access: Awaited<ReturnType<typeof requireRestaurantAccess>>) {
+  if (!isStaffDeviceRole(access.membership.role)) return null;
+  const deviceId = request.nextUrl.searchParams.get("deviceId");
+  if (!deviceId) {
+    return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+  }
+  const deviceSession = await prisma.staffDeviceSession.findUnique({
+    where: {
+      restaurantId_userId_deviceId: {
+        restaurantId: access.restaurant.id,
+        userId: access.user.id,
+        deviceId
+      }
+    },
+    select: { operatorName: true, isActive: true, revokedAt: true }
+  });
+  if (!deviceSession?.operatorName || !deviceSession.isActive || deviceSession.revokedAt) {
+    return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+  }
+  return null;
+}
+
+export async function GET(request: NextRequest, { params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, [...notificationAccessRoles]);
+  const deviceError = await ensureDeviceAllowed(request, access);
+  if (deviceError) return deviceError;
   const where = notificationWhere(access.restaurant.id, access.user.id);
 
   const [notifications, unreadCount] = await Promise.all([
@@ -60,6 +85,8 @@ export async function GET(_request: NextRequest, { params }: { params: { rSlug: 
 
 export async function PATCH(request: NextRequest, { params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, [...notificationAccessRoles]);
+  const deviceError = await ensureDeviceAllowed(request, access);
+  if (deviceError) return deviceError;
   const body = await request.json().catch(() => ({})) as { notificationId?: string; markAll?: boolean };
   const where = notificationWhere(access.restaurant.id, access.user.id);
 

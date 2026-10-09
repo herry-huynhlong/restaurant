@@ -23,28 +23,34 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
   }
 
   const userAgent = request.headers.get("user-agent");
-  const shiftSession = parsed.data.deviceId
-    ? await prisma.staffDeviceSession.upsert({
+  let shiftSession = null;
+  if (parsed.data.deviceId) {
+    shiftSession = await prisma.staffDeviceSession.findUnique({
         where: {
           restaurantId_userId_deviceId: {
             restaurantId: access.restaurant.id,
             userId: access.user.id,
             deviceId: parsed.data.deviceId
           }
-        },
-        update: {
-          role: access.membership.role,
-          lastSeenAt: new Date()
-        },
-        create: {
-          restaurantId: access.restaurant.id,
-          userId: access.user.id,
-          deviceId: parsed.data.deviceId,
-          role: access.membership.role,
-          onShift: true
         }
-      })
-    : null;
+      });
+
+    if (!shiftSession?.operatorName) {
+      return NextResponse.json({ ok: false, code: "DEVICE_NEEDS_OPERATOR", error: "Vui lòng nhập họ tên người sử dụng." }, { status: 403 });
+    }
+    if (!shiftSession.isActive || shiftSession.revokedAt) {
+      return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+    }
+
+    shiftSession = await prisma.staffDeviceSession.update({
+      where: { id: shiftSession.id },
+      data: {
+        role: access.membership.role,
+        deviceName: parsed.data.deviceName,
+        lastSeenAt: new Date()
+      }
+    });
+  }
   const subscription = await prisma.pushSubscription.upsert({
     where: { endpoint: parsed.data.endpoint },
     update: {

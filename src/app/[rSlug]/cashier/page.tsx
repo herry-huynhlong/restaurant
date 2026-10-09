@@ -9,6 +9,7 @@ import { formatVnd } from "@/lib/money";
 import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getRecentNotifications } from "@/server/services/notification-service";
+import { requireActiveStaffDeviceSession } from "@/server/services/staff-device-session-service";
 import { markDiningSessionPaidAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 import { calculateBillSummary } from "@/server/services/billing-service";
@@ -25,6 +26,13 @@ function getSessionCustomerName(session: {
 export default async function CashierPage({ params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "CASHIER"]);
   requireRestaurantFeature(access, "CASHIER_FLOW");
+  await requireActiveStaffDeviceSession({
+    restaurantId: access.restaurant.id,
+    restaurantSlug: access.restaurant.slug,
+    userId: access.user.id,
+    role: access.membership.role,
+    nextPath: `/${access.restaurant.slug}/cashier`
+  });
   const [sessions, paymentRequests, notifications, settings] = await Promise.all([
     prisma.diningSession.findMany({
       where: {

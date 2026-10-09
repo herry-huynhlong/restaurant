@@ -12,6 +12,7 @@ import { assignableRestaurantRolesForPlan, restaurantRoleLabels } from "@/lib/re
 import { getRecentNotifications } from "@/server/services/notification-service";
 import {
   createStaffAction,
+  revokeStaffDeviceSessionAction,
   resetStaffPasswordAction,
   toggleStaffActiveAction,
   updateStaffAction
@@ -45,7 +46,7 @@ export default async function AdminStaffPage({
       qrDataUrl: await QRCode.toDataURL(url, { margin: 1, width: 112 })
     };
   }));
-  const [staff, notifications] = await Promise.all([
+  const [staff, activeDeviceSessions, notifications] = await Promise.all([
     prisma.restaurantUser.findMany({
       where: {
         restaurantId: access.restaurant.id,
@@ -54,8 +55,28 @@ export default async function AdminStaffPage({
       include: { user: true },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }]
     }),
+    prisma.staffDeviceSession.findMany({
+      where: {
+        restaurantId: access.restaurant.id,
+        isActive: true,
+        operatorName: { not: null }
+      },
+      orderBy: [{ onShift: "desc" }, { lastSeenAt: "desc" }],
+      take: 50
+    }),
     getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
+  const activeDeviceUserIds = Array.from(new Set(activeDeviceSessions.map((session) => session.userId)));
+  const activeDeviceMemberships = activeDeviceUserIds.length
+    ? await prisma.restaurantUser.findMany({
+        where: {
+          restaurantId: access.restaurant.id,
+          userId: { in: activeDeviceUserIds }
+        },
+        include: { user: { select: { name: true } } }
+      })
+    : [];
+  const activeDeviceMembershipMap = new Map(activeDeviceMemberships.map((membership) => [membership.userId, membership]));
 
   return (
     <RestaurantAdminShell
@@ -90,6 +111,47 @@ export default async function AdminStaffPage({
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
+        <h2 className="text-base font-semibold">Thiết bị / người đang làm</h2>
+        {activeDeviceSessions.length ? (
+          <div className="mt-3 grid gap-3 lg:grid-cols-3">
+            {activeDeviceSessions.map((session) => {
+              const membership = activeDeviceMembershipMap.get(session.userId);
+              const username = membership?.username ?? membership?.user.name ?? "unknown";
+              return (
+                <article key={session.id} className="rounded-lg border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold">{session.operatorName}</h3>
+                      <p className="text-sm text-slate-600">{membership ? restaurantRoleLabels[membership.role] : restaurantRoleLabels[session.role]}</p>
+                    </div>
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${session.onShift ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700"}`}>
+                      {session.onShift ? "Trong ca" : "Ngoài ca"}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1 text-sm text-slate-600">
+                    <p>Tài khoản: <span className="font-semibold">{username}</span></p>
+                    <p>Thiết bị: <span className="font-semibold">{session.deviceName ?? "Không rõ thiết bị"}</span></p>
+                    <p>Hoạt động gần nhất: {formatTime(session.lastSeenAt)}</p>
+                  </div>
+                  <form className="mt-3" action={revokeStaffDeviceSessionAction.bind(null, access.restaurant.slug)}>
+                    <input name="deviceSessionId" type="hidden" value={session.id} />
+                    <ConfirmSubmitButton
+                      className="w-full rounded-md border border-red-200 px-3 py-2 text-sm font-semibold text-red-700"
+                      message={`Khóa thiết bị của ${session.operatorName}? Thiết bị này sẽ bị đăng xuất và không thể tiếp tục sử dụng phiên hiện tại.`}
+                    >
+                      Khóa thiết bị
+                    </ConfirmSubmitButton>
+                  </form>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Chưa có thiết bị nhân viên đang hoạt động.</p>
+        )}
       </section>
 
       <section className="rounded-lg border bg-white p-4 shadow-sm">
@@ -222,6 +284,10 @@ function getRequestOrigin() {
   const host = headerList.get("host");
   const protocol = headerList.get("x-forwarded-proto") ?? "https";
   return process.env.NEXTAUTH_URL ?? (host ? `${protocol}://${host}` : "http://localhost:3000");
+}
+
+function formatTime(value: Date) {
+  return new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(value);
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

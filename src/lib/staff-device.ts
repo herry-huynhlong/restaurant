@@ -2,12 +2,20 @@
 
 const deviceIdKey = "staffDeviceId";
 
+function persistDeviceCookie(deviceId: string) {
+  document.cookie = `${deviceIdKey}=${encodeURIComponent(deviceId)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
 export function getStaffDeviceId() {
   const existing = localStorage.getItem(deviceIdKey);
-  if (existing) return existing;
+  if (existing) {
+    persistDeviceCookie(existing);
+    return existing;
+  }
 
   const deviceId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   localStorage.setItem(deviceIdKey, deviceId);
+  persistDeviceCookie(deviceId);
   return deviceId;
 }
 
