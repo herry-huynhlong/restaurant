@@ -87,6 +87,12 @@ export function getPeriodRange(period: ReportPeriod, timeZone = "Asia/Ho_Chi_Min
   return { start: todayStart, end: addDays(todayStart, 1) };
 }
 
+export function getPreviousPeriodRange(period: ReportPeriod, timeZone = "Asia/Ho_Chi_Minh", now = new Date()) {
+  const current = getPeriodRange(period, timeZone, now);
+  const previousAnchor = new Date(current.start.getTime() - 1000);
+  return getPeriodRange(period, timeZone, previousAnchor);
+}
+
 export function formatInTimeZone(date: Date, timeZone = "Asia/Ho_Chi_Minh", options?: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat("vi-VN", {
     timeZone,
@@ -96,11 +102,16 @@ export function formatInTimeZone(date: Date, timeZone = "Asia/Ho_Chi_Minh", opti
 
 export function getBucketKey(date: Date, period: ReportPeriod, timeZone = "Asia/Ho_Chi_Minh") {
   const parts = getZonedParts(date, timeZone);
+  if (period === "today") return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}-${String(parts.hour).padStart(2, "0")}`;
   if (period === "year") return `${parts.year}-${String(parts.month).padStart(2, "0")}`;
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
 export function getBucketLabel(key: string, period: ReportPeriod) {
+  if (period === "today") {
+    const hour = key.split("-")[3];
+    return `${hour}:00`;
+  }
   if (period === "year") {
     const month = Number(key.split("-")[1]);
     return `Tháng ${month}`;

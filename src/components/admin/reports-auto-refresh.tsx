@@ -11,5 +11,5 @@ export function ReportsAutoRefresh() {
     return () => window.clearInterval(interval);
   }, [router]);
 
-  return <span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700">Live</span>;
+  return null;
 }

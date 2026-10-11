@@ -34,9 +34,11 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
 
   return (
     <section className="space-y-3">
-      <div className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${isStale ? "bg-amber-50 text-amber-700" : "bg-teal-50 text-teal-700"}`}>
-        {isStale ? "Đang kết nối lại" : "Live"}
-      </div>
+      {isStale ? (
+        <div className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+          Đang kết nối lại
+        </div>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard label="Doanh thu hôm nay" value={formatVnd(overview.revenueToday)} />
         <StatCard label="Bàn đã thanh toán" value={overview.paidTablesToday} />

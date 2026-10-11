@@ -178,9 +178,11 @@ export function TablesLivePanel({
   return (
     <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
       <div className="space-y-5">
-        <div className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${status === "live" ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700"}`}>
-          {status === "live" ? "Live" : "Đang kết nối lại"}
-        </div>
+        {status === "reconnecting" ? (
+          <div className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+            Đang kết nối lại
+          </div>
+        ) : null}
         {message ? <p className="rounded-md border bg-white px-3 py-2 text-sm text-slate-700">{message}</p> : null}
         {state.areas.map((area) => (
           <section key={area.id} className="space-y-3">

@@ -187,11 +187,8 @@ export function CustomerBillClient({ slug, mode }: { slug: string; mode: "orders
 }
 
 function LiveBadge({ status }: { status: "live" | "reconnecting" }) {
-  return (
-    <span className={`rounded-full px-2 py-1 text-xs font-medium ${status === "live" ? "bg-teal-50 text-teal-700" : "bg-amber-50 text-amber-700"}`}>
-      {status === "live" ? "Live" : "Đang cập nhật"}
-    </span>
-  );
+  if (status === "live") return null;
+  return <span className="rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">Đang cập nhật</span>;
 }
 
 function SummaryRow({ label, value }: { label: string; value: number }) {
