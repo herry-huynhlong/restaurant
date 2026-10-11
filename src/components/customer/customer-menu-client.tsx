@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import type { BusinessType } from "@prisma/client";
 import { formatVnd } from "@/lib/money";
 import { servedUploadUrl } from "@/lib/upload-url";
 
@@ -21,10 +22,12 @@ type CartItem = Product & {
 
 export function CustomerMenuClient({
   slug,
+  businessType,
   products,
   primaryColor
 }: {
   slug: string;
+  businessType: BusinessType;
   products: Product[];
   primaryColor: string;
 }) {
@@ -34,11 +37,17 @@ export function CustomerMenuClient({
   const cartItems = Object.values(cart);
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const groups = useMemo(() => [
-    { type: "MAIN", label: "Món chính", products: products.filter((product) => product.menuType === "MAIN") },
-    { type: "EXTRA", label: "Món thêm", products: products.filter((product) => product.menuType === "EXTRA") },
-    { type: "DRINK", label: "Nước / Đồ uống", products: products.filter((product) => product.menuType === "DRINK") }
-  ] as const, [products]);
+  const groups = useMemo(() => {
+    if (businessType === "DRINK_SHOP") {
+      return [{ type: "DRINK", label: "Đồ uống", products }] as const;
+    }
+
+    return [
+      { type: "MAIN", label: "Món chính", products: products.filter((product) => product.menuType === "MAIN") },
+      { type: "EXTRA", label: "Món thêm", products: products.filter((product) => product.menuType === "EXTRA") },
+      { type: "DRINK", label: "Nước / Đồ uống", products: products.filter((product) => product.menuType === "DRINK") }
+    ] as const;
+  }, [businessType, products]);
 
   function add(product: Product) {
     if (product.isSoldOut) return;

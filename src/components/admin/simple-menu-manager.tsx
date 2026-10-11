@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import type { BusinessType } from "@prisma/client";
 import { deleteSimpleProductAction, updateSimpleProductFlagsAction } from "@/app/[rSlug]/admin/actions";
 import { formatVnd, parseVndInteger } from "@/lib/money";
 import { servedUploadUrl } from "@/lib/upload-url";
@@ -131,7 +132,8 @@ function formatPriceInput(value: string | number) {
   return numericValue ? numericValue.toLocaleString("vi-VN") : "";
 }
 
-export function SimpleMenuManager({ slug, initialProducts }: { slug: string; initialProducts: Product[] }) {
+export function SimpleMenuManager({ slug, businessType, initialProducts }: { slug: string; businessType: BusinessType; initialProducts: Product[] }) {
+  const isDrinkShop = businessType === "DRINK_SHOP";
   const [products, setProducts] = useState(() => initialProducts.map(normalizeProduct).filter((product): product is Product => Boolean(product)));
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -158,12 +160,19 @@ export function SimpleMenuManager({ slug, initialProducts }: { slug: string; ini
 
   const groupedProducts = useMemo(() => {
     const safeProducts = Array.isArray(products) ? products : [];
+    if (isDrinkShop) {
+      return [{
+        type: "DRINK" as const,
+        label: "Đồ uống",
+        products: safeProducts
+      }];
+    }
     return menuTypeOptions.map(([type, label]) => ({
       type,
       label,
       products: safeProducts.filter((product) => product.menuType === type)
     }));
-  }, [products]);
+  }, [isDrinkShop, products]);
 
   return (
     <section className="space-y-5">
@@ -173,7 +182,7 @@ export function SimpleMenuManager({ slug, initialProducts }: { slug: string; ini
         </div>
       ) : null}
 
-      <NewProductCard slug={slug} onSaved={upsertProduct} onToast={showToast} />
+      <NewProductCard slug={slug} isDrinkShop={isDrinkShop} onSaved={upsertProduct} onToast={showToast} />
 
       {products.length === 0 ? (
         <section className="rounded-lg border bg-white p-8 text-center shadow-sm">
@@ -190,6 +199,7 @@ export function SimpleMenuManager({ slug, initialProducts }: { slug: string; ini
                   key={product.id}
                   slug={slug}
                   product={product}
+                  isDrinkShop={isDrinkShop}
                   onDeleted={removeProduct}
                   onSaved={upsertProduct}
                   onToast={showToast}
@@ -205,10 +215,12 @@ export function SimpleMenuManager({ slug, initialProducts }: { slug: string; ini
 
 function NewProductCard({
   slug,
+  isDrinkShop,
   onSaved,
   onToast
 }: {
   slug: string;
+  isDrinkShop: boolean;
   onSaved: (product: Product) => void;
   onToast: (toast: Toast) => void;
 }) {
@@ -246,6 +258,7 @@ function NewProductCard({
     <form ref={formRef} className="rounded-lg border bg-white p-4 shadow-sm" action={submit}>
       <h2 className="text-base font-semibold">+ Thêm món</h2>
       <ProductFields
+        isDrinkShop={isDrinkShop}
         previewUrl={previewUrl}
         price={price}
         onImagePreview={setPreviewUrl}
@@ -262,12 +275,14 @@ function NewProductCard({
 function ProductCard({
   slug,
   product,
+  isDrinkShop,
   onSaved,
   onDeleted,
   onToast
 }: {
   slug: string;
   product: Product;
+  isDrinkShop: boolean;
   onSaved: (product: Product) => void;
   onDeleted: (productId: string) => void;
   onToast: (toast: Toast) => void;
@@ -373,7 +388,7 @@ function ProductCard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold">{product.nameVi || "Món chưa đặt tên"}</h3>
-              <p className="text-sm text-slate-600">{formatVnd(Number(product.price ?? 0))} · {menuTypeLabels[product.menuType] ?? "Món chính"}</p>
+              <p className="text-sm text-slate-600">{formatVnd(Number(product.price ?? 0))}{isDrinkShop ? "" : ` · ${menuTypeLabels[product.menuType] ?? "Món chính"}`}</p>
             </div>
             <span className={`rounded-full px-2 py-1 text-xs font-semibold ${product.isActive && !product.isSoldOut ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-600"}`}>
               {!product.isActive ? "Ngừng bán" : product.isSoldOut ? "Hết món" : "Đang bán"}
@@ -382,7 +397,7 @@ function ProductCard({
           <div className="grid gap-3 lg:grid-cols-3">
             <TextInput label="Tên món" name="nameVi" defaultValue={product.nameVi} required />
             <PriceInput value={price} onChange={setPrice} />
-            <MenuTypeSelect defaultValue={product.menuType} />
+            {isDrinkShop ? <input name="menuType" type="hidden" value="DRINK" /> : <MenuTypeSelect defaultValue={product.menuType} />}
           </div>
           <textarea className="min-h-20 w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-teal-600" name="descriptionVi" placeholder="Mô tả ngắn" defaultValue={product.descriptionVi ?? ""} />
           <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -408,12 +423,14 @@ function ProductCard({
 }
 
 function ProductFields({
+  isDrinkShop,
   previewUrl,
   price,
   onImagePreview,
   onPriceChange,
   onToast
 }: {
+  isDrinkShop: boolean;
   previewUrl: string | null;
   price: string;
   onImagePreview: (value: string | null) => void;
@@ -426,7 +443,7 @@ function ProductFields({
       <div className="grid gap-3 lg:grid-cols-3">
         <TextInput label="Tên món" name="nameVi" required />
         <PriceInput value={price} onChange={onPriceChange} />
-        <MenuTypeSelect />
+        {isDrinkShop ? <input name="menuType" type="hidden" value="DRINK" /> : <MenuTypeSelect />}
         <div className="lg:col-span-3">
           <textarea className="min-h-20 w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-teal-600" name="descriptionVi" placeholder="Mô tả ngắn" />
         </div>

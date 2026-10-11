@@ -27,7 +27,7 @@ async function requireMenuAccess(slug: string) {
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug },
-    select: { id: true, slug: true, status: true }
+    select: { id: true, slug: true, status: true, businessType: true }
   });
   if (!restaurant) {
     return { error: NextResponse.json({ ok: false, code: "TENANT_NOT_FOUND", error: "Không tìm thấy nhà hàng." }, { status: 404 }) };
@@ -140,9 +140,12 @@ async function parseRequest(request: NextRequest, slug: string) {
   if (imageResult?.error) return { error: imageResult.error };
 
   const rawPrice = readString(formData, "price");
+  const menuType = access.restaurant.businessType === "DRINK_SHOP"
+    ? "DRINK"
+    : readString(formData, "menuType") || "MAIN";
   const payload = {
     productId: readString(formData, "productId") || undefined,
-    menuType: readString(formData, "menuType") || "MAIN",
+    menuType,
     nameVi: readString(formData, "nameVi"),
     descriptionVi: readString(formData, "descriptionVi") || undefined,
     price: parseVndInteger(rawPrice),

@@ -398,9 +398,9 @@ const simpleProductSchema = z.object({
   isFeatured: z.boolean()
 });
 
-async function simpleProductDataFromForm(restaurantId: string, formData: FormData) {
+async function simpleProductDataFromForm(restaurantId: string, businessType: string, formData: FormData) {
   const uploadedImageUrl = await saveUploadedImage(formData, "imageFile");
-  const menuType = (readString(formData, "menuType") || "MAIN") as SimpleMenuType;
+  const menuType = (businessType === "DRINK_SHOP" ? "DRINK" : readString(formData, "menuType") || "MAIN") as SimpleMenuType;
   return {
     productId: readString(formData, "productId") || undefined,
     menuType,
@@ -445,7 +445,7 @@ export async function saveSimpleProductAction(slug: string, formData: FormData) 
   try {
     const access = await requireAdminContext(slug);
     const path = restaurantRoutes.adminMenu(slug);
-    const data = await simpleProductDataFromForm(access.restaurant.id, formData);
+    const data = await simpleProductDataFromForm(access.restaurant.id, access.restaurant.businessType, formData);
     console.log("CREATE MENU PAYLOAD", {
       slug,
       restaurantId: access.restaurant.id,

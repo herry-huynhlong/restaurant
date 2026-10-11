@@ -21,10 +21,11 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
     <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan} businessType={restaurant.businessType}>
       <CustomerMenuClient
         slug={restaurant.slug}
+        businessType={restaurant.businessType}
         primaryColor={restaurant.settings?.primaryColor ?? "#0f766e"}
         products={products.map((product) => ({
           id: product.id,
-          categoryName: menuTypeLabels[product.menuType] ?? menuTypeLabels.MAIN,
+          categoryName: restaurant.businessType === "DRINK_SHOP" ? "Đồ uống" : menuTypeLabels[product.menuType] ?? menuTypeLabels.MAIN,
           menuType: product.menuType === "EXTRA" || product.menuType === "DRINK" ? product.menuType : "MAIN",
           nameVi: product.nameVi,
           descriptionVi: product.descriptionVi,
