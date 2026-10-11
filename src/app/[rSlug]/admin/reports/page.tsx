@@ -24,6 +24,7 @@ export default async function AdminReportsPage({
   const previousLabel = getPreviousPeriodLabel(period);
   const recentPayments = report.payments.slice(0, 8);
   const showPaymentMethods = report.paymentMethods.length >= 2;
+  const showRevenueTrend = period !== "today";
 
   return (
     <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Báo cáo" plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
@@ -49,48 +50,52 @@ export default async function AdminReportsPage({
           previousLabel={previousLabel}
         />
 
-        <div className={showPaymentMethods ? "grid gap-5 xl:grid-cols-[1fr_340px]" : "space-y-5"}>
-          <section className="rounded-lg border bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800">Xu hướng doanh thu</h2>
-            <div className="mt-5 flex min-h-[280px] items-end gap-2 overflow-x-auto rounded-lg bg-slate-50 p-4">
-              {report.buckets.map((bucket) => {
-                const height = bucket.amount > 0 ? Math.max(14, Math.round(bucket.amount / maxBucketAmount * 220)) : 4;
-                return (
-                  <div key={bucket.key} className="flex min-w-12 flex-1 flex-col items-center justify-end gap-2">
-                    <div className="flex h-[230px] w-full items-end justify-center">
-                      <div
-                        className="w-full max-w-12 rounded-t-md bg-teal-600 transition-all"
-                        style={{ height }}
-                        title={`${bucket.label}: ${formatVnd(bucket.amount)}`}
-                      />
-                    </div>
-                    <span className="text-xs font-medium text-slate-600">{bucket.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+        {showRevenueTrend || showPaymentMethods ? (
+          <div className={showRevenueTrend && showPaymentMethods ? "grid gap-5 xl:grid-cols-[1fr_340px]" : "space-y-5"}>
+            {showRevenueTrend ? (
+              <section className="rounded-lg border bg-white p-5 shadow-sm">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800">Xu hướng doanh thu</h2>
+                <div className="mt-5 flex min-h-[280px] items-end gap-2 overflow-hidden rounded-lg bg-slate-50 p-4">
+                  {report.buckets.map((bucket) => {
+                    const height = bucket.amount > 0 ? Math.max(14, Math.round(bucket.amount / maxBucketAmount * 220)) : 4;
+                    return (
+                      <div key={bucket.key} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2">
+                        <div className="flex h-[230px] w-full items-end justify-center">
+                          <div
+                            className="w-full max-w-12 rounded-t-md bg-teal-600 transition-all"
+                            style={{ height }}
+                            title={`${bucket.label}: ${formatVnd(bucket.amount)}`}
+                          />
+                        </div>
+                        <span className="text-xs font-medium text-slate-600">{bucket.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
 
-          {showPaymentMethods ? (
-            <section className="rounded-lg border bg-white p-5 shadow-sm">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800">Cơ cấu thanh toán</h2>
-              <div className="mt-4 space-y-3">
-                {report.paymentMethods.map((method) => (
-                  <div key={method.label} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="font-semibold">{method.label}</span>
-                      <span className="font-bold text-teal-700">{method.percent}%</span>
+            {showPaymentMethods ? (
+              <section className="rounded-lg border bg-white p-5 shadow-sm">
+                <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800">Cơ cấu thanh toán</h2>
+                <div className="mt-4 space-y-3">
+                  {report.paymentMethods.map((method) => (
+                    <div key={method.label} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-semibold">{method.label}</span>
+                        <span className="font-bold text-teal-700">{method.percent}%</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-teal-600" style={{ width: `${Math.max(4, method.percent)}%` }} />
+                      </div>
+                      <p className="mt-2 text-sm text-slate-500">{formatVnd(method.amount)}</p>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div className="h-full rounded-full bg-teal-600" style={{ width: `${Math.max(4, method.percent)}%` }} />
-                    </div>
-                    <p className="mt-2 text-sm text-slate-500">{formatVnd(method.amount)}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
 
         <section className="rounded-lg border bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">

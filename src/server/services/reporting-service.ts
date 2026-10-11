@@ -116,9 +116,7 @@ function buildPeriodBuckets(period: ReportPeriod, start: Date, end: Date, timeZo
       });
     }
 
-    if (period === "today") {
-      cursor.setUTCHours(cursor.getUTCHours() + 1);
-    } else if (period === "year") {
+    if (period === "year") {
       cursor.setUTCMonth(cursor.getUTCMonth() + 1);
     } else {
       cursor.setUTCDate(cursor.getUTCDate() + 1);

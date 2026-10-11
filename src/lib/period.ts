@@ -102,20 +102,21 @@ export function formatInTimeZone(date: Date, timeZone = "Asia/Ho_Chi_Minh", opti
 
 export function getBucketKey(date: Date, period: ReportPeriod, timeZone = "Asia/Ho_Chi_Minh") {
   const parts = getZonedParts(date, timeZone);
-  if (period === "today") return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}-${String(parts.hour).padStart(2, "0")}`;
   if (period === "year") return `${parts.year}-${String(parts.month).padStart(2, "0")}`;
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
 export function getBucketLabel(key: string, period: ReportPeriod) {
-  if (period === "today") {
-    const hour = key.split("-")[3];
-    return `${hour}:00`;
-  }
   if (period === "year") {
     const month = Number(key.split("-")[1]);
-    return `Tháng ${month}`;
+    return `T${month}`;
   }
   const [, month, day] = key.split("-");
+  if (period === "week") {
+    const date = new Date(Date.UTC(Number(key.split("-")[0]), Number(month) - 1, Number(day)));
+    const weekdays = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+    return weekdays[date.getUTCDay()];
+  }
+  if (period === "month") return day;
   return `${day}/${month}`;
 }
