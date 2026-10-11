@@ -791,6 +791,82 @@ export async function updateRestaurantSettingsAction(slug: string, formData: For
   }
 }
 
+const ownerPasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Mật khẩu hiện tại là bắt buộc."),
+  newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự."),
+  confirmPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự.")
+}).refine((value) => value.newPassword === value.confirmPassword, {
+  message: "Mật khẩu xác nhận không khớp.",
+  path: ["confirmPassword"]
+});
+
+export async function changeOwnerPasswordAction(slug: string, formData: FormData) {
+  const access = await requireRestaurantAccess(slug, ["OWNER"]);
+  const path = restaurantRoutes.adminSettings(slug);
+
+  try {
+    const parsed = ownerPasswordSchema.parse({
+      currentPassword: readString(formData, "currentPassword"),
+      newPassword: readString(formData, "newPassword"),
+      confirmPassword: readString(formData, "confirmPassword")
+    });
+
+    const user = await prisma.user.findFirst({
+      where: {
+        id: access.user.id,
+        isActive: true,
+        memberships: {
+          some: {
+            restaurantId: access.restaurant.id,
+            role: "OWNER",
+            isActive: true
+          }
+        }
+      },
+      select: {
+        id: true,
+        passwordHash: true
+      }
+    });
+
+    if (!user) {
+      redirectWithMessage(path, "error", "Tài khoản chủ quán không hợp lệ.");
+    }
+
+    const passwordMatches = await bcrypt.compare(parsed.currentPassword, user.passwordHash);
+    if (!passwordMatches) {
+      redirectWithMessage(path, "error", "Mật khẩu hiện tại không đúng.");
+    }
+
+    const passwordHash = await bcrypt.hash(parsed.newPassword, 12);
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash }
+      }),
+      prisma.auditLog.create({
+        data: {
+          restaurantId: access.restaurant.id,
+          userId: access.user.id,
+          action: "OWNER_PASSWORD_CHANGED",
+          entityType: "User",
+          entityId: user.id,
+          metadataJson: { selfService: true }
+        }
+      })
+    ]);
+
+    revalidatePath(path);
+    redirectWithMessage(path, "success", "Đã đổi mật khẩu.");
+  } catch (error) {
+    rethrowNextRedirect(error);
+    if (error instanceof z.ZodError) {
+      redirectWithMessage(path, "error", error.issues[0]?.message ?? "Dữ liệu mật khẩu không hợp lệ.");
+    }
+    redirectWithMessage(path, "error", "Không đổi được mật khẩu.");
+  }
+}
+
 const createStaffSchema = z.object({
   name: z.string().trim().min(1, "Tên là bắt buộc.").max(120),
   username: z.string().trim().min(1, "Tên đăng nhập là bắt buộc.").refine(isValidUsername, usernameValidationMessage()),

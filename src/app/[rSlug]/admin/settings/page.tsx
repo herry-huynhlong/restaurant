@@ -6,7 +6,7 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getRecentNotifications } from "@/server/services/notification-service";
-import { updateRestaurantSettingsAction } from "@/app/[rSlug]/admin/actions";
+import { changeOwnerPasswordAction, updateRestaurantSettingsAction } from "@/app/[rSlug]/admin/actions";
 
 export default async function SettingsPage({
   params,
@@ -16,12 +16,18 @@ export default async function SettingsPage({
   searchParams?: { error?: string; success?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
-  const [restaurant, notifications] = await Promise.all([
+  const [restaurant, notifications, currentMembership] = await Promise.all([
     prisma.restaurant.findUnique({
       where: { id: access.restaurant.id },
       include: { settings: true }
     }),
-    getRecentNotifications(access.restaurant.id, access.user.id)
+    getRecentNotifications(access.restaurant.id, access.user.id),
+    access.membership.role === "OWNER"
+      ? prisma.restaurantUser.findUnique({
+          where: { id: access.membership.id },
+          select: { username: true }
+        })
+      : null
   ]);
 
   if (!restaurant) return null;
@@ -99,6 +105,35 @@ export default async function SettingsPage({
           Lưu cài đặt
         </button>
       </form>
+
+      {access.membership.role === "OWNER" ? (
+        <form className="mt-6" action={changeOwnerPasswordAction.bind(null, access.restaurant.slug)}>
+          <SettingsSection title="Tài khoản chủ quán">
+            <label className="block text-sm font-medium">
+              Tên đăng nhập
+              <input className="mt-1 h-10 w-full rounded-md border bg-slate-50 px-3 text-slate-700" value={currentMembership?.username ?? ""} readOnly />
+            </label>
+            <div className="hidden md:block" />
+            <label className="block text-sm font-medium">
+              Mật khẩu hiện tại
+              <input className="mt-1 h-10 w-full rounded-md border px-3" name="currentPassword" type="password" autoComplete="current-password" required />
+            </label>
+            <label className="block text-sm font-medium">
+              Mật khẩu mới
+              <input className="mt-1 h-10 w-full rounded-md border px-3" name="newPassword" type="password" autoComplete="new-password" minLength={8} required />
+            </label>
+            <label className="block text-sm font-medium">
+              Xác nhận mật khẩu mới
+              <input className="mt-1 h-10 w-full rounded-md border px-3" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} required />
+            </label>
+            <div className="flex items-end">
+              <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+                Đổi mật khẩu
+              </button>
+            </div>
+          </SettingsSection>
+        </form>
+      ) : null}
     </RestaurantAdminShell>
   );
 }
