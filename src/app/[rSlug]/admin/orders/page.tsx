@@ -22,7 +22,7 @@ export default async function AdminOrdersPage({ params }: { params: { rSlug: str
       plan={access.restaurant.plan}
       businessType={access.restaurant.businessType}
     >
-      <OrdersByTableBoard slug={access.restaurant.slug} initialTables={tables} />
+      <OrdersByTableBoard slug={access.restaurant.slug} restaurantName={access.restaurant.name} initialTables={tables} />
     </RestaurantAdminShell>
   );
 }

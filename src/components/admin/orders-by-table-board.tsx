@@ -1,37 +1,56 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import type { ActiveTableOrder } from "@/server/services/order-board-service";
 
-const requestLabels: Record<string, { icon: string; label: string; tone: string }> = {
-  CALL_STAFF: { icon: "🔔", label: "Gọi nhân viên", tone: "bg-red-50 text-red-700 border-red-100" },
-  REQUEST_WATER: { icon: "💧", label: "Xin nước", tone: "bg-sky-50 text-sky-700 border-sky-100" },
-  REQUEST_UTENSILS: { icon: "🍴", label: "Xin dụng cụ", tone: "bg-amber-50 text-amber-700 border-amber-100" },
-  REQUEST_PAYMENT: { icon: "💵", label: "Yêu cầu thanh toán", tone: "bg-emerald-50 text-emerald-700 border-emerald-100" },
-  OTHER: { icon: "📝", label: "Hỗ trợ", tone: "bg-slate-50 text-slate-700 border-slate-100" }
+const requestLabels: Record<string, { label: string; tone: string }> = {
+  CALL_STAFF: { label: "Gọi nhân viên", tone: "border-red-100 bg-red-50 text-red-700" },
+  REQUEST_WATER: { label: "Xin nước", tone: "border-sky-100 bg-sky-50 text-sky-700" },
+  REQUEST_UTENSILS: { label: "Xin dụng cụ", tone: "border-amber-100 bg-amber-50 text-amber-700" },
+  REQUEST_PAYMENT: { label: "Yêu cầu thanh toán", tone: "border-emerald-100 bg-emerald-50 text-emerald-700" },
+  OTHER: { label: "Hỗ trợ", tone: "border-slate-100 bg-slate-50 text-slate-700" }
+};
+
+const orderStatusLabels: Record<string, string> = {
+  NEW: "Mới",
+  CONFIRMED: "Đã nhận",
+  PREPARING: "Đang làm",
+  READY: "Sẵn sàng",
+  SERVED: "Đã phục vụ"
+};
+
+const itemStatusLabels: Record<string, string> = {
+  NEW: "Mới",
+  COOKING: "Đang làm",
+  READY: "Sẵn sàng",
+  SERVED: "Đã phục vụ"
 };
 
 export function OrdersByTableBoard({
   slug,
+  restaurantName,
   initialTables
 }: {
   slug: string;
+  restaurantName: string;
   initialTables: ActiveTableOrder[];
 }) {
   const [tables, setTables] = useState(initialTables);
-  const [selectedSessionId, setSelectedSessionId] = useState(initialTables[0]?.diningSessionId ?? "");
+  const [expandedSessionId, setExpandedSessionId] = useState(initialTables[0]?.diningSessionId ?? "");
+  const [expandedHistorySessionIds, setExpandedHistorySessionIds] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
-  const selectedTable = useMemo(
-    () => tables.find((table) => table.diningSessionId === selectedSessionId) ?? tables[0] ?? null,
-    [selectedSessionId, tables]
+  const expandedTable = useMemo(
+    () => tables.find((table) => table.diningSessionId === expandedSessionId) ?? null,
+    [expandedSessionId, tables]
   );
 
   useEffect(() => {
-    if (!selectedTable && tables[0]) {
-      setSelectedSessionId(tables[0].diningSessionId);
+    if (!expandedTable && tables[0]) {
+      setExpandedSessionId(tables[0].diningSessionId);
     }
-  }, [selectedTable, tables]);
+  }, [expandedTable, tables]);
 
   useEffect(() => {
     let isMounted = true;
@@ -98,120 +117,204 @@ export function OrdersByTableBoard({
   }
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
-      <div className="space-y-3">
-        {message ? (
-          <p className={`rounded-md border px-3 py-2 text-sm ${message.type === "success" ? "border-teal-200 bg-teal-50 text-teal-800" : "border-red-200 bg-red-50 text-red-700"}`}>
-            {message.text}
-          </p>
-        ) : null}
+    <section className="space-y-4">
+      {message ? (
+        <p className={`rounded-md border px-3 py-2 text-sm ${message.type === "success" ? "border-teal-200 bg-teal-50 text-teal-800" : "border-red-200 bg-red-50 text-red-700"}`}>
+          {message.text}
+        </p>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-2">
         {tables.map((table) => {
-          const isSelected = table.diningSessionId === selectedTable?.diningSessionId;
-          const requestCount = table.requests.length;
+          const isExpanded = table.diningSessionId === expandedSessionId;
+          const isHistoryExpanded = expandedHistorySessionIds[table.diningSessionId] ?? false;
+          const shownItems = table.items.slice(0, 5);
+          const hiddenItemCount = Math.max(0, table.items.length - shownItems.length);
+
           return (
-            <button
-              key={table.diningSessionId}
-              className={`w-full rounded-lg border bg-white p-4 text-left shadow-sm transition ${isSelected ? "border-teal-600 ring-1 ring-teal-600" : "hover:border-slate-300"}`}
-              type="button"
-              onClick={() => setSelectedSessionId(table.diningSessionId)}
-            >
+            <article key={table.diningSessionId} className="rounded-xl border bg-white p-4 shadow-sm transition hover:border-slate-300">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">Bàn {table.tableName}</h2>
-                  <p className="mt-1 text-sm text-slate-500">{table.areaName}</p>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold">Bàn {table.tableName}</h2>
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${tableBadgeClass(table)}`}>
+                      {tableStatusLabel(table)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {table.areaName} · {table.orders.length} lượt gọi · mở lúc {formatTime(table.openedAt)}
+                  </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-lg font-semibold text-teal-700">{formatMoney(table.totalAmount)}</p>
-                  {requestCount > 0 ? <p className="mt-1 rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">🔴 {requestCount} yêu cầu</p> : null}
-                </div>
+                <p className="text-xl font-bold text-teal-700">{formatMoney(table.totalAmount)}</p>
               </div>
-              <ul className="mt-3 space-y-1 text-sm">
-                {table.items.map((item) => (
-                  <li key={`${item.productName}-${item.unitPrice}`} className="flex justify-between gap-3">
-                    <span>{item.quantity} x {item.productName}</span>
-                    <span className="shrink-0 text-slate-600">{formatMoney(item.subtotal)}</span>
-                  </li>
+
+              <div className="mt-4 space-y-2">
+                {shownItems.map((item) => (
+                  <div key={`${item.productName}-${item.unitPrice}`} className="grid grid-cols-[1fr_52px_96px] items-center gap-2 text-sm">
+                    <span className="min-w-0 truncate font-medium">{item.productName}</span>
+                    <span className="text-center tabular-nums">{item.quantity}</span>
+                    <span className="text-right font-semibold tabular-nums">{formatMoney(item.subtotal)}</span>
+                  </div>
                 ))}
-              </ul>
-              <p className="mt-3 text-xs text-slate-500">{table.orders.length} order trong phiên hiện tại</p>
-            </button>
+                {hiddenItemCount > 0 ? <p className="text-sm text-slate-500">+ {hiddenItemCount} món khác</p> : null}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <span>{table.items.length} món</span>
+                  {table.requests.length > 0 ? (
+                    <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
+                      {table.requests.length} yêu cầu
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+                  type="button"
+                  onClick={() => setExpandedSessionId(isExpanded ? "" : table.diningSessionId)}
+                >
+                  {isExpanded ? "Ẩn chi tiết" : "Xem chi tiết"}
+                </button>
+              </div>
+
+              {isExpanded ? (
+                <div className="mt-4 space-y-4 border-t pt-4">
+                  <section>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <h3 className="font-semibold">Tổng hợp món</h3>
+                      <InvoicePrintButton
+                        label="In phiếu tạm tính"
+                        invoice={{
+                          restaurantName,
+                          tableName: table.tableName,
+                          areaName: table.areaName,
+                          openedAt: formatTime(table.openedAt),
+                          status: table.paymentStatus === "PENDING" ? "PENDING" : "UNPAID",
+                          subtotal: table.totalAmount,
+                          taxRate: 0,
+                          taxAmount: 0,
+                          grandTotal: table.totalAmount,
+                          items: table.items.map((item) => ({
+                            id: `${item.productName}-${item.unitPrice}`,
+                            name: item.productName,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                            subtotal: item.subtotal
+                          }))
+                        }}
+                      />
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {table.items.map((item) => (
+                        <div key={`${item.productName}-${item.unitPrice}-detail`} className="grid grid-cols-[1fr_48px_92px_104px] items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm max-sm:grid-cols-[1fr_44px_96px]">
+                          <span className="min-w-0 font-medium">{item.productName}</span>
+                          <span className="text-center tabular-nums">{item.quantity}</span>
+                          <span className="text-right text-slate-600 tabular-nums max-sm:hidden">{formatMoney(item.unitPrice)}</span>
+                          <span className="text-right font-semibold tabular-nums">{formatMoney(item.subtotal)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-semibold">Yêu cầu khách</h3>
+                      {table.requests.length > 0 ? <span className="text-sm font-semibold text-red-700">{table.requests.length} đang chờ</span> : null}
+                    </div>
+                    {table.requests.length ? (
+                      <div className="mt-3 space-y-2">
+                        {table.requests.map((request) => {
+                          const label = requestLabels[request.requestType] ?? requestLabels.OTHER;
+                          return (
+                            <article key={request.id} className={`rounded-md border p-3 ${label.tone}`}>
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold">{label.label}</p>
+                                  <p className="mt-1 text-xs opacity-80">
+                                    {request.customerName} · {formatTime(request.createdAt)} · {request.status === "NEW" ? "Chờ xử lý" : "Đã nhận"}
+                                  </p>
+                                  {request.message ? <p className="mt-2 text-sm">{request.message}</p> : null}
+                                </div>
+                                <button
+                                  className="min-h-10 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm disabled:opacity-60"
+                                  type="button"
+                                  disabled={processingRequestId === request.id}
+                                  onClick={() => void completeRequest(request.id)}
+                                >
+                                  Đã xử lý
+                                </button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500">Không có yêu cầu đang chờ.</p>
+                    )}
+                  </section>
+
+                  <section>
+                    <button
+                      className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm font-semibold hover:bg-slate-50"
+                      type="button"
+                      onClick={() => setExpandedHistorySessionIds((current) => ({ ...current, [table.diningSessionId]: !isHistoryExpanded }))}
+                    >
+                      <span>Lịch sử gọi món</span>
+                      <span>{isHistoryExpanded ? "Ẩn" : `${table.orders.length} lượt`}</span>
+                    </button>
+
+                    {isHistoryExpanded ? (
+                      <div className="mt-3 space-y-3">
+                        {table.orders.map((order) => (
+                          <article key={order.id} className="rounded-md border p-3">
+                            <div className="flex flex-wrap justify-between gap-2">
+                              <div>
+                                <p className="font-semibold">Order #{order.orderNumber} - {formatTime(order.createdAt)}</p>
+                                <p className="text-xs text-slate-500">{order.customerName} · {orderStatusLabels[order.status] ?? order.status}</p>
+                              </div>
+                              <p className="font-semibold">{formatMoney(order.subtotal)}</p>
+                            </div>
+                            <ul className="mt-3 space-y-2 text-sm">
+                              {order.items.map((item) => (
+                                <li key={item.id} className="rounded-md bg-slate-50 px-3 py-2">
+                                  <div className="grid grid-cols-[1fr_44px_92px] gap-2">
+                                    <span className="min-w-0">{item.productName}</span>
+                                    <span className="text-center tabular-nums">{item.quantity}</span>
+                                    <span className="text-right font-semibold tabular-nums">{formatMoney(item.subtotal)}</span>
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                    <span>{formatMoney(item.unitPrice)} / món</span>
+                                    <span>{itemStatusLabels[item.status] ?? item.status}</span>
+                                  </div>
+                                  {item.note ? <p className="mt-1 text-xs text-slate-500">Ghi chú: {item.note}</p> : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+                </div>
+              ) : null}
+            </article>
           );
         })}
       </div>
-
-      <aside className="rounded-lg border bg-white p-4 shadow-sm">
-        {selectedTable ? (
-          <>
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
-              <div>
-                <h2 className="text-lg font-semibold">Chi tiết bàn {selectedTable.tableName}</h2>
-                <p className="mt-1 text-sm text-slate-500">{selectedTable.areaName}</p>
-              </div>
-              <p className="text-lg font-semibold text-teal-700">{formatMoney(selectedTable.totalAmount)}</p>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              <section className="rounded-md border p-3">
-                <h3 className="font-semibold">Yêu cầu</h3>
-                {selectedTable.requests.length ? (
-                  <div className="mt-3 space-y-2">
-                    {selectedTable.requests.map((request) => {
-                      const label = requestLabels[request.requestType] ?? requestLabels.OTHER;
-                      return (
-                        <article key={request.id} className={`rounded-md border p-3 ${label.tone}`}>
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <p className="font-semibold">{label.icon} {label.label}</p>
-                              <p className="mt-1 text-xs opacity-80">{formatTime(request.createdAt)} · {request.status === "NEW" ? "Chờ xử lý" : "Đã nhận"}</p>
-                              {request.message ? <p className="mt-2 text-sm">{request.message}</p> : null}
-                            </div>
-                            <button
-                              className="min-h-10 rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm disabled:opacity-60"
-                              type="button"
-                              disabled={processingRequestId === request.id}
-                              onClick={() => void completeRequest(request.id)}
-                            >
-                              Đã xử lý
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-slate-500">Không có yêu cầu đang chờ.</p>
-                )}
-              </section>
-
-              <h3 className="font-semibold">Món đang gọi</h3>
-              {selectedTable.orders.map((order) => (
-                <article key={order.id} className="rounded-md border p-3">
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <div>
-                      <p className="font-semibold">Order #{order.orderNumber}</p>
-                      <p className="text-xs text-slate-500">{order.customerName} · {formatTime(order.createdAt)}</p>
-                    </div>
-                    <p className="font-semibold">{formatMoney(order.subtotal)}</p>
-                  </div>
-                  <ul className="mt-3 space-y-2 text-sm">
-                    {order.items.map((item) => (
-                      <li key={item.id}>
-                        <div className="flex justify-between gap-3">
-                          <span>{item.quantity} x {item.productName}</span>
-                          <span className="shrink-0">{formatMoney(item.subtotal)}</span>
-                        </div>
-                        {item.note ? <p className="mt-1 text-xs text-slate-500">Ghi chú: {item.note}</p> : null}
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-          </>
-        ) : null}
-      </aside>
     </section>
   );
+}
+
+function tableStatusLabel(table: ActiveTableOrder) {
+  if (table.status === "AWAITING_PAYMENT" || table.paymentStatus === "PENDING") return "Chờ thanh toán";
+  return "Đang phục vụ";
+}
+
+function tableBadgeClass(table: ActiveTableOrder) {
+  if (table.status === "AWAITING_PAYMENT" || table.paymentStatus === "PENDING") {
+    return "bg-amber-50 text-amber-700";
+  }
+  return "bg-teal-50 text-teal-700";
 }
 
 function formatMoney(value: number) {

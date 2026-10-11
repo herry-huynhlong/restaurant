@@ -6,6 +6,8 @@ export type ActiveTableOrder = {
   tableId: string;
   tableName: string;
   areaName: string;
+  status: string;
+  paymentStatus: string;
   openedAt: string;
   totalAmount: number;
   items: Array<{
@@ -28,6 +30,7 @@ export type ActiveTableOrder = {
       unitPrice: number;
       subtotal: number;
       note: string | null;
+      status: string;
     }>;
   }>;
   requests: Array<{
@@ -97,8 +100,10 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
       tableId: session.tableId,
       tableName: session.table.name,
       areaName: session.table.area.name,
+      status: session.status,
+      paymentStatus: session.paymentStatus,
       openedAt: session.openedAt.toISOString(),
-      totalAmount: session.orders.reduce((sum, order) => sum + order.subtotal, 0),
+      totalAmount: session.totalAmount || session.orders.reduce((sum, order) => sum + order.subtotal, 0),
       items: Array.from(itemMap.values()),
       orders: session.orders.map((order) => ({
         id: order.id,
@@ -113,7 +118,8 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
           quantity: item.quantity,
           unitPrice: item.unitPriceSnapshot,
           subtotal: item.subtotal,
-          note: item.note
+          note: item.note,
+          status: item.status
         }))
       })),
       requests: session.serviceRequests.map((request) => ({
@@ -125,5 +131,13 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
         createdAt: request.createdAt.toISOString()
       }))
     };
-  }).sort((a, b) => b.requests.length - a.requests.length || new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime());
+  }).sort((a, b) => {
+    const priority = (table: ActiveTableOrder) => {
+      if (table.requests.length > 0) return 0;
+      if (table.status === "AWAITING_PAYMENT" || table.paymentStatus === "PENDING") return 1;
+      return 2;
+    };
+
+    return priority(a) - priority(b) || new Date(a.openedAt).getTime() - new Date(b.openedAt).getTime();
+  });
 }
