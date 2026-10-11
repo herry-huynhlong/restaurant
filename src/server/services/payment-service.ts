@@ -18,63 +18,54 @@ export async function confirmDiningSessionPaid({
   confirmedByUserId: string;
   paymentMethod: PaymentMethod;
 }): Promise<ConfirmPaymentResult> {
-  const session = await prisma.diningSession.findFirst({
-    where: {
-      id: diningSessionId,
-      restaurantId,
-      ...activeDiningSessionWhere()
-    },
-    include: {
-      table: true,
-      restaurant: { include: { settings: true } },
-      orders: {
-        include: { items: true }
-      }
-    }
-  });
-
-  console.log("PAYMENT SESSION LOOKUP", {
-    restaurantId,
-    diningSessionId,
-    activeWhere: activeDiningSessionWhere(),
-    found: Boolean(session),
-    tableId: session?.tableId ?? null,
-    tableName: session?.table.name ?? null,
-    tableIsActive: session?.table.isActive ?? null,
-    tableStatus: session?.table.status ?? null,
-    sessionStatus: session?.status ?? null,
-    paymentStatus: session?.paymentStatus ?? null
-  });
-
-  if (!session) {
-    const existingPaidPayment = await prisma.payment.findFirst({
-      where: {
-        restaurantId,
-        diningSessionId,
-        status: "PAID"
-      },
-      include: {
-        diningSession: {
-          include: { table: true }
-        }
-      },
-      orderBy: { paidAt: "desc" }
-    });
-
-    if (existingPaidPayment) {
-      return {
-        ok: true,
-        paymentId: existingPaidPayment.id,
-        invoiceNumber: existingPaidPayment.invoiceNumber,
-        grandTotal: existingPaidPayment.grandTotal || existingPaidPayment.amount,
-        tableName: existingPaidPayment.tableNameSnapshot ?? existingPaidPayment.diningSession.table.name
-      };
-    }
-
-    return { ok: false, reason: "SESSION_NOT_ACTIVE" };
-  }
+  const paymentIdempotencyKey = `payment-request-${diningSessionId}`;
 
   return prisma.$transaction(async (tx) => {
+    const lockedActiveSession = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "DiningSession"
+      WHERE id = ${diningSessionId}
+        AND "restaurantId" = ${restaurantId}
+        AND status IN ('OPEN', 'AWAITING_PAYMENT')
+      FOR UPDATE
+    `;
+
+    if (lockedActiveSession.length === 0) {
+      const existingPaidPayment = await tx.payment.findFirst({
+        where: {
+          restaurantId,
+          diningSessionId,
+          status: "PAID"
+        },
+        include: {
+          diningSession: {
+            include: { table: true }
+          }
+        },
+        orderBy: { paidAt: "desc" }
+      });
+
+      if (existingPaidPayment) return paidPaymentResult(existingPaidPayment);
+      return { ok: false, reason: "SESSION_NOT_ACTIVE" };
+    }
+
+    const session = await tx.diningSession.findFirst({
+      where: {
+        id: diningSessionId,
+        restaurantId,
+        ...activeDiningSessionWhere()
+      },
+      include: {
+        table: true,
+        restaurant: { include: { settings: true } },
+        orders: {
+          include: { items: true }
+        }
+      }
+    });
+
+    if (!session) return { ok: false, reason: "SESSION_NOT_ACTIVE" };
+
     const paidAt = new Date();
     const bill = calculateBillSummary(session.orders, session.restaurant.settings);
     const invoiceNumber = generateInvoiceNumber(paidAt);
@@ -108,31 +99,59 @@ export async function confirmDiningSessionPaid({
       }
     });
 
-    if (closedSession.count === 0) return { ok: false, reason: "SESSION_NOT_ACTIVE" };
+    if (closedSession.count === 0) {
+      const existingPaidPayment = await tx.payment.findFirst({
+        where: {
+          restaurantId,
+          diningSessionId: session.id,
+          status: "PAID"
+        },
+        include: {
+          diningSession: {
+            include: { table: true }
+          }
+        },
+        orderBy: { paidAt: "desc" }
+      });
 
-    const payment = await tx.payment.create({
-      data: {
+      if (existingPaidPayment) return paidPaymentResult(existingPaidPayment);
+      return { ok: false, reason: "SESSION_NOT_ACTIVE" };
+    }
+
+    const paymentPayload = {
+      amount: bill.grandTotal,
+      invoiceNumber,
+      subtotalAmount: bill.subtotal,
+      taxRate: bill.taxRate,
+      taxAmount: bill.taxAmount,
+      grandTotal: bill.grandTotal,
+      tableIdSnapshot: session.tableId,
+      tableNameSnapshot: session.table.name,
+      invoiceBusinessName: session.restaurant.settings?.invoiceBusinessName ?? session.restaurant.name,
+      invoiceTaxCode: session.restaurant.settings?.invoiceTaxCode ?? null,
+      invoiceAddress: session.restaurant.settings?.invoiceAddress ?? session.restaurant.settings?.address ?? null,
+      invoicePhone: session.restaurant.settings?.invoicePhone ?? session.restaurant.settings?.phone ?? null,
+      invoiceEmail: session.restaurant.settings?.invoiceEmail ?? null,
+      invoiceDisplayName: session.restaurant.settings?.invoiceDisplayName ?? session.restaurant.settings?.restaurantName ?? session.restaurant.name,
+      paymentMethod,
+      status: "PAID" as const,
+      paidAt,
+      confirmedByUserId
+    };
+
+    const payment = await tx.payment.upsert({
+      where: {
+        restaurantId_idempotencyKey: {
+          restaurantId,
+          idempotencyKey: paymentIdempotencyKey
+        }
+      },
+      update: paymentPayload,
+      create: {
         restaurantId,
         diningSessionId: session.id,
-        amount: bill.grandTotal,
-        invoiceNumber,
-        subtotalAmount: bill.subtotal,
-        taxRate: bill.taxRate,
-        taxAmount: bill.taxAmount,
-        grandTotal: bill.grandTotal,
-        tableIdSnapshot: session.tableId,
-        tableNameSnapshot: session.table.name,
-        invoiceBusinessName: session.restaurant.settings?.invoiceBusinessName ?? session.restaurant.name,
-        invoiceTaxCode: session.restaurant.settings?.invoiceTaxCode ?? null,
-        invoiceAddress: session.restaurant.settings?.invoiceAddress ?? session.restaurant.settings?.address ?? null,
-        invoicePhone: session.restaurant.settings?.invoicePhone ?? session.restaurant.settings?.phone ?? null,
-        invoiceEmail: session.restaurant.settings?.invoiceEmail ?? null,
-        invoiceDisplayName: session.restaurant.settings?.invoiceDisplayName ?? session.restaurant.settings?.restaurantName ?? session.restaurant.name,
-        paymentMethod,
-        status: "PAID",
-        idempotencyKey: `paid-${session.id}-${paidAt.getTime()}`,
-        paidAt,
-        confirmedByUserId
+        idempotencyKey: paymentIdempotencyKey,
+        ...paymentPayload
       }
     });
 
@@ -181,4 +200,21 @@ export async function confirmDiningSessionPaid({
       tableName: session.table.name
     };
   });
+}
+
+function paidPaymentResult(payment: {
+  id: string;
+  invoiceNumber: string | null;
+  grandTotal: number;
+  amount: number;
+  tableNameSnapshot: string | null;
+  diningSession: { table: { name: string } };
+}): ConfirmPaymentResult {
+  return {
+    ok: true,
+    paymentId: payment.id,
+    invoiceNumber: payment.invoiceNumber,
+    grandTotal: payment.grandTotal || payment.amount,
+    tableName: payment.tableNameSnapshot ?? payment.diningSession.table.name
+  };
 }
