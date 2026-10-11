@@ -16,18 +16,12 @@ export default async function SettingsPage({
   searchParams?: { error?: string; success?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
-  const [restaurant, notifications, currentMembership] = await Promise.all([
+  const [restaurant, notifications] = await Promise.all([
     prisma.restaurant.findUnique({
       where: { id: access.restaurant.id },
       include: { settings: true }
     }),
-    getRecentNotifications(access.restaurant.id, access.user.id),
-    access.membership.role === "OWNER"
-      ? prisma.restaurantUser.findUnique({
-          where: { id: access.membership.id },
-          select: { username: true }
-        })
-      : null
+    getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
 
   if (!restaurant) return null;
@@ -110,8 +104,8 @@ export default async function SettingsPage({
         <form className="mt-6" action={changeOwnerPasswordAction.bind(null, access.restaurant.slug)}>
           <SettingsSection title="Tài khoản chủ quán">
             <label className="block text-sm font-medium">
-              Tên đăng nhập
-              <input className="mt-1 h-10 w-full rounded-md border bg-slate-50 px-3 text-slate-700" value={currentMembership?.username ?? ""} readOnly />
+              Email đăng nhập
+              <input className="mt-1 h-10 w-full rounded-md border bg-slate-50 px-3 text-slate-700" value={access.user.email ?? ""} readOnly />
             </label>
             <div className="hidden md:block" />
             <label className="block text-sm font-medium">
