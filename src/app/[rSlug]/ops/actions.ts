@@ -262,7 +262,9 @@ export async function markDiningSessionPaidAction(slug: string, diningSessionId:
 
   revalidatePath(restaurantRoutes.cashier(slug));
   revalidatePath(restaurantRoutes.staff(slug));
+  revalidatePath(restaurantRoutes.adminOrders(slug));
   revalidatePath(restaurantRoutes.adminTables(slug));
   revalidatePath(restaurantRoutes.admin(slug));
   revalidatePath(restaurantRoutes.adminReports(slug));
+  publishNotificationRefresh(access.restaurant.id);
 }

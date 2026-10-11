@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import type { ActiveTableOrder } from "@/server/services/order-board-service";
 
@@ -37,20 +37,16 @@ export function OrdersByTableBoard({
   initialTables: ActiveTableOrder[];
 }) {
   const [tables, setTables] = useState(initialTables);
-  const [expandedSessionId, setExpandedSessionId] = useState(initialTables[0]?.diningSessionId ?? "");
+  const [expandedSessionIds, setExpandedSessionIds] = useState<Record<string, boolean>>({});
   const [expandedHistorySessionIds, setExpandedHistorySessionIds] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
-  const expandedTable = useMemo(
-    () => tables.find((table) => table.diningSessionId === expandedSessionId) ?? null,
-    [expandedSessionId, tables]
-  );
 
   useEffect(() => {
-    if (!expandedTable && tables[0]) {
-      setExpandedSessionId(tables[0].diningSessionId);
-    }
-  }, [expandedTable, tables]);
+    const liveSessionIds = new Set(tables.map((table) => table.diningSessionId));
+    setExpandedSessionIds((current) => pruneMissingSessionIds(current, liveSessionIds));
+    setExpandedHistorySessionIds((current) => pruneMissingSessionIds(current, liveSessionIds));
+  }, [tables]);
 
   useEffect(() => {
     let isMounted = true;
@@ -126,7 +122,7 @@ export function OrdersByTableBoard({
 
       <div className="grid gap-4 xl:grid-cols-2">
         {tables.map((table) => {
-          const isExpanded = table.diningSessionId === expandedSessionId;
+          const isExpanded = expandedSessionIds[table.diningSessionId] ?? false;
           const isHistoryExpanded = expandedHistorySessionIds[table.diningSessionId] ?? false;
           const shownItems = table.items.slice(0, 5);
           const hiddenItemCount = Math.max(0, table.items.length - shownItems.length);
@@ -171,7 +167,10 @@ export function OrdersByTableBoard({
                 <button
                   className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
                   type="button"
-                  onClick={() => setExpandedSessionId(isExpanded ? "" : table.diningSessionId)}
+                  onClick={() => setExpandedSessionIds((current) => ({
+                    ...current,
+                    [table.diningSessionId]: !isExpanded
+                  }))}
                 >
                   {isExpanded ? "Ẩn chi tiết" : "Xem chi tiết"}
                 </button>
@@ -315,6 +314,16 @@ function tableBadgeClass(table: ActiveTableOrder) {
     return "bg-amber-50 text-amber-700";
   }
   return "bg-teal-50 text-teal-700";
+}
+
+function pruneMissingSessionIds(current: Record<string, boolean>, liveSessionIds: Set<string>) {
+  const next: Record<string, boolean> = {};
+  for (const [sessionId, isOpen] of Object.entries(current)) {
+    if (isOpen && liveSessionIds.has(sessionId)) {
+      next[sessionId] = true;
+    }
+  }
+  return next;
 }
 
 function formatMoney(value: number) {

@@ -5,6 +5,7 @@ import { confirmDiningSessionPaid } from "@/server/services/payment-service";
 import { hasPlanFeature } from "@/lib/plan/features";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { assertActiveStaffDeviceForAction } from "@/server/services/staff-device-session-service";
+import { publishNotificationRefresh } from "@/server/services/notification-event-service";
 
 export async function POST(request: Request, { params }: { params: { rSlug: string } }) {
   try {
@@ -42,6 +43,8 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.reason, message: "Không tìm thấy phiên phục vụ đang mở để thanh toán." }, { status: 409 });
     }
+
+    publishNotificationRefresh(access.restaurant.id);
 
     return NextResponse.json({ ok: true, payment: result }, {
       headers: {
