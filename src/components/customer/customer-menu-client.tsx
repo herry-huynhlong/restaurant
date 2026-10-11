@@ -102,15 +102,9 @@ export function CustomerMenuClient({
     <div className="pb-[calc(9rem+env(safe-area-inset-bottom))]">
       <section className="mb-4 rounded-lg border bg-white p-3 shadow-sm">
         <p className="text-sm font-semibold">Gọi nhanh</p>
-        <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-          <button className="rounded-md border px-3 py-2 disabled:opacity-60" type="button" disabled={isPending} onClick={() => sendServiceRequest("CALL_STAFF", "Gọi nhân viên")}>
+        <div className="mt-3 text-sm">
+          <button className="w-full rounded-md border px-3 py-2 font-semibold disabled:opacity-60" type="button" disabled={isPending} onClick={() => sendServiceRequest("CALL_STAFF", "Gọi nhân viên")}>
             Gọi nhân viên
-          </button>
-          <button className="rounded-md border px-3 py-2" type="button" onClick={() => sendServiceRequest("REQUEST_WATER", "Thêm nước")}>
-            Thêm nước
-          </button>
-          <button className="rounded-md border px-3 py-2" type="button" onClick={() => sendServiceRequest("REQUEST_UTENSILS", "Thêm dụng cụ")}>
-            Thêm dụng cụ
           </button>
         </div>
         {message ? <p className="mt-3 rounded-md bg-teal-50 px-3 py-2 text-sm text-teal-800">{message}</p> : null}

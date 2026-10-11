@@ -162,13 +162,15 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       serviceRequestId: serviceRequest.id,
       duplicate: true,
       totalAmount,
-      message: parsed.data.requestType === "REQUEST_PAYMENT" ? "Yêu cầu thanh toán đã được gửi. Vui lòng đến quầy để hoàn tất thanh toán." : "Nhân viên đang được gọi."
+      message: parsed.data.requestType === "REQUEST_PAYMENT" ? "Yêu cầu thanh toán đã được gửi. Vui lòng đến quầy để hoàn tất thanh toán." : "Đã gửi yêu cầu gọi nhân viên."
     });
   }
 
   const notificationTitle = parsed.data.requestType === "REQUEST_PAYMENT"
     ? `Bàn ${context.table.name} yêu cầu thanh toán tiền mặt`
-    : `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`;
+    : parsed.data.requestType === "CALL_STAFF"
+      ? `Khách gọi nhân viên - Bàn ${context.table.name}`
+      : `Bàn ${context.table.name} ${requestLabels[parsed.data.requestType]}`;
   const notificationMessage = parsed.data.requestType === "REQUEST_PAYMENT"
     ? `Tổng hiện tại ${totalAmount.toLocaleString("vi-VN")}đ. Khách đến quầy thanh toán tiền mặt.`
     : parsed.data.message || `${context.session.customerName} ${requestLabels[parsed.data.requestType]}`;
@@ -200,6 +202,8 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     totalAmount,
     message: parsed.data.requestType === "REQUEST_PAYMENT"
       ? "Đã gửi yêu cầu thanh toán. Vui lòng đến quầy để hoàn tất thanh toán."
-      : undefined
+      : parsed.data.requestType === "CALL_STAFF"
+        ? "Đã gửi yêu cầu gọi nhân viên."
+        : undefined
   });
 }
