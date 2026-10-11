@@ -42,6 +42,7 @@ export async function getRestaurantPaymentReport(restaurantId: string, period: R
   ]);
 
   const revenue = payments.reduce((sum, payment) => sum + (payment.grandTotal || payment.amount), 0);
+  const paidSessionIds = Array.from(new Set(payments.map((payment) => payment.diningSessionId)));
   const tableKeys = new Set(payments.map((payment) => payment.tableIdSnapshot ?? payment.diningSession.tableId));
   const previousRevenue = previousPayments.reduce((sum, payment) => sum + (payment.grandTotal || payment.amount), 0);
   const previousTableKeys = new Set(previousPayments.map((payment) => payment.tableIdSnapshot ?? payment.diningSession.tableId));
@@ -56,6 +57,7 @@ export async function getRestaurantPaymentReport(restaurantId: string, period: R
     paymentMethodMap.set(methodLabel, (paymentMethodMap.get(methodLabel) ?? 0) + (payment.grandTotal || payment.amount));
   }
 
+  const topItems = paidSessionIds.length ? await getTopRevenueItems(restaurantId, paidSessionIds) : [];
   const buckets = buildPeriodBuckets(period, start, end, timeZone, bucketMap);
   const paymentMethods = Array.from(paymentMethodMap.entries())
     .sort(([, left], [, right]) => right - left)
@@ -86,6 +88,7 @@ export async function getRestaurantPaymentReport(restaurantId: string, period: R
     },
     buckets,
     paymentMethods,
+    topItems,
     payments: payments.map((payment) => ({
       id: payment.id,
       invoiceNumber: payment.invoiceNumber,
@@ -100,6 +103,57 @@ export async function getRestaurantPaymentReport(restaurantId: string, period: R
       confirmedByName: payment.confirmedBy?.name ?? null
     }))
   };
+}
+
+async function getTopRevenueItems(restaurantId: string, diningSessionIds: string[]) {
+  const groupedItems = await prisma.orderItem.groupBy({
+    by: ["productId"],
+    where: {
+      restaurantId,
+      order: {
+        diningSessionId: { in: diningSessionIds }
+      }
+    },
+    _sum: {
+      quantity: true,
+      subtotal: true
+    },
+    orderBy: [
+      { _sum: { subtotal: "desc" } },
+      { _sum: { quantity: "desc" } }
+    ],
+    take: 5
+  });
+
+  const productIds = groupedItems.map((item) => item.productId);
+  const snapshots = productIds.length ? await prisma.orderItem.findMany({
+    where: {
+      restaurantId,
+      productId: { in: productIds },
+      order: {
+        diningSessionId: { in: diningSessionIds }
+      }
+    },
+    distinct: ["productId"],
+    orderBy: [
+      { productId: "asc" },
+      { createdAt: "desc" }
+    ],
+    select: {
+      productId: true,
+      productNameViSnapshot: true
+    }
+  }) : [];
+
+  const snapshotMap = new Map(snapshots.map((item) => [item.productId, item.productNameViSnapshot]));
+
+  return groupedItems.map((item, index) => ({
+    rank: index + 1,
+    productId: item.productId,
+    name: snapshotMap.get(item.productId) ?? "Món đã xóa",
+    quantity: item._sum.quantity ?? 0,
+    revenue: item._sum.subtotal ?? 0
+  }));
 }
 
 function buildPeriodBuckets(period: ReportPeriod, start: Date, end: Date, timeZone: string, amounts: Map<string, number>) {
