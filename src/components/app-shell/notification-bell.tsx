@@ -117,22 +117,33 @@ export function NotificationBell({
 
     let cancelled = false;
 
-    function showSystemNotifications(newItems: NotificationItem[]) {
+    async function showSystemNotifications(newItems: NotificationItem[]) {
       if (localStorage.getItem("notificationEnabled") !== "true") return;
       if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+      const registration = "serviceWorker" in navigator
+        ? await navigator.serviceWorker.ready.catch(() => null)
+        : null;
 
       for (const notification of newItems) {
         if (!soundTypes.has(notification.type)) continue;
         try {
-          const options: NotificationOptions & { renotify?: boolean } = {
+          const options: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
             body: notification.message,
-            icon: "/icons/icon-192.png",
-            badge: "/icons/icon-192.png",
-            tag: notification.id,
-            renotify: true
+            icon: `/${slug}/icons/icon-192.png`,
+            badge: `/${slug}/icons/icon-192.png`,
+            data: { url: `/${slug}/staff`, type: notification.type },
+            tag: `${notification.id}-${Date.now()}`,
+            renotify: true,
+            requireInteraction: true,
+            vibrate: [350, 140, 350, 140, 500]
           };
-          const systemNotification = new Notification(notification.title, options);
-          systemNotification.onclick = () => window.focus();
+          if (registration) {
+            await registration.showNotification(notification.title, options);
+          } else {
+            const systemNotification = new Notification(notification.title, options);
+            systemNotification.onclick = () => window.focus();
+          }
         } catch {
           // Some mobile browsers only allow background notifications from the service worker.
         }
@@ -168,7 +179,7 @@ export function NotificationBell({
 
         if (initializedRef.current && newItems.some((notification) => soundTypes.has(notification.type))) {
           playSound();
-          showSystemNotifications(newItems);
+          void showSystemNotifications(newItems);
         }
         initializedRef.current = true;
       } catch {
