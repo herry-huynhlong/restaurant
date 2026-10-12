@@ -19,6 +19,10 @@ type RestaurantActionProps = {
   businessType?: string | null;
   returnTo: string;
   compact?: boolean;
+  showStatusAction?: boolean;
+  showPlanAction?: boolean;
+  showResetPasswordAction?: boolean;
+  showDeleteAction?: boolean;
 };
 
 export function PlatformRestaurantActions({
@@ -29,7 +33,11 @@ export function PlatformRestaurantActions({
   plan,
   businessType,
   returnTo,
-  compact = false
+  compact = false,
+  showStatusAction = true,
+  showPlanAction = true,
+  showResetPasswordAction = true,
+  showDeleteAction = true
 }: RestaurantActionProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
@@ -55,7 +63,7 @@ export function PlatformRestaurantActions({
 
   return (
     <div className={`flex flex-wrap gap-2 ${compact ? "items-center" : ""}`}>
-      {!isDeleted ? (
+      {!isDeleted && showStatusAction ? (
         <form action={setRestaurantStatusAction}>
           <input name="restaurantId" type="hidden" value={restaurantId} />
           <input name="status" type="hidden" value={nextStatus} />
@@ -74,7 +82,7 @@ export function PlatformRestaurantActions({
         </form>
       ) : null}
 
-      {!isDeleted ? (
+      {!isDeleted && showPlanAction ? (
         <form className="flex gap-1" action={changePlanAction}>
           <input name="restaurantId" type="hidden" value={restaurantId} />
           <input name="returnTo" type="hidden" value={returnTo} />
@@ -87,15 +95,17 @@ export function PlatformRestaurantActions({
         </form>
       ) : null}
 
-      {!isDeleted ? <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => dialogRef.current?.showModal()}>
+      {!isDeleted && showResetPasswordAction ? <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => dialogRef.current?.showModal()}>
         Reset pass admin
       </button> : null}
 
-      {!isDeleted ? (
+      {!isDeleted && showDeleteAction ? (
         <button className="rounded-md border border-red-200 px-2 py-1 text-sm font-semibold text-red-700 hover:bg-red-50" type="button" onClick={() => deleteDialogRef.current?.showModal()}>
           Xóa
         </button>
-      ) : (
+      ) : null}
+
+      {isDeleted && showDeleteAction ? (
         <>
           <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => restoreDialogRef.current?.showModal()}>
             Khôi phục
@@ -104,7 +114,7 @@ export function PlatformRestaurantActions({
             Xóa vĩnh viễn
           </button>
         </>
-      )}
+      ) : null}
 
       <dialog ref={dialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
         <form className="space-y-4 p-5" action={resetOwnerPasswordAction}>

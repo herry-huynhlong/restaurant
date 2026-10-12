@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
+import { PlatformMobileMenu } from "@/components/app-shell/platform-mobile-menu";
 import { platformRoutes } from "@/lib/routes";
 
 const navItems = [
@@ -35,9 +36,12 @@ export function PlatformShell({
         </aside>
         <section className="min-w-0 flex-1">
           <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold">{title}</h1>
-              <p className="mt-1 text-sm text-slate-600">Quản trị SaaS đa nhà hàng</p>
+            <div className="flex min-w-0 items-start gap-3">
+              <PlatformMobileMenu />
+              <div className="min-w-0">
+                <h1 className="text-2xl font-semibold">{title}</h1>
+                <p className="mt-1 text-sm text-slate-600">Quản trị SaaS đa nhà hàng</p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {action}
