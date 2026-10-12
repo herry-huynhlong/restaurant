@@ -114,8 +114,7 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
         <KpiCard icon={BellRing} label="Yêu cầu đang chờ" value={overview.pendingRequests} helper="Cần nhân viên xử lý" tone={overview.pendingRequests > 0 ? "red" : "green"} />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <article className="rounded-2xl border bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 text-teal-800">
@@ -154,26 +153,6 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
           ) : (
             <EmptyState icon={CalendarDays} title="Chưa có dữ liệu doanh thu" description="Khi có payment PAID, biểu đồ doanh thu 7 ngày sẽ hiển thị tại đây." />
           )}
-        </article>
-
-        <article className="rounded-2xl border bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-teal-800">
-            <Table2 className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">Tình trạng bàn</h2>
-          </div>
-          <div className="mt-5 space-y-4">
-            <TableStatusRow label="Đang sử dụng" value={overview.occupiedTables} total={overview.totalTables} tone="bg-teal-700" />
-            <TableStatusRow label="Bàn trống" value={overview.availableTables} total={overview.totalTables} tone="bg-emerald-500" />
-            <TableStatusRow label="Chờ thanh toán" value={overview.waitingPaymentTables} total={overview.totalTables} tone="bg-amber-500" />
-          </div>
-          <div className="mt-5 rounded-xl border bg-slate-50 p-4">
-            <p className="text-sm text-slate-500">Tỷ lệ sử dụng bàn</p>
-            <p className="mt-1 text-3xl font-semibold">{overview.tableUtilization}%</p>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-              <div className="h-full rounded-full bg-teal-700" style={{ width: `${Math.min(100, overview.tableUtilization)}%` }} />
-            </div>
-          </div>
-        </article>
       </section>
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
@@ -235,22 +214,6 @@ function KpiCard({ icon: Icon, label, value, helper, tone }: { icon: LucideIcon;
       <p className="mt-1 text-2xl font-semibold tracking-normal text-slate-950">{value}</p>
       <p className="mt-2 text-xs text-slate-500">{helper}</p>
     </article>
-  );
-}
-
-function TableStatusRow({ label, value, total, tone }: { label: string; value: number; total: number; tone: string }) {
-  const percent = total > 0 ? Math.round(value / total * 100) : 0;
-
-  return (
-    <div>
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium text-slate-700">{label}</span>
-        <span className="font-semibold">{value}</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.min(100, percent)}%` }} />
-      </div>
-    </div>
   );
 }
 

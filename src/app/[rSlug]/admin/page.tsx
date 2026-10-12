@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, Grid3X3, ListOrdered, Menu as MenuIcon, Sparkles, Store, Trophy, Users } from "lucide-react";
+import { ArrowUpRight, BarChart3, Grid3X3, ListOrdered, Menu as MenuIcon, Store, Trophy, Users } from "lucide-react";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { DashboardLiveOverview } from "@/components/admin/dashboard-live-overview";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
@@ -40,8 +40,7 @@ export default async function RestaurantAdminPage({ params }: { params: { rSlug:
     >
       <section className="mb-5 overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-sm">
         <div className="bg-gradient-to-br from-teal-800 via-teal-700 to-slate-950 px-5 py-6 text-white sm:px-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/15 text-white shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {logoUrl ? <img alt={`Logo ${access.restaurant.name}`} className="h-full w-full object-cover" src={logoUrl} /> : <Store className="h-8 w-8" />}
@@ -59,14 +58,6 @@ export default async function RestaurantAdminPage({ params }: { params: { rSlug:
                 <h1 className="mt-1 text-3xl font-semibold tracking-normal sm:text-4xl">{access.restaurant.name}</h1>
                 <p className="mt-2 max-w-2xl text-sm text-teal-50">Trung tâm điều hành doanh thu, bàn, đơn hàng và hoạt động trong ngày.</p>
               </div>
-            </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-teal-50">
-                <Sparkles className="h-4 w-4" />
-                Tổng quan realtime
-              </div>
-              <p className="mt-2 text-xs text-teal-50">Dữ liệu tự cập nhật định kỳ, không cần F5.</p>
-            </div>
           </div>
         </div>
       </section>
