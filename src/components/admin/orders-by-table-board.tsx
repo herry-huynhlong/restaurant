@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { StaffAddOrderModal, type LiveTable, type MenuProduct } from "@/components/admin/tables-live-panel";
+import { FoodItemDisplayCard } from "@/components/ops/food-item-display-card";
 import type { ActiveTableOrder } from "@/server/services/order-board-service";
 
 const requestLabels: Record<string, { label: string; tone: string }> = {
@@ -224,12 +225,14 @@ export function OrdersByTableBoard({
                     </div>
                     <div className="mt-3 space-y-2">
                       {table.items.map((item) => (
-                        <div key={`${item.productName}-${item.unitPrice}-detail`} className="grid grid-cols-[1fr_48px_92px_104px] items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm max-sm:grid-cols-[1fr_44px_96px]">
-                          <span className="min-w-0 font-medium">{item.productName}</span>
-                          <span className="text-center tabular-nums">{item.quantity}</span>
-                          <span className="text-right text-slate-600 tabular-nums max-sm:hidden">{formatMoney(item.unitPrice)}</span>
-                          <span className="text-right font-semibold tabular-nums">{formatMoney(item.subtotal)}</span>
-                        </div>
+                        <FoodItemDisplayCard
+                          key={`${item.productName}-${item.unitPrice}-detail`}
+                          imageUrl={item.imageUrl}
+                          name={item.productName}
+                          quantity={item.quantity}
+                          unitPrice={item.unitPrice}
+                          subtotal={item.subtotal}
+                        />
                       ))}
                     </div>
                   </section>
@@ -294,17 +297,16 @@ export function OrdersByTableBoard({
                             </div>
                             <ul className="mt-3 space-y-2 text-sm">
                               {order.items.map((item) => (
-                                <li key={item.id} className="rounded-md bg-slate-50 px-3 py-2">
-                                  <div className="grid grid-cols-[1fr_44px_92px] gap-2">
-                                    <span className="min-w-0">{item.productName}</span>
-                                    <span className="text-center tabular-nums">{item.quantity}</span>
-                                    <span className="text-right font-semibold tabular-nums">{formatMoney(item.subtotal)}</span>
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                    <span>{formatMoney(item.unitPrice)} / món</span>
-                                    <span>{itemStatusLabels[item.status] ?? item.status}</span>
-                                  </div>
-                                  {item.note ? <p className="mt-1 text-xs text-slate-500">Ghi chú: {item.note}</p> : null}
+                                <li key={item.id}>
+                                  <FoodItemDisplayCard
+                                    imageUrl={item.imageUrl}
+                                    name={item.productName}
+                                    quantity={item.quantity}
+                                    unitPrice={item.unitPrice}
+                                    subtotal={item.subtotal}
+                                    note={item.note}
+                                    statusLabel={itemStatusLabels[item.status] ?? item.status}
+                                  />
                                 </li>
                               ))}
                             </ul>

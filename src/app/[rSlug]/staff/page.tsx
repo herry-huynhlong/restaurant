@@ -3,6 +3,7 @@ import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
 import { OrdersByTableBoard } from "@/components/admin/orders-by-table-board";
 import { TablesLivePanel } from "@/components/admin/tables-live-panel";
+import { FoodItemDisplayCard } from "@/components/ops/food-item-display-card";
 import { StaffWorkspaceTabs } from "@/components/staff/staff-workspace-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/db/prisma";
@@ -224,31 +225,31 @@ function WaiterItemCard({
   const readyLabel = item.product.menuType === "DRINK" ? "Đồ uống" : "Bếp đã xong";
 
   return (
-    <article className="rounded-lg border bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase text-teal-700">Bàn {item.order.table.name} · {readyLabel}</p>
-          <h3 className="mt-1 text-lg font-semibold">{item.productNameViSnapshot} x{item.quantity}</h3>
-          {item.note ? <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-sm text-amber-800">{item.note}</p> : null}
-        </div>
-        <p className="text-xs text-slate-500">Xong lúc {formatTime(item.readyAt ?? item.createdAt)}</p>
-      </div>
+    <FoodItemDisplayCard
+      imageUrl={item.product.imageUrl}
+      name={item.productNameViSnapshot}
+      quantity={item.quantity}
+      note={item.note}
+      meta={<span>Bàn {item.order.table.name} · {readyLabel} · xong lúc {formatTime(item.readyAt ?? item.createdAt)}</span>}
+      statusLabel={assigneeName ? `Đã có ${isMine ? "tôi" : assigneeName} nhận` : null}
+      actions={
+        <>
       {assigneeName ? (
-        <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        <p className="w-full rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
           Đã có: <span className="font-semibold">{isMine ? "Tôi" : assigneeName}</span> nhận
         </p>
       ) : null}
-      <div className="mt-3 flex flex-wrap gap-2">
         {!item.waiterAssignedToUserId ? (
           <form action={claimWaiterItemAction.bind(null, slug, item.id)}>
-            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" type="submit">Nhận đi món</button>
+            <button className="min-h-11 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Nhận đi món</button>
           </form>
         ) : isMine ? (
           <form action={markWaiterItemServedAction.bind(null, slug, item.id)}>
-            <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" type="submit">Đã phục vụ</button>
+            <button className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">Đã phục vụ</button>
           </form>
         ) : null}
-      </div>
-    </article>
+        </>
+      }
+    />
   );
 }

@@ -15,6 +15,7 @@ export type ActiveTableOrder = {
     quantity: number;
     unitPrice: number;
     subtotal: number;
+    imageUrl: string | null;
   }>;
   orders: Array<{
     id: string;
@@ -31,6 +32,7 @@ export type ActiveTableOrder = {
       subtotal: number;
       note: string | null;
       status: string;
+      imageUrl: string | null;
     }>;
   }>;
   requests: Array<{
@@ -58,7 +60,10 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
       orders: {
         orderBy: { createdAt: "asc" },
         include: {
-          items: { orderBy: { createdAt: "asc" } }
+          items: {
+            orderBy: { createdAt: "asc" },
+            include: { product: { select: { imageUrl: true } } }
+          }
         }
       },
       serviceRequests: {
@@ -75,6 +80,7 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
       quantity: number;
       unitPrice: number;
       subtotal: number;
+      imageUrl: string | null;
     }>();
 
     for (const order of session.orders) {
@@ -89,7 +95,8 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
             productName: item.productNameViSnapshot,
             quantity: item.quantity,
             unitPrice: item.unitPriceSnapshot,
-            subtotal: item.subtotal
+            subtotal: item.subtotal,
+            imageUrl: item.product.imageUrl
           });
         }
       }
@@ -119,7 +126,8 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
           unitPrice: item.unitPriceSnapshot,
           subtotal: item.subtotal,
           note: item.note,
-          status: item.status
+          status: item.status,
+          imageUrl: item.product.imageUrl
         }))
       })),
       requests: session.serviceRequests.map((request) => ({

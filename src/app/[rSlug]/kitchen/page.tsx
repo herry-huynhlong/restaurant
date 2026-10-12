@@ -1,6 +1,7 @@
 import { AppHeader } from "@/components/app-shell/app-header";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
+import { FoodItemDisplayCard } from "@/components/ops/food-item-display-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
@@ -27,7 +28,7 @@ async function getKitchenItems(restaurantId: string) {
     },
     include: {
       order: { include: { table: true } },
-      product: { select: { menuType: true } },
+      product: { select: { menuType: true, imageUrl: true } },
       restaurant: false
     },
     orderBy: [
@@ -188,31 +189,31 @@ function KitchenItemCard({
   const assigneeName = item.kitchenAssignedToUserId ? operatorName ?? userNameMap.get(item.kitchenAssignedToUserId) ?? "Bếp khác" : null;
 
   return (
-    <article className="rounded-lg border bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase text-teal-700">Bàn {item.order.table.name}</p>
-          <h3 className="mt-1 text-lg font-semibold">{item.productNameViSnapshot} x{item.quantity}</h3>
-          {item.note ? <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-sm text-amber-800">{item.note}</p> : null}
-        </div>
-        <p className="text-xs text-slate-500">Gọi lúc {formatTime(item.order.createdAt)}</p>
-      </div>
-      {assigneeName ? (
-        <p className="mt-3 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
-          Đang làm bởi: <span className="font-semibold">{isMine ? "Tôi" : assigneeName}</span>
-        </p>
-      ) : null}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {mode === "waiting" ? (
-          <form action={claimKitchenItemAction.bind(null, slug, item.id)}>
-            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" type="submit">Nhận món</button>
-          </form>
-        ) : isMine ? (
-          <form action={markKitchenItemReadyAction.bind(null, slug, item.id)}>
-            <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" type="submit">Xong món</button>
-          </form>
-        ) : null}
-      </div>
-    </article>
+    <FoodItemDisplayCard
+      imageUrl={item.product.imageUrl}
+      name={item.productNameViSnapshot}
+      quantity={item.quantity}
+      note={item.note}
+      meta={<span>Bàn {item.order.table.name} · gọi lúc {formatTime(item.order.createdAt)}</span>}
+      statusLabel={mode === "waiting" ? "Chờ làm" : "Đang làm"}
+      actions={
+        <>
+          {assigneeName ? (
+            <p className="w-full rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              Đang làm bởi: <span className="font-semibold">{isMine ? "Tôi" : assigneeName}</span>
+            </p>
+          ) : null}
+          {mode === "waiting" ? (
+            <form action={claimKitchenItemAction.bind(null, slug, item.id)}>
+              <button className="min-h-11 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Nhận món</button>
+            </form>
+          ) : isMine ? (
+            <form action={markKitchenItemReadyAction.bind(null, slug, item.id)}>
+              <button className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">Hoàn thành</button>
+            </form>
+          ) : null}
+        </>
+      }
+    />
   );
 }
