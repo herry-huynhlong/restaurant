@@ -18,13 +18,29 @@ export default async function TablesPage({
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  const [areas, notifications, tableState] = await Promise.all([
+  const [areas, notifications, tableState, products] = await Promise.all([
     prisma.area.findMany({
       where: { restaurantId: access.restaurant.id },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
     }),
     getRecentNotifications(access.restaurant.id, access.user.id),
-    getAdminTablesState(access.restaurant.id, access.restaurant.slug, baseUrl)
+    getAdminTablesState(access.restaurant.id, access.restaurant.slug, baseUrl),
+    prisma.product.findMany({
+      where: {
+        restaurantId: access.restaurant.id,
+        isActive: true
+      },
+      orderBy: [{ isFeatured: "desc" }, { nameVi: "asc" }],
+      select: {
+        id: true,
+        menuType: true,
+        nameVi: true,
+        descriptionVi: true,
+        price: true,
+        imageUrl: true,
+        isSoldOut: true
+      }
+    })
   ]);
 
   return (
@@ -66,6 +82,7 @@ export default async function TablesPage({
         restaurantName={access.restaurant.name}
         cashierName={access.user.name}
         canUsePayment={hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType)}
+        products={products}
         initialState={tableState}
         initialSelectedTableId={searchParams?.table}
       />

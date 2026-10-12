@@ -4,7 +4,13 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { getActiveTableOrders } from "@/server/services/order-board-service";
 
-export default async function AdminOrdersPage({ params }: { params: { rSlug: string } }) {
+export default async function AdminOrdersPage({
+  params,
+  searchParams
+}: {
+  params: { rSlug: string };
+  searchParams?: { session?: string };
+}) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
   const [tables, notifications] = await Promise.all([
     getActiveTableOrders(access.restaurant.id),
@@ -22,7 +28,7 @@ export default async function AdminOrdersPage({ params }: { params: { rSlug: str
       plan={access.restaurant.plan}
       businessType={access.restaurant.businessType}
     >
-      <OrdersByTableBoard slug={access.restaurant.slug} restaurantName={access.restaurant.name} initialTables={tables} />
+      <OrdersByTableBoard slug={access.restaurant.slug} restaurantName={access.restaurant.name} initialTables={tables} initialExpandedSessionId={searchParams?.session} />
     </RestaurantAdminShell>
   );
 }

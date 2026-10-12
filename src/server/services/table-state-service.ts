@@ -61,6 +61,33 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
         const activeSession = table.sessions[0] ?? null;
         const bill = activeSession ? calculateBillSummary(activeSession.orders, settings) : null;
         const qrUrl = getTableQrUrl(baseUrl, slug, table.qrToken);
+        const aggregatedItems = new Map<string, {
+          id: string;
+          name: string;
+          quantity: number;
+          unitPrice: number;
+          subtotal: number;
+        }>();
+        if (activeSession) {
+          for (const order of activeSession.orders) {
+            for (const item of order.items) {
+              const key = `${item.productNameViSnapshot}:${item.unitPriceSnapshot}`;
+              const existing = aggregatedItems.get(key);
+              if (existing) {
+                existing.quantity += item.quantity;
+                existing.subtotal += item.subtotal;
+              } else {
+                aggregatedItems.set(key, {
+                  id: key,
+                  name: item.productNameViSnapshot,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPriceSnapshot,
+                  subtotal: item.subtotal
+                });
+              }
+            }
+          }
+        }
         return {
           id: table.id,
           areaId: table.areaId,
@@ -79,21 +106,13 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
             taxRate: bill?.taxRate ?? 0,
             taxAmount: bill?.taxAmount ?? 0,
             grandTotal: bill?.grandTotal ?? 0,
-            orders: activeSession.orders.map((order) => ({
-              id: order.id,
-              orderNumber: order.orderNumber,
-              customerName: order.customerName,
-              status: order.status,
-              subtotal: order.subtotal,
-              createdAt: order.createdAt.toISOString(),
-              items: order.items.map((item) => ({
-                id: item.id,
-                name: item.productNameViSnapshot,
-                quantity: item.quantity,
-                unitPrice: item.unitPriceSnapshot,
-                subtotal: item.subtotal
-              }))
-            })),
+            itemCount: activeSession.orders.reduce(
+              (total, order) => total + order.items.reduce((sum, item) => sum + item.quantity, 0),
+              0
+            ),
+            orderCount: activeSession.orders.length,
+            customers: Array.from(new Set(activeSession.orders.map((order) => order.customerName).filter(Boolean))),
+            items: Array.from(aggregatedItems.values()),
             serviceRequests: activeSession.serviceRequests.map((request) => ({
               id: request.id,
               type: request.requestType,

@@ -30,14 +30,18 @@ const itemStatusLabels: Record<string, string> = {
 export function OrdersByTableBoard({
   slug,
   restaurantName,
-  initialTables
+  initialTables,
+  initialExpandedSessionId
 }: {
   slug: string;
   restaurantName: string;
   initialTables: ActiveTableOrder[];
+  initialExpandedSessionId?: string;
 }) {
   const [tables, setTables] = useState(initialTables);
-  const [expandedSessionIds, setExpandedSessionIds] = useState<Record<string, boolean>>({});
+  const [expandedSessionIds, setExpandedSessionIds] = useState<Record<string, boolean>>(
+    initialExpandedSessionId ? { [initialExpandedSessionId]: true } : {}
+  );
   const [expandedHistorySessionIds, setExpandedHistorySessionIds] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
@@ -128,7 +132,7 @@ export function OrdersByTableBoard({
           const hiddenItemCount = Math.max(0, table.items.length - shownItems.length);
 
           return (
-            <article key={table.diningSessionId} className="rounded-xl border bg-white p-4 shadow-sm transition hover:border-slate-300">
+            <article id={`session-${table.diningSessionId}`} key={table.diningSessionId} className={`rounded-xl border bg-white p-4 shadow-sm transition hover:border-slate-300 ${initialExpandedSessionId === table.diningSessionId ? "border-teal-300 ring-2 ring-teal-100" : ""}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
