@@ -131,7 +131,7 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       localStorage.setItem("notificationEnabled", "true");
       localStorage.setItem("notificationSoundEnabled", "true");
       window.dispatchEvent(new Event("notification-sound-enabled"));
-      await playNotificationSound(0.65);
+      await playNotificationSound(1);
 
       if (!("Notification" in window)) {
         setStatus("enabled");
@@ -198,7 +198,7 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
   async function testSound() {
     localStorage.setItem("notificationSoundEnabled", "true");
     setStatus("enabled");
-    const played = await playNotificationSound(0.9);
+    const played = await playNotificationSound(1);
     setMessage(played
       ? "Đã phát thử âm thanh. Nếu vẫn không nghe, hãy tăng âm lượng media và tắt chế độ im lặng/Không làm phiền."
       : "Trình duyệt đang chặn âm thanh. Hãy chạm lại nút kiểm tra hoặc mở app bằng Chrome/PWA đã cài.");
@@ -220,6 +220,7 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
         return;
       }
 
+      const localShown = await showTestNotification(registration, slug);
       const response = await fetch(`/api/restaurants/${slug}/push/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -227,22 +228,17 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       });
 
       if (!response.ok) {
-        setMessage("Chưa gửi được thông báo thử. Hãy bật lại thông báo hoặc kiểm tra quyền trên điện thoại.");
+        const data = await response.json().catch(() => ({})) as { error?: string };
+        setMessage(localShown
+          ? `Đã hiện thông báo local, nhưng push server lỗi: ${data.error ?? response.status}.`
+          : `Chưa hiện được thông báo local và push server lỗi: ${data.error ?? response.status}.`);
         return;
       }
 
       setPushReady(true);
-      const options: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
-        body: "Nếu thấy thông báo này, quyền thông báo của thiết bị đang hoạt động.",
-        icon: `/${slug}/icons/icon-192.png`,
-        badge: `/${slug}/icons/icon-192.png`,
-        tag: `local-test-${Date.now()}`,
-        renotify: true,
-        requireInteraction: true,
-        vibrate: [250, 120, 250]
-      };
-      await registration.showNotification("Thông báo thử", options).catch(() => undefined);
-      setMessage("Đã gửi push qua server và hiển thị thử thông báo trên thiết bị này.");
+      setMessage(localShown
+        ? "Đã hiển thị thông báo thử trên thiết bị và đã gửi push qua server."
+        : "Push server đã gửi, nhưng thiết bị không cho hiện notification local. Kiểm tra quyền hiển thị thông báo/Pop-up của app trong Android.");
     } finally {
       setBusy(false);
     }
@@ -334,5 +330,32 @@ function permissionLabel(permission: PermissionState) {
 async function registerServiceWorker() {
   await navigator.serviceWorker.register("/sw.js");
   return navigator.serviceWorker.ready;
+}
+
+async function showTestNotification(registration: ServiceWorkerRegistration, slug: string) {
+  try {
+    const options: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
+      body: "Nếu thấy thông báo này, quyền hiển thị thông báo của thiết bị đang hoạt động.",
+      icon: `/${slug}/icons/icon-192.png`,
+      badge: `/${slug}/icons/icon-192.png`,
+      tag: `local-test-${Date.now()}`,
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [350, 140, 350, 140, 500]
+    };
+    await registration.showNotification("Thông báo thử", options);
+    return true;
+  } catch {
+    try {
+      const notification = new Notification("Thông báo thử", {
+        body: "Nếu thấy thông báo này, quyền hiển thị thông báo của thiết bị đang hoạt động.",
+        icon: `/${slug}/icons/icon-192.png`
+      });
+      notification.onclick = () => window.focus();
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 

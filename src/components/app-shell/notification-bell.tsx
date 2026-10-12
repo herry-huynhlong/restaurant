@@ -106,7 +106,7 @@ export function NotificationBell({
     if (now - lastSoundAtRef.current < 800) return;
     lastSoundAtRef.current = now;
 
-    void playNotificationSound(0.75).catch((error) => console.warn("Notification sound blocked", error));
+    void playNotificationSound(1).catch((error) => console.warn("Notification sound blocked", error));
   }
 
   useEffect(() => {

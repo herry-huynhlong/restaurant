@@ -9,7 +9,7 @@ function getAudioContext() {
   return sharedAudioContext;
 }
 
-export async function playNotificationSound(volume = 0.6) {
+export async function playNotificationSound(volume = 1) {
   const audioPlayed = await playAudioFile(volume);
   const beepPlayed = await playBeep(volume);
   return audioPlayed || beepPlayed;
@@ -27,7 +27,7 @@ async function playAudioFile(volume: number) {
   try {
     const audio = new Audio("/sounds/notification.wav");
     audio.preload = "auto";
-    audio.volume = volume;
+    audio.volume = Math.min(1, Math.max(0, volume));
     await audio.play();
     return true;
   } catch {
@@ -35,7 +35,7 @@ async function playAudioFile(volume: number) {
   }
 }
 
-async function playBeep(volume: number, durationMs = 520) {
+async function playBeep(volume: number, durationMs = 720) {
   try {
     const context = getAudioContext();
     if (!context) return false;
@@ -46,7 +46,7 @@ async function playBeep(volume: number, durationMs = 520) {
     const now = context.currentTime;
     const gain = context.createGain();
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, Math.min(1, volume)), now + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000);
     gain.connect(context.destination);
 
