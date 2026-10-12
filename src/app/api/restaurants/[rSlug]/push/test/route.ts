@@ -7,6 +7,7 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "WAITER", "KITCHEN", "CASHIER"]);
   const body = await request.json().catch(() => ({}));
   const subscriptionId = typeof body.subscriptionId === "string" ? body.subscriptionId : undefined;
+  const endpoint = typeof body.endpoint === "string" ? body.endpoint : undefined;
 
   const subscription = subscriptionId
     ? await prisma.pushSubscription.findFirst({
@@ -17,6 +18,15 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
           isActive: true
         }
       })
+    : endpoint
+      ? await prisma.pushSubscription.findFirst({
+          where: {
+            endpoint,
+            userId: access.user.id,
+            restaurantId: access.restaurant.id,
+            isActive: true
+          }
+        })
     : await prisma.pushSubscription.findFirst({
         where: {
           userId: access.user.id,
