@@ -4,6 +4,7 @@ import { AlertTriangle, BellRing, CheckCircle2, Volume2, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react";
 import { urlBase64ToUint8Array } from "@/lib/push";
 import { getStaffDeviceId, getStaffDeviceName } from "@/lib/staff-device";
+import { playNotificationSound } from "@/lib/client-notification-sound";
 
 type Status = "idle" | "enabled" | "denied";
 type PermissionState = "unsupported" | "default" | "granted" | "denied";
@@ -130,7 +131,7 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       localStorage.setItem("notificationEnabled", "true");
       localStorage.setItem("notificationSoundEnabled", "true");
       window.dispatchEvent(new Event("notification-sound-enabled"));
-      await playNotificationSound(0.35);
+      await playNotificationSound(0.65);
 
       if (!("Notification" in window)) {
         setStatus("enabled");
@@ -197,8 +198,10 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
   async function testSound() {
     localStorage.setItem("notificationSoundEnabled", "true");
     setStatus("enabled");
-    await playNotificationSound(0.45);
-    setMessage("Đã phát thử âm thanh. Nếu không nghe, kiểm tra âm lượng hoặc chế độ im lặng của điện thoại.");
+    const played = await playNotificationSound(0.9);
+    setMessage(played
+      ? "Đã phát thử âm thanh. Nếu vẫn không nghe, hãy tăng âm lượng media và tắt chế độ im lặng/Không làm phiền."
+      : "Trình duyệt đang chặn âm thanh. Hãy chạm lại nút kiểm tra hoặc mở app bằng Chrome/PWA đã cài.");
   }
 
   async function testSystemNotification() {
@@ -229,7 +232,17 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       }
 
       setPushReady(true);
-      setMessage("Đã gửi thông báo thử tới thiết bị này.");
+      const options: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
+        body: "Nếu thấy thông báo này, quyền thông báo của thiết bị đang hoạt động.",
+        icon: `/${slug}/icons/icon-192.png`,
+        badge: `/${slug}/icons/icon-192.png`,
+        tag: `local-test-${Date.now()}`,
+        renotify: true,
+        requireInteraction: true,
+        vibrate: [250, 120, 250]
+      };
+      await registration.showNotification("Thông báo thử", options).catch(() => undefined);
+      setMessage("Đã gửi push qua server và hiển thị thử thông báo trên thiết bị này.");
     } finally {
       setBusy(false);
     }
@@ -323,9 +336,3 @@ async function registerServiceWorker() {
   return navigator.serviceWorker.ready;
 }
 
-async function playNotificationSound(volume: number) {
-  const audio = new Audio("/sounds/notification.wav");
-  audio.preload = "auto";
-  audio.volume = volume;
-  await audio.play().catch(() => undefined);
-}

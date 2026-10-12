@@ -4,6 +4,7 @@ import { Bell, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Notification, NotificationType } from "@prisma/client";
 import { getStaffDeviceId, isDeviceOnShift } from "@/lib/staff-device";
+import { playNotificationSound } from "@/lib/client-notification-sound";
 
 type NotificationItem = {
   id: string;
@@ -62,14 +63,7 @@ export function NotificationBell({
   const knownIdsRef = useRef(new Set(notifications.map((notification) => notification.id)));
   const initializedRef = useRef(false);
   const lastSoundAtRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    audioRef.current = new Audio("/sounds/notification.wav");
-    audioRef.current.preload = "auto";
-    audioRef.current.volume = 0.45;
-  }, []);
 
   useEffect(() => {
     setOnShift(isDeviceOnShift(slug));
@@ -112,9 +106,7 @@ export function NotificationBell({
     if (now - lastSoundAtRef.current < 800) return;
     lastSoundAtRef.current = now;
 
-    const audio = audioRef.current ?? new Audio("/sounds/notification.wav");
-    audio.currentTime = 0;
-    void audio.play().catch((error) => console.warn("Notification sound blocked", error));
+    void playNotificationSound(0.75).catch((error) => console.warn("Notification sound blocked", error));
   }
 
   useEffect(() => {

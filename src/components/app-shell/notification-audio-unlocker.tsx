@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { unlockNotificationSound } from "@/lib/client-notification-sound";
 
 export function NotificationAudioUnlocker() {
   useEffect(() => {
@@ -11,9 +12,7 @@ export function NotificationAudioUnlocker() {
       const enabled = localStorage.getItem("notificationEnabled") === "true" || localStorage.getItem("notificationSoundEnabled") === "true";
       if (!enabled) return;
       unlocked = true;
-      const audio = new Audio("/sounds/notification.wav");
-      audio.volume = 0.01;
-      void audio.play().catch(() => undefined);
+      void unlockNotificationSound();
     }
 
     window.addEventListener("pointerdown", unlock, { once: true });
