@@ -40,17 +40,21 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     return NextResponse.json({ error: "No active subscription for current user/device." }, { status: 404 });
   }
 
+  const tag = `test-${access.restaurant.id}-${Date.now()}`;
   const result = await sendPushToSubscription(subscription.id, {
     title: "Thông báo thử",
-    body: `Thông báo của ${access.restaurant.name} đang hoạt động.`,
+    body: `Thông báo của ${access.restaurant.name} đang hoạt động. ${new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`,
     url: `/${access.restaurant.slug}/staff`,
-    tag: `test-${access.restaurant.id}`,
-    type: "PUSH_TEST"
+    tag,
+    type: "PUSH_TEST",
+    requireInteraction: true,
+    silent: false,
+    vibrate: [350, 140, 350, 140, 500]
   });
 
   if (!result.ok) {
     return NextResponse.json({ error: result.reason }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, tag });
 }

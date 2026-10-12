@@ -236,9 +236,10 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       }
 
       setPushReady(true);
+      const data = await response.json().catch(() => ({})) as { tag?: string };
       setMessage(localShown
-        ? "Đã hiển thị thông báo thử trên thiết bị và đã gửi push qua server."
-        : "Push server đã gửi, nhưng thiết bị không cho hiện notification local. Kiểm tra quyền hiển thị thông báo/Pop-up của app trong Android.");
+        ? `Đã tạo thông báo local và server đã gửi push (${data.tag ?? "ok"}). Nếu không thấy pop-up, mở cài đặt Android của app/site và bật thông báo dạng cảnh báo/hiển thị nổi.`
+        : `Server đã gửi push (${data.tag ?? "ok"}), nhưng Android/browser không cho hiện notification local. Kiểm tra quyền thông báo, pop-up và chế độ Không làm phiền.`);
     } finally {
       setBusy(false);
     }
