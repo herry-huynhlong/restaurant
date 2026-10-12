@@ -22,6 +22,16 @@ export default async function EditRestaurantPage({
     notFound();
   }
 
+  if (restaurant.status === "DELETED") {
+    return (
+      <PlatformShell title={`Chỉnh sửa ${restaurant.name}`}>
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+          Nhà hàng này đã xóa mềm. Hãy khôi phục nhà hàng trong danh sách Đã xóa trước khi chỉnh sửa.
+        </section>
+      </PlatformShell>
+    );
+  }
+
   return (
     <PlatformShell title={`Chỉnh sửa ${restaurant.name}`}>
       {searchParams?.error ? <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{searchParams.error}</p> : null}

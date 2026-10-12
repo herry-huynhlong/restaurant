@@ -11,10 +11,11 @@ import { getPlatformRestaurants } from "@/server/services/platform-service";
 export default async function PlatformRestaurantsPage({
   searchParams
 }: {
-  searchParams?: { error?: string; success?: string };
+  searchParams?: { error?: string; success?: string; view?: string };
 }) {
   await requirePlatformAdmin();
-  const restaurants = await getPlatformRestaurants();
+  const showDeleted = searchParams?.view === "deleted";
+  const restaurants = await getPlatformRestaurants({ includeDeleted: showDeleted });
 
   return (
     <PlatformShell
@@ -22,6 +23,14 @@ export default async function PlatformRestaurantsPage({
       action={<Link className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" href={platformRoutes.newRestaurant}>+ Thêm nhà hàng</Link>}
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${!showDeleted ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={platformRoutes.restaurants}>
+          Đang quản lý
+        </Link>
+        <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${showDeleted ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={`${platformRoutes.restaurants}?view=deleted`}>
+          Đã xóa
+        </Link>
+      </div>
       <div className="overflow-auto rounded-lg border bg-white shadow-sm">
         <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead className="bg-slate-100 text-slate-700">
@@ -60,6 +69,7 @@ export default async function PlatformRestaurantsPage({
                       <PlatformRestaurantActions
                         restaurantId={restaurant.id}
                         restaurantName={restaurant.name}
+                        restaurantSlug={restaurant.slug}
                         status={restaurant.status}
                         plan={restaurant.plan}
                         businessType={restaurant.businessType}

@@ -24,6 +24,7 @@ enum RestaurantStatus {
   ACTIVE
   SUSPENDED
   INACTIVE
+  DELETED
 }
 
 enum RestaurantPlan {
@@ -142,6 +143,8 @@ model Restaurant {
   subscriptionStatus SubscriptionStatus @default(ACTIVE)
   subscriptionStart  DateTime?
   subscriptionEnd    DateTime?
+  deletedAt          DateTime?
+  deletedByUserId    String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   users              RestaurantUser[]
@@ -162,6 +165,7 @@ model Restaurant {
   pushSubscriptions  PushSubscription[]
 
   @@index([status])
+  @@index([deletedAt])
   @@index([plan])
   @@index([businessType])
   @@index([createdAt])

@@ -17,13 +17,14 @@ export async function getPlatformOverview() {
     expired
   ] =
     await Promise.all([
-      prisma.restaurant.count(),
+      prisma.restaurant.count({ where: { status: { not: "DELETED" } } }),
       prisma.restaurant.count({ where: { status: "ACTIVE" } }),
       prisma.restaurant.count({ where: { status: "INACTIVE" } }),
       prisma.restaurant.count({ where: { status: "SUSPENDED" } }),
       prisma.restaurant.count({ where: { subscriptionStatus: "EXPIRED" } }),
-      prisma.restaurant.count({ where: { createdAt: { gte: startOfMonth } } }),
+      prisma.restaurant.count({ where: { status: { not: "DELETED" }, createdAt: { gte: startOfMonth } } }),
       prisma.restaurant.findMany({
+        where: { status: { not: "DELETED" } },
         take: 8,
         orderBy: { createdAt: "desc" },
         include: {
@@ -37,6 +38,7 @@ export async function getPlatformOverview() {
       }),
       prisma.restaurant.findMany({
         where: {
+          status: { not: "DELETED" },
           subscriptionEnd: {
             gte: new Date(),
             lte: inThirtyDays
@@ -47,6 +49,7 @@ export async function getPlatformOverview() {
       }),
       prisma.restaurant.findMany({
         where: {
+          status: { not: "DELETED" },
           OR: [{ subscriptionStatus: "EXPIRED" }, { subscriptionEnd: { lt: new Date() } }]
         },
         take: 8,
@@ -67,8 +70,9 @@ export async function getPlatformOverview() {
   };
 }
 
-export async function getPlatformRestaurants() {
+export async function getPlatformRestaurants({ includeDeleted = false }: { includeDeleted?: boolean } = {}) {
   return prisma.restaurant.findMany({
+    where: includeDeleted ? { status: "DELETED" } : { status: { not: "DELETED" } },
     orderBy: { createdAt: "desc" },
     include: {
       users: {
@@ -127,7 +131,7 @@ export async function getPlatformRestaurantDetail(restaurantId: string) {
 
 export async function getPlatformOwners() {
   return prisma.restaurantUser.findMany({
-    where: { role: "OWNER" },
+    where: { role: "OWNER", restaurant: { status: { not: "DELETED" } } },
     include: {
       user: true,
       restaurant: true

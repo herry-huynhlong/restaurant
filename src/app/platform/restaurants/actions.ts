@@ -12,6 +12,10 @@ import { enforceBusinessPlan } from "@/lib/business-type";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
+const restaurantDeleteSchema = z.object({
+  restaurantId: z.string().min(1),
+  confirmSlug: z.string().trim().min(1)
+});
 const planSchema = z.enum(["BASIC", "PRO"]);
 const businessTypeSchema = z.enum(["RESTAURANT", "DRINK_SHOP"]);
 const subscriptionStatusSchema = z.enum(["ACTIVE", "EXPIRED", "SUSPENDED"]);
@@ -417,6 +421,13 @@ export async function updateRestaurantAction(formData: FormData) {
   const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.restaurantEdit(restaurantId), dateError);
+  const currentRestaurant = await prisma.restaurant.findUnique({
+    where: { id: parsed.data.restaurantId },
+    select: { status: true }
+  });
+  if (currentRestaurant?.status === "DELETED") {
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Nhà hàng đã xóa. Hãy khôi phục trước khi chỉnh sửa.");
+  }
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -487,6 +498,14 @@ export async function setRestaurantStatusAction(formData: FormData) {
   const status = statusSchema.parse(readString(formData, "status"));
   const action = status === "ACTIVE" ? "RESTAURANT_ACTIVATED" : "RESTAURANT_SUSPENDED";
   const returnTo = readPlatformReturnPath(formData);
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { status: true }
+  });
+
+  if (restaurant?.status === "DELETED") {
+    redirectWithError(returnTo, "Nhà hàng đã xóa. Hãy khôi phục trước khi đổi trạng thái.");
+  }
 
   await prisma.$transaction([
     prisma.restaurant.update({ where: { id: restaurantId }, data: { status } }),
@@ -505,6 +524,198 @@ export async function setRestaurantStatusAction(formData: FormData) {
   revalidatePath(platformRoutes.restaurants);
   revalidatePath(platformRoutes.restaurantDetail(restaurantId));
   redirectWithSuccess(returnTo, status === "ACTIVE" ? "Đã mở lại nhà hàng." : "Đã khóa nhà hàng.");
+}
+
+export async function softDeleteRestaurantAction(formData: FormData) {
+  const actor = await requirePlatformAdmin();
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = restaurantDeleteSchema.safeParse({
+    restaurantId: readString(formData, "restaurantId"),
+    confirmSlug: readString(formData, "confirmSlug")
+  });
+
+  if (!parsed.success) {
+    redirectWithError(returnTo, "Vui lòng nhập slug để xác nhận xóa.");
+  }
+
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: parsed.data.restaurantId },
+    select: { id: true, name: true, slug: true, status: true }
+  });
+
+  if (!restaurant) {
+    redirectWithError(returnTo, "Không tìm thấy nhà hàng.");
+  }
+
+  if (parsed.data.confirmSlug !== restaurant.slug) {
+    redirectWithError(returnTo, "Slug xác nhận không đúng.");
+  }
+
+  if (restaurant.status === "DELETED") {
+    redirectWithError(returnTo, "Nhà hàng đã được xóa trước đó.");
+  }
+
+  await prisma.$transaction([
+    prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: {
+        status: "DELETED",
+        deletedAt: new Date(),
+        deletedByUserId: actor.id,
+        subscriptionStatus: "SUSPENDED"
+      }
+    }),
+    prisma.pushSubscription.updateMany({
+      where: { restaurantId: restaurant.id },
+      data: { isActive: false, onShift: false }
+    }),
+    prisma.staffDeviceSession.updateMany({
+      where: { restaurantId: restaurant.id, isActive: true },
+      data: { isActive: false, onShift: false, revokedAt: new Date(), revokedByUserId: actor.id }
+    }),
+    prisma.auditLog.create({
+      data: {
+        restaurantId: restaurant.id,
+        userId: actor.id,
+        action: "RESTAURANT_SOFT_DELETED",
+        entityType: "Restaurant",
+        entityId: restaurant.id,
+        metadataJson: { slug: restaurant.slug, name: restaurant.name }
+      }
+    })
+  ]);
+
+  revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.owners);
+  revalidatePath(platformRoutes.restaurantDetail(restaurant.id));
+  redirectWithSuccess(platformRoutes.restaurants, "Đã xóa mềm nhà hàng. Dữ liệu lịch sử vẫn được giữ.");
+}
+
+export async function restoreRestaurantAction(formData: FormData) {
+  const actor = await requirePlatformAdmin();
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = restaurantDeleteSchema.safeParse({
+    restaurantId: readString(formData, "restaurantId"),
+    confirmSlug: readString(formData, "confirmSlug")
+  });
+
+  if (!parsed.success) {
+    redirectWithError(returnTo, "Vui lòng nhập slug để xác nhận khôi phục.");
+  }
+
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: parsed.data.restaurantId },
+    select: { id: true, name: true, slug: true, status: true }
+  });
+
+  if (!restaurant) {
+    redirectWithError(returnTo, "Không tìm thấy nhà hàng.");
+  }
+
+  if (parsed.data.confirmSlug !== restaurant.slug) {
+    redirectWithError(returnTo, "Slug xác nhận không đúng.");
+  }
+
+  if (restaurant.status !== "DELETED") {
+    redirectWithError(returnTo, "Chỉ nhà hàng đã xóa mới có thể khôi phục.");
+  }
+
+  await prisma.$transaction([
+    prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: {
+        status: "INACTIVE",
+        deletedAt: null,
+        deletedByUserId: null,
+        subscriptionStatus: "SUSPENDED"
+      }
+    }),
+    prisma.auditLog.create({
+      data: {
+        restaurantId: restaurant.id,
+        userId: actor.id,
+        action: "RESTAURANT_RESTORED",
+        entityType: "Restaurant",
+        entityId: restaurant.id,
+        metadataJson: { slug: restaurant.slug, name: restaurant.name, restoredStatus: "INACTIVE" }
+      }
+    })
+  ]);
+
+  revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.owners);
+  revalidatePath(platformRoutes.restaurantDetail(restaurant.id));
+  redirectWithSuccess(returnTo, "Đã khôi phục nhà hàng. Trạng thái hiện là Chưa hoạt động.");
+}
+
+export async function permanentlyDeleteRestaurantAction(formData: FormData) {
+  const actor = await requirePlatformAdmin();
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = restaurantDeleteSchema.safeParse({
+    restaurantId: readString(formData, "restaurantId"),
+    confirmSlug: readString(formData, "confirmSlug")
+  });
+
+  if (!parsed.success) {
+    redirectWithError(returnTo, "Vui lòng nhập slug để xác nhận xóa vĩnh viễn.");
+  }
+
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: parsed.data.restaurantId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      status: true,
+      _count: {
+        select: {
+          orders: true,
+          payments: true,
+          diningSessions: true,
+          serviceRequests: true
+        }
+      }
+    }
+  });
+
+  if (!restaurant) {
+    redirectWithError(returnTo, "Không tìm thấy nhà hàng.");
+  }
+
+  if (parsed.data.confirmSlug !== restaurant.slug) {
+    redirectWithError(returnTo, "Slug xác nhận không đúng.");
+  }
+
+  if (restaurant.status !== "DELETED") {
+    redirectWithError(returnTo, "Phải xóa mềm nhà hàng trước khi xóa vĩnh viễn.");
+  }
+
+  const hasBusinessHistory = restaurant._count.orders > 0
+    || restaurant._count.payments > 0
+    || restaurant._count.diningSessions > 0
+    || restaurant._count.serviceRequests > 0;
+  if (hasBusinessHistory) {
+    redirectWithError(returnTo, "Không thể xóa vĩnh viễn vì nhà hàng có lịch sử order/thanh toán/yêu cầu. Hãy giữ bản ghi đã xóa để audit.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.auditLog.create({
+      data: {
+        restaurantId: null,
+        userId: actor.id,
+        action: "RESTAURANT_PERMANENT_DELETE_REQUESTED",
+        entityType: "Restaurant",
+        entityId: restaurant.id,
+        metadataJson: { slug: restaurant.slug, name: restaurant.name }
+      }
+    });
+    await tx.staffDeviceSession.deleteMany({ where: { restaurantId: restaurant.id } });
+    await tx.restaurant.delete({ where: { id: restaurant.id } });
+  });
+
+  revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.owners);
+  redirectWithSuccess(platformRoutes.restaurants + "?view=deleted", "Đã xóa vĩnh viễn nhà hàng không có lịch sử nghiệp vụ.");
 }
 
 export async function extendSubscriptionAction(formData: FormData) {

@@ -6,6 +6,8 @@ export function restaurantStatusLabel(status: string) {
       return "Đã khóa";
     case "INACTIVE":
       return "Chưa hoạt động";
+    case "DELETED":
+      return "Đã xóa";
     default:
       return status;
   }

@@ -48,6 +48,7 @@ export default async function RestaurantDetailPage({
           <PlatformRestaurantActions
             restaurantId={restaurant.id}
             restaurantName={restaurant.name}
+            restaurantSlug={restaurant.slug}
             status={restaurant.status}
             plan={restaurant.plan}
             businessType={restaurant.businessType}
