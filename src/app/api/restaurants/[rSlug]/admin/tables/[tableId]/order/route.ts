@@ -47,7 +47,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   }
 
   const membership = access.users[0];
-  if (!membership?.isActive || !["OWNER", "MANAGER"].includes(membership.role)) {
+  if (!membership?.isActive || !["OWNER", "MANAGER", "WAITER"].includes(membership.role)) {
     return NextResponse.json({ error: "Bạn không có quyền thêm món tại bàn." }, { status: 403 });
   }
 

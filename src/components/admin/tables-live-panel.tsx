@@ -9,7 +9,7 @@ import { servedUploadUrl } from "@/lib/upload-url";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { QrCard } from "@/components/admin/qr-card";
 
-type TableState = {
+export type TableState = {
   settings: {
     taxEnabled: boolean;
     taxRate: number;
@@ -34,7 +34,7 @@ type TableState = {
   }>;
 };
 
-type LiveTable = {
+export type LiveTable = {
   id: string;
   areaId: string;
   areaName: string;
@@ -72,7 +72,7 @@ type LiveTable = {
   };
 };
 
-type MenuProduct = {
+export type MenuProduct = {
   id: string;
   menuType: string;
   nameVi: string;
@@ -107,6 +107,7 @@ export function TablesLivePanel({
   restaurantName,
   cashierName,
   canUsePayment,
+  showQrTools = true,
   products,
   initialState,
   initialSelectedTableId
@@ -115,6 +116,7 @@ export function TablesLivePanel({
   restaurantName: string;
   cashierName?: string | null;
   canUsePayment: boolean;
+  showQrTools?: boolean;
   products: MenuProduct[];
   initialState: TableState;
   initialSelectedTableId?: string | null;
@@ -235,6 +237,7 @@ export function TablesLivePanel({
         onConfirmPaid={confirmPaid}
         onRefresh={refreshTables}
         onAddOrder={() => setOrderingTableId(selectedTable?.id ?? null)}
+        showQrTools={showQrTools}
         paymentPending={payingSessionId === selectedTable?.activeSession?.id}
       />
       {orderingTableId ? (
@@ -320,6 +323,7 @@ function TableDetail({
   onConfirmPaid,
   onRefresh,
   onAddOrder,
+  showQrTools,
   paymentPending
 }: {
   slug: string;
@@ -331,6 +335,7 @@ function TableDetail({
   onConfirmPaid: (table: LiveTable) => void;
   onRefresh: () => Promise<void>;
   onAddOrder: () => void;
+  showQrTools: boolean;
   paymentPending: boolean;
 }) {
   if (!table) {
@@ -422,25 +427,27 @@ function TableDetail({
         <p className="mt-4 rounded-md bg-slate-50 p-3 text-sm text-slate-500">Bàn đang trống, chưa có phiên phục vụ.</p>
       ) : null}
 
-      <details className="mt-5">
-        <summary className="cursor-pointer rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem QR / Tải / In</summary>
-        <div className="mt-3">
-          <QrCard
-            restaurantName={restaurantName}
-            tableName={table.name}
-            tableId={table.id}
-            slug={slug}
-            qrDataUrl={table.qrDataUrl}
-            qrUrl={table.qrUrl}
-            onRegenerated={onRefresh}
-          />
-        </div>
-      </details>
+      {showQrTools ? (
+        <details className="mt-5">
+          <summary className="cursor-pointer rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem QR / Tải / In</summary>
+          <div className="mt-3">
+            <QrCard
+              restaurantName={restaurantName}
+              tableName={table.name}
+              tableId={table.id}
+              slug={slug}
+              qrDataUrl={table.qrDataUrl}
+              qrUrl={table.qrUrl}
+              onRegenerated={onRefresh}
+            />
+          </div>
+        </details>
+      ) : null}
     </aside>
   );
 }
 
-function StaffAddOrderModal({
+export function StaffAddOrderModal({
   slug,
   table,
   products,

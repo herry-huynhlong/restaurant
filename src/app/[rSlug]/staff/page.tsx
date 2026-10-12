@@ -1,12 +1,18 @@
 import { AppHeader } from "@/components/app-shell/app-header";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
+import { OrdersByTableBoard } from "@/components/admin/orders-by-table-board";
+import { TablesLivePanel } from "@/components/admin/tables-live-panel";
+import { StaffWorkspaceTabs } from "@/components/staff/staff-workspace-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { prisma } from "@/lib/db/prisma";
+import { hasPlanFeature } from "@/lib/plan/features";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
+import { getActiveTableOrders } from "@/server/services/order-board-service";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { requireActiveStaffDeviceSession } from "@/server/services/staff-device-session-service";
+import { getAdminTablesState } from "@/server/services/table-state-service";
 import { claimWaiterItemAction, markWaiterItemServedAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 
 const serviceLabels: Record<string, string> = {
@@ -54,7 +60,8 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
     role: access.membership.role,
     nextPath: `/${access.restaurant.slug}/staff`
   });
-  const [readyItems, serviceRequests, notifications, assignedUsers] = await Promise.all([
+  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const [readyItems, serviceRequests, notifications, assignedUsers, tableState, activeTableOrders, products] = await Promise.all([
     getWaiterItems(access.restaurant.id),
     prisma.serviceRequest.findMany({
       where: {
@@ -72,6 +79,24 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
         memberships: { some: { restaurantId: access.restaurant.id } }
       },
       select: { id: true, name: true }
+    }),
+    getAdminTablesState(access.restaurant.id, access.restaurant.slug, baseUrl),
+    getActiveTableOrders(access.restaurant.id),
+    prisma.product.findMany({
+      where: {
+        restaurantId: access.restaurant.id,
+        isActive: true
+      },
+      orderBy: [{ isFeatured: "desc" }, { nameVi: "asc" }],
+      select: {
+        id: true,
+        menuType: true,
+        nameVi: true,
+        descriptionVi: true,
+        price: true,
+        imageUrl: true,
+        isSoldOut: true
+      }
     })
   ]);
   const userNameMap = new Map(assignedUsers.map((user) => [user.id, user.name]));
@@ -103,51 +128,75 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
           </>
         }
       />
-      <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 lg:grid-cols-[2fr_1fr]">
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold uppercase tracking-wide text-slate-700">Món chờ đi</h2>
-          {sortedReadyItems.length ? (
-            sortedReadyItems.map((item) => (
-              <WaiterItemCard
-                key={item.id}
-                item={item}
-                slug={access.restaurant.slug}
-                currentUserId={access.user.id}
-                currentDeviceSessionId={currentDeviceSession?.id ?? null}
-                userNameMap={userNameMap}
-                operatorNameMap={operatorNameMap}
-              />
-            ))
-          ) : (
-            <EmptyState title="Món chờ đi" description="Món bếp báo xong và đồ uống sẽ xuất hiện tại đây." />
-          )}
-        </section>
-        <aside className="space-y-3">
-          <h2 className="text-base font-semibold">Yêu cầu khách</h2>
-          {serviceRequests.length ? (
-            serviceRequests.map((request) => (
-              <article key={request.id} className="rounded-lg border bg-white p-4 shadow-sm">
-                <p className="text-sm font-semibold">Bàn {request.table.name} · {serviceLabels[request.requestType]}</p>
-                <p className="mt-1 text-sm text-slate-600">{request.customerName}</p>
-                {request.message ? <p className="mt-2 rounded-md bg-slate-50 p-2 text-sm">{request.message}</p> : null}
-                <p className="mt-2 text-xs text-slate-500">{formatTime(request.createdAt)}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {request.status === "NEW" ? (
-                    <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "ACKNOWLEDGED")}>
-                      <button className="rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đã nhận</button>
+      <StaffWorkspaceTabs
+        ready={
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold uppercase tracking-wide text-slate-700">Món chờ đi</h2>
+            {sortedReadyItems.length ? (
+              sortedReadyItems.map((item) => (
+                <WaiterItemCard
+                  key={item.id}
+                  item={item}
+                  slug={access.restaurant.slug}
+                  currentUserId={access.user.id}
+                  currentDeviceSessionId={currentDeviceSession?.id ?? null}
+                  userNameMap={userNameMap}
+                  operatorNameMap={operatorNameMap}
+                />
+              ))
+            ) : (
+              <EmptyState title="Món chờ đi" description="Món bếp báo xong và đồ uống sẽ xuất hiện tại đây." />
+            )}
+          </section>
+        }
+        requests={
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold">Yêu cầu khách</h2>
+            {serviceRequests.length ? (
+              serviceRequests.map((request) => (
+                <article key={request.id} className="rounded-lg border bg-white p-4 shadow-sm">
+                  <p className="text-sm font-semibold">Bàn {request.table.name} · {serviceLabels[request.requestType]}</p>
+                  <p className="mt-1 text-sm text-slate-600">{request.customerName}</p>
+                  {request.message ? <p className="mt-2 rounded-md bg-slate-50 p-2 text-sm">{request.message}</p> : null}
+                  <p className="mt-2 text-xs text-slate-500">{formatTime(request.createdAt)}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {request.status === "NEW" ? (
+                      <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "ACKNOWLEDGED")}>
+                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đã nhận</button>
+                      </form>
+                    ) : null}
+                    <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "COMPLETED")}>
+                      <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" type="submit">Hoàn tất</button>
                     </form>
-                  ) : null}
-                  <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "COMPLETED")}>
-                    <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" type="submit">Hoàn tất</button>
-                  </form>
-                </div>
-              </article>
-            ))
-          ) : (
-            <EmptyState title="Yêu cầu khách" description="Chưa có yêu cầu khách." />
-          )}
-        </aside>
-      </section>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <EmptyState title="Yêu cầu khách" description="Chưa có yêu cầu khách." />
+            )}
+          </section>
+        }
+        tables={
+          <TablesLivePanel
+            slug={access.restaurant.slug}
+            restaurantName={access.restaurant.name}
+            cashierName={access.user.name}
+            canUsePayment={hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType) && ["OWNER", "MANAGER", "CASHIER"].includes(access.membership.role)}
+            showQrTools={false}
+            products={products}
+            initialState={tableState}
+          />
+        }
+        orders={
+          <OrdersByTableBoard
+            slug={access.restaurant.slug}
+            restaurantName={access.restaurant.name}
+            initialTables={activeTableOrders}
+            products={products}
+            enableAddOrder
+          />
+        }
+      />
     </main>
   );
 }

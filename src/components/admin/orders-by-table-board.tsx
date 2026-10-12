@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
+import { StaffAddOrderModal, type LiveTable, type MenuProduct } from "@/components/admin/tables-live-panel";
 import type { ActiveTableOrder } from "@/server/services/order-board-service";
 
 const requestLabels: Record<string, { label: string; tone: string }> = {
@@ -31,12 +32,16 @@ export function OrdersByTableBoard({
   slug,
   restaurantName,
   initialTables,
-  initialExpandedSessionId
+  initialExpandedSessionId,
+  products = [],
+  enableAddOrder = false
 }: {
   slug: string;
   restaurantName: string;
   initialTables: ActiveTableOrder[];
   initialExpandedSessionId?: string;
+  products?: MenuProduct[];
+  enableAddOrder?: boolean;
 }) {
   const [tables, setTables] = useState(initialTables);
   const [expandedSessionIds, setExpandedSessionIds] = useState<Record<string, boolean>>(
@@ -45,6 +50,7 @@ export function OrdersByTableBoard({
   const [expandedHistorySessionIds, setExpandedHistorySessionIds] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [orderingTable, setOrderingTable] = useState<LiveTable | null>(null);
 
   useEffect(() => {
     const liveSessionIds = new Set(tables.map((table) => table.diningSessionId));
@@ -178,6 +184,15 @@ export function OrdersByTableBoard({
                 >
                   {isExpanded ? "Ẩn chi tiết" : "Xem chi tiết"}
                 </button>
+                {enableAddOrder ? (
+                  <button
+                    className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                    type="button"
+                    onClick={() => setOrderingTable(activeTableOrderToLiveTable(table))}
+                  >
+                    + Thêm món
+                  </button>
+                ) : null}
               </div>
 
               {isExpanded ? (
@@ -304,8 +319,65 @@ export function OrdersByTableBoard({
           );
         })}
       </div>
+      {orderingTable ? (
+        <StaffAddOrderModal
+          slug={slug}
+          table={orderingTable}
+          products={products}
+          onClose={() => setOrderingTable(null)}
+          onCreated={async (text) => {
+            setMessage({ type: "success", text });
+            setOrderingTable(null);
+            const response = await fetch(`/api/restaurants/${slug}/admin/orders/state`, { cache: "no-store" });
+            if (response.ok) {
+              const data = await response.json() as { tables: ActiveTableOrder[] };
+              setTables(data.tables);
+            }
+          }}
+        />
+      ) : null}
     </section>
   );
+}
+
+function activeTableOrderToLiveTable(table: ActiveTableOrder): LiveTable {
+  return {
+    id: table.tableId,
+    areaId: "",
+    areaName: table.areaName,
+    name: table.tableName,
+    status: table.status,
+    isActive: true,
+    qrUrl: "",
+    qrDataUrl: "",
+    activeSession: {
+      id: table.diningSessionId,
+      status: table.status,
+      paymentStatus: table.paymentStatus,
+      openedAt: table.openedAt,
+      subtotal: table.totalAmount,
+      taxRate: 0,
+      taxAmount: 0,
+      grandTotal: table.totalAmount,
+      itemCount: table.items.reduce((sum, item) => sum + item.quantity, 0),
+      orderCount: table.orders.length,
+      customers: Array.from(new Set(table.orders.map((order) => order.customerName).filter(Boolean))),
+      items: table.items.map((item) => ({
+        id: `${item.productName}-${item.unitPrice}`,
+        name: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotal: item.subtotal
+      })),
+      serviceRequests: table.requests.map((request) => ({
+        id: request.id,
+        type: request.requestType,
+        customerName: request.customerName,
+        status: request.status,
+        createdAt: request.createdAt
+      }))
+    }
+  };
 }
 
 function tableStatusLabel(table: ActiveTableOrder) {

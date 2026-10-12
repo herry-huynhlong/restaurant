@@ -3,7 +3,7 @@ import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getActiveTableOrders } from "@/server/services/order-board-service";
 
 export async function GET(_request: Request, { params }: { params: { rSlug: string } }) {
-  const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
+  const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "WAITER", "CASHIER"]);
   const tables = await getActiveTableOrders(access.restaurant.id);
 
   return NextResponse.json({ tables }, {
