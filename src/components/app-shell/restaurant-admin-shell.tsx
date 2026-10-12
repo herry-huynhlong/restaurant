@@ -7,9 +7,17 @@ import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { NotificationAudioUnlocker } from "@/components/app-shell/notification-audio-unlocker";
 import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
+import { AdminMobileMenu, type AdminMobileNavIcon } from "@/components/app-shell/admin-mobile-menu";
 import { hasPlanFeature } from "@/lib/plan/features";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { restaurantRoutes } from "@/lib/routes";
+
+type AdminNavItem = {
+  label: string;
+  href: string;
+  Icon: typeof Home;
+  icon: AdminMobileNavIcon;
+};
 
 export function RestaurantAdminShell({
   slug,
@@ -37,16 +45,21 @@ export function RestaurantAdminShell({
   const planBadgeClass = planLabel === "PRO"
     ? "border-teal-200 bg-teal-50 text-teal-700"
     : "border-slate-200 bg-slate-50 text-slate-700";
-  const navItems = [
-    ["Tổng quan", restaurantRoutes.admin(slug), Home],
-    ["Menu", restaurantRoutes.adminMenu(slug), MenuIcon],
-    ["Khu vực & Bàn", restaurantRoutes.adminTables(slug), Grid3X3],
-    ["Order", restaurantRoutes.adminOrders(slug), ListOrdered],
-    ["Nhân viên", restaurantRoutes.adminStaff(slug), Users],
-    ["Top món", restaurantRoutes.adminTopItems(slug), Trophy],
-    ...(hasPlanFeature(plan, "REPORTS", businessType) ? [["Báo cáo", restaurantRoutes.adminReports(slug), BarChart3] as const] : []),
-    ["Cài đặt", restaurantRoutes.adminSettings(slug), Settings]
-  ] as const;
+  const displayUserName = userName?.trim() || roleLabel;
+  const reportNavItems: AdminNavItem[] = hasPlanFeature(plan, "REPORTS", businessType)
+    ? [{ label: "Báo cáo", href: restaurantRoutes.adminReports(slug), Icon: BarChart3, icon: "reports" }]
+    : [];
+  const navItems: AdminNavItem[] = [
+    { label: "Tổng quan", href: restaurantRoutes.admin(slug), Icon: Home, icon: "home" },
+    { label: "Menu", href: restaurantRoutes.adminMenu(slug), Icon: MenuIcon, icon: "menu" },
+    { label: "Khu vực & Bàn", href: restaurantRoutes.adminTables(slug), Icon: Grid3X3, icon: "tables" },
+    { label: "Order", href: restaurantRoutes.adminOrders(slug), Icon: ListOrdered, icon: "orders" },
+    { label: "Nhân viên", href: restaurantRoutes.adminStaff(slug), Icon: Users, icon: "staff" },
+    { label: "Top món", href: restaurantRoutes.adminTopItems(slug), Icon: Trophy, icon: "top-items" },
+    ...reportNavItems,
+    { label: "Cài đặt", href: restaurantRoutes.adminSettings(slug), Icon: Settings, icon: "settings" }
+  ];
+  const mobileNavItems = navItems.map(({ label, href, icon }) => ({ label, href, icon }));
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -61,7 +74,7 @@ export function RestaurantAdminShell({
             </span>
           </div>
           <nav className="mt-3 space-y-1">
-            {navItems.map(([label, href, Icon]) => (
+            {navItems.map(({ label, href, Icon }) => (
               <Link key={href} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-slate-100" href={href}>
                 <Icon className="h-4 w-4" />
                 {label}
@@ -71,16 +84,26 @@ export function RestaurantAdminShell({
           <div className="mt-auto space-y-2 border-t pt-3">
             <InstallAppButton />
             <div className="rounded-md bg-slate-50 px-3 py-2 text-sm">
-              <p className="font-medium">{userName ?? "User"}</p>
+              <p className="font-medium">{displayUserName}</p>
               <p className="text-xs text-slate-500">{roleLabel}</p>
             </div>
           </div>
         </aside>
         <section className="min-w-0 flex-1">
           <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-semibold">{title}</h1>
-              <p className="mt-1 text-sm text-slate-600">{restaurantName} · {roleLabel}</p>
+            <div className="flex min-w-0 items-start gap-3">
+              <AdminMobileMenu
+                restaurantName={restaurantName}
+                roleLabel={roleLabel}
+                planLabel={planLabel}
+                planBadgeClass={planBadgeClass}
+                userName={displayUserName}
+                items={mobileNavItems}
+              />
+              <div className="min-w-0">
+                <h1 className="text-2xl font-semibold">{title}</h1>
+                <p className="mt-1 text-sm text-slate-600">{restaurantName} · {roleLabel}</p>
+              </div>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <InstallAppButton compact />
@@ -88,10 +111,10 @@ export function RestaurantAdminShell({
               <NotificationBell slug={slug} notifications={notifications} />
               <details className="relative">
                 <summary className="cursor-pointer list-none rounded-md border bg-white px-3 py-2 text-sm hover:bg-slate-50">
-                  {userName ?? role} ▼
+                  {displayUserName} ▼
                 </summary>
                 <div className="absolute right-0 z-20 mt-2 w-56 rounded-lg border bg-white p-3 shadow-lg">
-                  <p className="text-sm font-semibold">{userName ?? "User"}</p>
+                  <p className="text-sm font-semibold">{displayUserName}</p>
                   <p className="mb-3 text-xs text-slate-500">{roleLabel}</p>
                   <InstallAppButton />
                   <div className="mt-2">

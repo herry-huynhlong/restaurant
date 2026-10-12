@@ -27,7 +27,7 @@ export default async function AdminReportsPage({
   const showRevenueTrend = period !== "today";
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Báo cáo" plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Báo cáo" userName={access.user.name} plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
       <section className="space-y-5">
         <div className="flex flex-wrap gap-2">
           {periods.map((item) => (
