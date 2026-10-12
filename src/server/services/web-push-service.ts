@@ -104,10 +104,16 @@ export async function sendPushToRestaurantRoles({
 }) {
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
-    select: { plan: true, businessType: true }
+    select: { slug: true, plan: true, businessType: true }
   });
   const allowedRoles = new Set<RestaurantRole>(["OWNER", ...allowedStaffRolesForPlan(restaurant?.plan, restaurant?.businessType)]);
   const effectiveRoles = roles.filter((role) => allowedRoles.has(role));
+  const iconUrl = restaurant?.slug ? `/${restaurant.slug}/icons/icon-192.png` : "/icons/icon-192.png";
+  const payloadWithRestaurantIcon: PushPayload = {
+    icon: iconUrl,
+    badge: iconUrl,
+    ...payload
+  };
 
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
@@ -133,7 +139,7 @@ export async function sendPushToRestaurantRoles({
     title: payload.title
   });
 
-  const results = await Promise.all(subscriptions.map((subscription) => sendPushToSubscription(subscription.id, payload)));
+  const results = await Promise.all(subscriptions.map((subscription) => sendPushToSubscription(subscription.id, payloadWithRestaurantIcon)));
   console.info("[push] result", {
     restaurantId,
     sent: results.filter((result) => result.ok).length,

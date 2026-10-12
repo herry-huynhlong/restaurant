@@ -62,7 +62,14 @@ export async function GET(_request: Request, { params }: { params: { rSlug: stri
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug: params.rSlug },
-    select: { logoUrl: true }
+    select: {
+      logoUrl: true,
+      settings: {
+        select: {
+          logoUrl: true
+        }
+      }
+    }
   });
 
   if (!restaurant) {
@@ -70,7 +77,7 @@ export async function GET(_request: Request, { params }: { params: { rSlug: stri
   }
 
   let iconBuffer: Buffer;
-  const logoPath = getUploadedLogoPath(restaurant.logoUrl);
+  const logoPath = getUploadedLogoPath(restaurant.settings?.logoUrl ?? restaurant.logoUrl);
 
   try {
     const source = logoPath ? await readFile(logoPath) : await readFallbackIcon(params.icon);
