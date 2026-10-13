@@ -154,27 +154,27 @@ function diagnosticBackupError(message: string | null) {
   if (!message) return null;
   const lower = message.toLowerCase();
   if (lower.includes("server version mismatch") || lower.includes("pg_dump version")) {
-    return "Công cụ sao lưu chưa cùng phiên bản chính với PostgreSQL đang chạy.";
+    return "Công cụ sao lưu chưa tương thích với hệ thống dữ liệu.";
   }
   if (lower.includes("database_url_missing")) {
-    return "Dịch vụ sao lưu thiếu cấu hình kết nối dữ liệu.";
+    return "Dịch vụ sao lưu thiếu cấu hình cần thiết.";
   }
   if (lower.includes("backup_database_file_empty")) {
-    return "File dữ liệu sao lưu không hợp lệ.";
+    return "Dữ liệu sao lưu không hợp lệ.";
   }
   if (lower.includes("pg_dump_major_mismatch")) {
-    return "Phiên bản công cụ sao lưu không tương thích với PostgreSQL.";
+    return "Công cụ sao lưu chưa tương thích với hệ thống dữ liệu.";
   }
   if (lower.includes("backup_tool_not_available")) {
     return "Dịch vụ sao lưu thiếu công cụ cần thiết.";
   }
   if (lower.includes("backup_failed")) {
-    return "Tác vụ sao lưu chưa hoàn tất.";
+    return "Lần sao lưu chưa hoàn tất.";
   }
   if (lower.includes("command failed")) {
-    return "Lệnh sao lưu chưa hoàn tất. Hãy kiểm tra log dịch vụ sao lưu trên máy chủ.";
+    return "Lần sao lưu chưa hoàn tất. Hãy kiểm tra tình trạng hệ thống.";
   }
-  return "Tác vụ chưa hoàn tất. Hãy kiểm tra log dịch vụ sao lưu trên máy chủ.";
+  return "Yêu cầu chưa hoàn tất. Hãy kiểm tra tình trạng hệ thống.";
 }
 
 async function markTimedOutBackupRuns() {
@@ -187,7 +187,7 @@ async function markTimedOutBackupRuns() {
     data: {
       status: "FAILED",
       completedAt: now,
-      errorMessage: "Dịch vụ sao lưu chưa xử lý tác vụ trong thời gian cho phép."
+      errorMessage: "Dịch vụ sao lưu chưa xử lý yêu cầu trong thời gian cho phép."
     }
   });
 
@@ -218,11 +218,19 @@ function buildBackupWorkerStatus(
     lastSeenAt,
     status: heartbeat?.status ?? "UNKNOWN",
     message: ready
-      ? heartbeat?.message ?? "Dịch vụ sao lưu đang sẵn sàng."
+      ? publicWorkerMessage(heartbeat?.message)
       : hasPending
-        ? "Dịch vụ sao lưu chưa sẵn sàng. Tác vụ có thể chưa được xử lý ngay."
-        : "Chưa ghi nhận dịch vụ sao lưu đang chạy."
+        ? "Dịch vụ sao lưu chưa sẵn sàng. Yêu cầu có thể chưa được xử lý ngay."
+        : "Dịch vụ sao lưu tạm thời chưa sẵn sàng."
   };
+}
+
+function publicWorkerMessage(message: string | null | undefined) {
+  if (!message) return "Dịch vụ sao lưu đang sẵn sàng.";
+  if (message.includes("sẵn sàng")) return "Dịch vụ sao lưu đang sẵn sàng.";
+  if (message.includes("thủ công")) return "Đang xử lý yêu cầu sao lưu.";
+  if (message.includes("dọn")) return "Đang dọn dữ liệu theo chính sách lưu trữ.";
+  return "Dịch vụ sao lưu đang hoạt động.";
 }
 
 export async function refreshRestaurantStorageUsage() {

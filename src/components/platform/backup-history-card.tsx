@@ -40,7 +40,7 @@ export function BackupHistoryCard({ rows }: { rows: BackupHistoryRow[] }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Lịch sử sao lưu</h2>
-          <p className="mt-1 text-sm text-slate-500">Mặc định hiển thị 3 bản ghi mới nhất.</p>
+          <p className="mt-1 text-sm text-slate-500">Hiển thị 3 lần gần nhất.</p>
         </div>
         {rows.length > 3 ? (
           <button className="rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={toggleShowAll}>
@@ -50,7 +50,7 @@ export function BackupHistoryCard({ rows }: { rows: BackupHistoryRow[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-dashed bg-slate-50 px-4 py-6 text-sm text-slate-500">Chưa có tác vụ sao lưu.</p>
+        <p className="mt-4 rounded-xl border border-dashed bg-slate-50 px-4 py-6 text-sm text-slate-500">Chưa có bản sao lưu.</p>
       ) : (
         <div className="mt-4 divide-y">
           {visibleRows.map((row) => {
@@ -90,7 +90,7 @@ export function BackupHistoryCard({ rows }: { rows: BackupHistoryRow[] }) {
                     </p>
                     {row.diagnosticMessage ? (
                       <p className="sm:col-span-2">
-                        <span className="font-semibold text-slate-800">Chẩn đoán:</span> {row.diagnosticMessage}
+                        <span className="font-semibold text-slate-800">Thông tin kiểm tra:</span> {row.diagnosticMessage}
                       </p>
                     ) : null}
                   </div>

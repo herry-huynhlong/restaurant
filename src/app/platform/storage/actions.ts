@@ -11,7 +11,7 @@ import { ensurePlatformDataPolicy, refreshRestaurantStorageUsage } from "@/serve
 const storagePolicySchema = z.object({
   backupEnabled: z.boolean(),
   backupTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Giờ sao lưu không hợp lệ."),
-  backupRetentionCount: z.coerce.number().int().min(1, "Cần giữ ít nhất 1 bản sao lưu.").max(14, "Không nên giữ quá 14 bản trên máy chủ."),
+  backupRetentionCount: z.coerce.number().int().min(1, "Cần giữ ít nhất 1 bản sao lưu.").max(14, "Không nên giữ quá 14 bản sao lưu."),
   notificationRetentionDays: z.coerce.number().int().min(1, "Số ngày lưu thông báo không hợp lệ.").max(90, "Thông báo không nên giữ quá 90 ngày."),
   temporaryDataRetentionDays: z.coerce.number().int().min(7, "Dữ liệu tạm cần lưu ít nhất 7 ngày.").max(365, "Dữ liệu tạm không nên giữ quá 365 ngày."),
   backupStorageKind: z.literal("LOCAL")
@@ -98,7 +98,7 @@ export async function queueManualBackupAction() {
   });
 
   revalidatePath(platformRoutes.storage);
-  redirectWithSuccess("Đã đưa tác vụ sao lưu vào hàng chờ.");
+  redirectWithSuccess("Đã tiếp nhận yêu cầu sao lưu.");
 }
 
 export async function queueCleanupAction() {
@@ -121,11 +121,11 @@ export async function queueCleanupAction() {
   });
 
   revalidatePath(platformRoutes.storage);
-  redirectWithSuccess("Đã xếp lịch dọn dữ liệu tạm.");
+  redirectWithSuccess("Đã tiếp nhận yêu cầu dọn dữ liệu tạm.");
 }
 
 function storageKindLabel(value: string) {
-  return value === "S3_COMPATIBLE" ? "Kho lưu trữ ngoài máy chủ" : "Máy chủ hiện tại";
+  return value === "S3_COMPATIBLE" ? "Nơi lưu độc lập" : "Nơi lưu hiện tại";
 }
 
 function readString(formData: FormData, key: string) {

@@ -92,7 +92,7 @@ function resultErrorMessage(result: unknown, fallback: string) {
   const value = result && typeof result === "object" ? result as { code?: string; error?: string; fieldErrors?: Record<string, string[] | undefined> } : null;
   const fieldMessages = value?.fieldErrors ? Object.values(value.fieldErrors).flat().filter(Boolean) : [];
   const detail = fieldMessages.length ? fieldMessages.join(" ") : value?.error;
-  return value?.code ? `${detail ?? fallback} [${value.code}]` : detail ?? fallback;
+  return detail ?? fallback;
 }
 
 async function saveProductRequest(slug: string, formData: FormData, mode: "create" | "update") {
@@ -121,7 +121,7 @@ async function saveProductRequest(slug: string, formData: FormData, mode: "creat
     if (response.status === 413) {
       throw new Error("Ảnh hoặc dữ liệu gửi lên quá lớn. Vui lòng chọn ảnh nhỏ hơn rồi thử lại.");
     }
-    throw new Error(resultErrorMessage(data, `Không lưu được món. Mã lỗi: ${response.status}`));
+    throw new Error(resultErrorMessage(data, "Không lưu được món. Vui lòng thử lại sau."));
   }
 
   return data as { ok: true; product: unknown; message?: string };
@@ -238,7 +238,7 @@ function NewProductCard({
         const product = normalizeProduct(result.product);
         if (!product) {
           console.error("CREATE MENU RESPONSE INVALID", result);
-          onToast({ type: "error", message: "Server đã lưu nhưng trả dữ liệu món không hợp lệ." });
+          onToast({ type: "error", message: "Đã lưu món nhưng chưa thể cập nhật lại giao diện. Vui lòng tải lại trang." });
           return;
         }
 
@@ -305,7 +305,7 @@ function ProductCard({
         const nextProduct = normalizeProduct(result.product);
         if (!nextProduct) {
           console.error("SAVE MENU RESPONSE INVALID", result);
-          onToast({ type: "error", message: "Server đã lưu nhưng trả dữ liệu món không hợp lệ." });
+          onToast({ type: "error", message: "Đã lưu món nhưng chưa thể cập nhật lại giao diện. Vui lòng tải lại trang." });
           return;
         }
 
@@ -336,7 +336,7 @@ function ProductCard({
         if (!nextProduct) {
           console.error("UPDATE MENU FLAGS RESPONSE INVALID", result);
           onSaved(product);
-          onToast({ type: "error", message: "Server trả dữ liệu trạng thái không hợp lệ." });
+          onToast({ type: "error", message: "Chưa thể cập nhật trạng thái món. Vui lòng tải lại trang." });
           return;
         }
 
@@ -365,7 +365,7 @@ function ProductCard({
           const nextProduct = normalizeProduct(result.product);
           if (!nextProduct) {
             console.error("DELETE MENU RESPONSE INVALID", result);
-            onToast({ type: "error", message: "Server trả dữ liệu món không hợp lệ." });
+            onToast({ type: "error", message: "Đã cập nhật món nhưng chưa thể làm mới giao diện. Vui lòng tải lại trang." });
             return;
           }
           onSaved(nextProduct);

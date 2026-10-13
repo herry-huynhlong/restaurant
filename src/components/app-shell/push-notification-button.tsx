@@ -42,7 +42,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       const permission = await Notification.requestPermission();
       if (permission === "denied") {
         setStatus("denied");
-        setMessage("Bạn cần bật lại notification trong cài đặt trình duyệt/hệ thống.");
+        setMessage("Bạn cần bật lại thông báo trong cài đặt thiết bị hoặc trình duyệt.");
         return;
       }
       if (permission !== "granted") {
@@ -78,7 +78,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
         })
       });
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error("Không thể bật thông báo đẩy. Vui lòng thử lại sau.");
       }
       const data = (await response.json()) as { subscriptionId: string };
       setSubscriptionId(data.subscriptionId);
@@ -86,7 +86,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       setMessage("Đã bật thông báo đẩy và âm thanh ting ting cho thiết bị này.");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Không thể bật thông báo đẩy.");
+      setMessage(error instanceof Error ? error.message : "Không thể bật thông báo đẩy. Vui lòng thử lại sau.");
     }
   }
 
@@ -125,7 +125,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       {message ? <p className="max-w-md text-xs text-slate-600">{message}</p> : null}
       {status === "denied" ? (
         <p className="max-w-md text-xs text-red-600">
-          Notification đang bị chặn. Hãy mở cài đặt site/browser và cho phép thông báo.
+          Thông báo đang bị chặn. Hãy mở cài đặt của app hoặc trình duyệt và cho phép thông báo.
         </p>
       ) : null}
       {status === "unsupported" ? (

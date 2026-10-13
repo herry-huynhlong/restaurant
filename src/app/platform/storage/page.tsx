@@ -3,7 +3,6 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { BackupHistoryCard } from "@/components/platform/backup-history-card";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
-import { productBrand } from "@/lib/brand";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
 import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
@@ -17,7 +16,7 @@ export default async function PlatformStoragePage({
   const dashboard = await getPlatformStorageDashboard();
 
   return (
-    <PlatformShell title="Tài nguyên & Sao lưu" subtitle={productBrand.platformSubtitle}>
+    <PlatformShell title="Tài nguyên & Sao lưu" subtitle="Quản lý dung lượng lưu trữ và bảo vệ dữ liệu cửa hàng.">
       <FeedbackBanner success={searchParams?.success} error={searchParams?.error} />
 
       <ServerResourceMonitor />
@@ -25,19 +24,19 @@ export default async function PlatformStoragePage({
       <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={<HardDrive className="h-5 w-5" />}
-          label="Tổng dung lượng ước tính"
+          label="Dung lượng cửa hàng"
           value={formatBytes(dashboard.totals.estimatedBytes)}
-          helper={`${dashboard.totals.restaurantCount} nhà hàng đang theo dõi`}
+          helper={`${dashboard.totals.restaurantCount} nhà hàng đang quản lý`}
         />
         <StatCard
           icon={<Archive className="h-5 w-5" />}
-          label="Dung lượng sao lưu"
+          label="Bản sao lưu"
           value={formatBytes(dashboard.totals.backupBytes)}
-          helper={`Giữ tối đa ${dashboard.policy.backupRetentionCount} bản đã kiểm tra`}
+          helper={`Giữ tối đa ${dashboard.policy.backupRetentionCount} bản thành công`}
         />
         <StatCard
           icon={<CheckCircle2 className="h-5 w-5" />}
-          label="Lần sao lưu thành công"
+          label="Lần sao lưu gần nhất"
           value={dashboard.latestSuccessfulBackup ? formatDateTime(dashboard.latestSuccessfulBackup.completedAt ?? dashboard.latestSuccessfulBackup.updatedAt) : "Chưa có"}
           helper={dashboard.latestSuccessfulBackup ? formatBytes(Number(dashboard.latestSuccessfulBackup.sizeBytes)) : "Chưa ghi nhận bản sao lưu"}
         />
@@ -105,15 +104,15 @@ export default async function PlatformStoragePage({
         <aside className="space-y-4">
           {dashboard.policy.backupStorageKind === "LOCAL" ? (
             <WarningCard
-              title="Nên có bản sao ngoài máy chủ"
-              message="Hiện bản sao lưu đang đặt trên cùng máy chủ. Nếu máy chủ gặp sự cố, dữ liệu gốc và bản sao có thể cùng bị ảnh hưởng."
+              title="Nên có bản sao độc lập"
+              message="Bản sao hiện đang lưu cùng nơi với hệ thống chính. Nên lưu thêm ở một nơi độc lập để giảm rủi ro."
             />
           ) : null}
 
           {dashboard.latestFailedBackup ? (
             <WarningCard
               title="Có lần sao lưu chưa thành công"
-              message="Hãy kiểm tra tác vụ gần nhất và chạy lại sau khi xử lý nguyên nhân."
+              message="Hãy kiểm tra lần sao lưu gần nhất và thử lại sau khi xử lý nguyên nhân."
             />
           ) : null}
 
@@ -144,7 +143,7 @@ export default async function PlatformStoragePage({
       <section className="mt-5 rounded-2xl border bg-white shadow-sm">
         <div className="border-b px-5 py-4">
           <h2 className="text-lg font-semibold">Cấu hình sao lưu và dọn dữ liệu</h2>
-          <p className="mt-1 text-sm text-slate-500">Các nút thao tác chỉ xếp lịch xử lý. Tác vụ nặng chạy bằng tiến trình riêng trên máy chủ.</p>
+          <p className="mt-1 text-sm text-slate-500">Các yêu cầu sao lưu và dọn dữ liệu sẽ được tiếp nhận, xử lý an toàn ở nền.</p>
         </div>
 
         <form action={updateStoragePolicyAction} className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
@@ -171,9 +170,9 @@ export default async function PlatformStoragePage({
 
           <Field label="Nơi lưu bản sao">
             <select className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupStorageKind} name="backupStorageKind">
-              <option value="LOCAL">Máy chủ hiện tại</option>
+              <option value="LOCAL">Nơi lưu hiện tại</option>
             </select>
-            <p className="mt-2 text-xs leading-5 text-slate-500">Kho lưu trữ ngoài máy chủ sẽ được cấu hình ở bước vận hành riêng.</p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">Nên bổ sung nơi lưu độc lập để tăng an toàn dữ liệu.</p>
           </Field>
 
           <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">
@@ -186,12 +185,12 @@ export default async function PlatformStoragePage({
         <div className="flex flex-wrap gap-3 border-t bg-slate-50 px-5 py-4">
           <form action={queueManualBackupAction}>
             <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
-              Chạy sao lưu thủ công
+              Sao lưu ngay
             </button>
           </form>
           <form action={queueCleanupAction}>
             <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
-              Xếp lịch dọn dữ liệu tạm
+              Dọn dữ liệu tạm
             </button>
           </form>
         </div>
@@ -202,7 +201,7 @@ export default async function PlatformStoragePage({
           rows={dashboard.backupRuns.map((run) => ({
             id: run.id,
             status: run.status,
-            title: statusLabel(run.status),
+            title: backupStatusLabel(run.status),
             meta: `${run.triggerType === "MANUAL" ? "Thủ công" : "Tự động"} · ${formatDateTime(run.completedAt ?? run.startedAt ?? run.queuedAt)}`,
             sizeLabel: run.status === "SUCCESS" ? formatBytes(run.sizeBytes) : null,
             errorMessage: run.status === "FAILED" ? run.errorMessage : null,
@@ -213,14 +212,14 @@ export default async function PlatformStoragePage({
         />
         <HistoryCard
           title="Lịch sử dọn dữ liệu"
-          emptyText="Chưa có tác vụ dọn dữ liệu."
+          emptyText="Chưa có lần dọn dữ liệu."
           rows={dashboard.maintenanceRuns.map((run) => ({
             id: run.id,
             title: statusLabel(run.status),
             meta: formatDateTime(run.completedAt ?? run.startedAt ?? run.queuedAt),
             value:
               run.status === "SUCCESS"
-                ? `${run.deletedNotifications} thông báo · ${run.deletedDeviceSessions} phiên thiết bị`
+                ? `${run.deletedNotifications} thông báo · ${run.deletedDeviceSessions} phiên làm việc`
                 : run.errorMessage ?? ""
           }))}
         />
@@ -318,10 +317,21 @@ function formatDateTime(value: Date | null | undefined) {
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
-    QUEUED: "Đang chờ xử lý",
+    QUEUED: "Đang chờ",
     RUNNING: "Đang xử lý",
-    SUCCESS: "Thành công",
+    SUCCESS: "Hoàn tất",
     FAILED: "Chưa thành công",
+    EXPIRED: "Đã hết hạn lưu"
+  };
+  return labels[status] ?? status;
+}
+
+function backupStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    QUEUED: "Đang chờ",
+    RUNNING: "Đang sao lưu",
+    SUCCESS: "Sao lưu thành công",
+    FAILED: "Sao lưu chưa thành công",
     EXPIRED: "Đã hết hạn lưu"
   };
   return labels[status] ?? status;

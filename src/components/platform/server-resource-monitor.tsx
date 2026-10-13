@@ -37,12 +37,12 @@ export function ServerResourceMonitor() {
     startTransition(async () => {
       try {
         const response = await fetch("/api/platform/storage/metrics", { cache: "no-store" });
-        if (!response.ok) throw new Error("Không thể cập nhật số liệu.");
+        if (!response.ok) throw new Error("Chưa thể cập nhật.");
         const payload = (await response.json()) as MetricsResponse;
         setMetrics(payload);
         setError(payload.host.error);
       } catch {
-        setError("Không thể cập nhật số liệu.");
+        setError("Chưa thể cập nhật. Vui lòng thử lại sau.");
       }
     });
   };
@@ -57,11 +57,7 @@ export function ServerResourceMonitor() {
     <section className="rounded-2xl border bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Tài nguyên máy chủ</p>
-          <h2 className="mt-1 text-xl font-semibold text-slate-950">Theo dõi gần realtime</h2>
-          <p className="mt-2 text-sm text-slate-500">
-            Cập nhật mỗi 10 giây từ bộ đo trên máy chủ.
-          </p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Tình trạng hệ thống</p>
         </div>
         <button
           className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
@@ -82,14 +78,14 @@ export function ServerResourceMonitor() {
       ) : null}
 
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ResourceCard icon={<HardDrive className="h-5 w-5" />} title="Ổ cứng máy chủ" metric={metrics?.host.disk ?? null} />
-        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="RAM máy chủ" metric={metrics?.host.memory ?? null} />
-        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="Swap" metric={metrics?.host.swap ?? null} />
+        <ResourceCard icon={<HardDrive className="h-5 w-5" />} title="Dung lượng lưu trữ" metric={metrics?.host.disk ?? null} />
+        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="Bộ nhớ RAM" metric={metrics?.host.memory ?? null} />
+        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="Bộ nhớ dự phòng" metric={metrics?.host.swap ?? null} />
         <BackupCard metrics={metrics} />
       </div>
 
       <p className="mt-4 text-xs text-slate-500">
-        Cập nhật cuối: {metrics?.host.collectedAt && metrics.host.ok ? formatDateTime(metrics.host.collectedAt) : "Chưa có dữ liệu mới"}
+        Số liệu gần nhất: {metrics?.host.collectedAt ? formatDateTime(metrics.host.collectedAt) : "Chưa có dữ liệu"}
       </p>
     </section>
   );
@@ -108,7 +104,7 @@ function ResourceCard({ icon, title, metric }: { icon: React.ReactNode; title: s
       </p>
       <ProgressBar value={metric?.percentUsed ?? 0} level={level} />
       <p className="mt-2 text-sm text-slate-500">
-        {metric ? `${metric.percentUsed.toFixed(1)}% đang sử dụng` : "Đang chờ số liệu máy chủ"}
+        {metric ? `${metric.percentUsed.toFixed(1)}% đang sử dụng` : "Chưa có dữ liệu"}
       </p>
     </article>
   );
@@ -125,7 +121,7 @@ function BackupCard({ metrics }: { metrics: MetricsResponse | null }) {
       </div>
       <p className="mt-4 text-2xl font-bold text-slate-950">{metrics ? formatBytes(metrics.backup.totalBytes) : "Chưa có"}</p>
       <p className="mt-2 text-sm text-slate-500">
-        {metrics ? `${metrics.backup.successfulCount} bản thành công · giữ tối đa ${metrics.backup.retentionCount}` : "Đang chờ số liệu"}
+        {metrics ? `${metrics.backup.successfulCount} bản thành công · giữ tối đa ${metrics.backup.retentionCount}` : "Chưa có dữ liệu"}
       </p>
       <p className="mt-1 text-sm text-slate-500">
         Gần nhất: {metrics?.backup.latestSuccessfulAt ? formatDateTime(metrics.backup.latestSuccessfulAt) : "Chưa có"}

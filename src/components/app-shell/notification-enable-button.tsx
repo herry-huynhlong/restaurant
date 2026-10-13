@@ -201,7 +201,7 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
     const played = await playNotificationSound(1);
     setMessage(played
       ? "Đã phát thử âm thanh. Nếu vẫn không nghe, hãy tăng âm lượng media và tắt chế độ im lặng/Không làm phiền."
-      : "Trình duyệt đang chặn âm thanh. Hãy chạm lại nút kiểm tra hoặc mở app bằng Chrome/PWA đã cài.");
+      : "Trình duyệt đang chặn âm thanh. Hãy chạm lại nút kiểm tra hoặc mở app đã cài trên thiết bị.");
   }
 
   async function testSystemNotification() {
@@ -228,18 +228,17 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({})) as { error?: string };
         setMessage(localShown
-          ? `Đã hiện thông báo trên thiết bị, nhưng chưa gửi được thông báo đẩy. Mã lỗi: ${data.error ?? response.status}.`
-          : `Chưa hiện được thông báo trên thiết bị và chưa gửi được thông báo đẩy. Mã lỗi: ${data.error ?? response.status}.`);
+          ? "Đã hiện thông báo trên thiết bị, nhưng chưa gửi được thông báo đẩy. Vui lòng thử lại sau."
+          : "Chưa hiện được thông báo trên thiết bị và chưa gửi được thông báo đẩy. Vui lòng kiểm tra quyền thông báo rồi thử lại.");
         return;
       }
 
       setPushReady(true);
-      const data = await response.json().catch(() => ({})) as { tag?: string };
+      await response.json().catch(() => ({}));
       setMessage(localShown
-        ? `Đã gửi thông báo thử (${data.tag ?? "ok"}). Nếu không thấy pop-up, mở cài đặt Android của app/site và bật thông báo dạng cảnh báo hoặc hiển thị nổi.`
-        : `Đã gửi thông báo thử (${data.tag ?? "ok"}), nhưng thiết bị chưa cho hiện pop-up. Kiểm tra quyền thông báo, kiểu pop-up và chế độ Không làm phiền.`);
+        ? "Đã gửi thông báo thử. Nếu không thấy pop-up, mở cài đặt thông báo của app/site và bật kiểu hiển thị nổi."
+        : "Đã gửi thông báo thử, nhưng thiết bị chưa cho hiện pop-up. Kiểm tra quyền thông báo, kiểu pop-up và chế độ Không làm phiền.");
     } finally {
       setBusy(false);
     }

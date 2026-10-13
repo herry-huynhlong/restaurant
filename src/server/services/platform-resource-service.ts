@@ -66,7 +66,7 @@ async function readHostMetrics() {
       disk: normalizeStorage(parsed.disk),
       memory: normalizeStorage(parsed.memory),
       swap: normalizeSwap(parsed.swap),
-      error: stale ? "Không thể cập nhật số liệu máy chủ." : null
+      error: stale ? "Chưa thể cập nhật. Vui lòng thử lại sau." : null
     };
   } catch {
     return {
@@ -76,7 +76,7 @@ async function readHostMetrics() {
       disk: null,
       memory: null,
       swap: null,
-      error: "Chưa nhận được số liệu máy chủ."
+      error: "Chưa có dữ liệu"
     };
   }
 }
