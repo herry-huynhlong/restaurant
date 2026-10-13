@@ -15,15 +15,65 @@ export type PlanFeature =
   | "REPORTS"
   | "ADVANCED_REPORTS";
 
-const basicFeatures = new Set<PlanFeature>([
-  "WAITER_ACCESS",
-  "PAYMENT_REQUEST",
-  "PAYMENT_CONFIRM",
-  "BILL_PRINT",
-  "REPORTS"
-]);
+export const planFeatureLabels: Record<PlanFeature, { title: string; description: string; group: string }> = {
+  WAITER_ACCESS: {
+    title: "Nhân viên phục vụ",
+    description: "Cho tạo và đăng nhập tài khoản phục vụ.",
+    group: "Nhân sự"
+  },
+  MANAGER_ACCESS: {
+    title: "Quản lý",
+    description: "Cho tạo tài khoản quản lý nhà hàng.",
+    group: "Nhân sự"
+  },
+  KITCHEN_ACCESS: {
+    title: "Bếp",
+    description: "Cho tạo tài khoản bếp.",
+    group: "Nhân sự"
+  },
+  CASHIER_ACCESS: {
+    title: "Thu ngân",
+    description: "Cho tạo tài khoản thu ngân.",
+    group: "Nhân sự"
+  },
+  KITCHEN_FLOW: {
+    title: "Flow bếp",
+    description: "Món chờ làm, đang làm, hoàn thành.",
+    group: "Vận hành"
+  },
+  CASHIER_FLOW: {
+    title: "Màn hình thu ngân",
+    description: "Trang làm việc riêng cho thu ngân.",
+    group: "Thanh toán"
+  },
+  PAYMENT_REQUEST: {
+    title: "Khách yêu cầu thanh toán",
+    description: "Khách gửi yêu cầu thanh toán từ tab Thanh toán.",
+    group: "Thanh toán"
+  },
+  PAYMENT_CONFIRM: {
+    title: "Xác nhận thanh toán",
+    description: "Chủ quán/thu ngân xác nhận bill đã thanh toán.",
+    group: "Thanh toán"
+  },
+  BILL_PRINT: {
+    title: "In phiếu/bill",
+    description: "In phiếu tạm tính và bill thanh toán.",
+    group: "Thanh toán"
+  },
+  REPORTS: {
+    title: "Báo cáo cơ bản",
+    description: "Doanh thu, giao dịch gần đây, bộ lọc kỳ.",
+    group: "Báo cáo"
+  },
+  ADVANCED_REPORTS: {
+    title: "Báo cáo nâng cao",
+    description: "Các chỉ số phân tích mở rộng khi cần.",
+    group: "Báo cáo"
+  }
+};
 
-const proFeatures = new Set<PlanFeature>([
+export const planFeatureOrder: PlanFeature[] = [
   "WAITER_ACCESS",
   "MANAGER_ACCESS",
   "KITCHEN_ACCESS",
@@ -35,7 +85,32 @@ const proFeatures = new Set<PlanFeature>([
   "BILL_PRINT",
   "REPORTS",
   "ADVANCED_REPORTS"
-]);
+];
+
+export const basicPlanFeatures: PlanFeature[] = [
+  "WAITER_ACCESS",
+  "PAYMENT_REQUEST",
+  "PAYMENT_CONFIRM",
+  "BILL_PRINT",
+  "REPORTS"
+];
+
+export const proPlanFeatures: PlanFeature[] = [
+  "WAITER_ACCESS",
+  "MANAGER_ACCESS",
+  "KITCHEN_ACCESS",
+  "CASHIER_ACCESS",
+  "KITCHEN_FLOW",
+  "CASHIER_FLOW",
+  "PAYMENT_REQUEST",
+  "PAYMENT_CONFIRM",
+  "BILL_PRINT",
+  "REPORTS",
+  "ADVANCED_REPORTS"
+];
+
+const basicFeatures = new Set<PlanFeature>(basicPlanFeatures);
+const proFeatures = new Set<PlanFeature>(proPlanFeatures);
 
 export const commercialPlans: CommercialPlan[] = ["BASIC", "PRO"];
 
