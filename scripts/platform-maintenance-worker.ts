@@ -1,0 +1,360 @@
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { promisify } from "node:util";
+import { execFile } from "node:child_process";
+import { PrismaClient } from "@prisma/client";
+
+const execFileAsync = promisify(execFile);
+const prisma = new PrismaClient();
+const backupRoot = path.resolve(process.env.BACKUP_DIR ?? path.join(process.cwd(), "backups"));
+const uploadRoot = path.resolve(process.cwd(), "public", "uploads");
+const policyKey = "default";
+const vietnamUtcOffsetHours = 7;
+
+async function main() {
+  const mode = process.argv[2] ?? "worker";
+  const policy = await ensurePolicy();
+
+  if (mode === "backup") {
+    await queueManualBackupIfNeeded(policy);
+    await processNextBackup();
+    return;
+  }
+
+  if (mode === "cleanup") {
+    await queueCleanup();
+    await processNextCleanup();
+    return;
+  }
+
+  await queueAutomaticBackupIfNeeded(policy, false);
+  await processNextBackup();
+  await processNextCleanup();
+}
+
+async function ensurePolicy() {
+  return prisma.platformDataPolicy.upsert({
+    where: { singletonKey: policyKey },
+    create: { singletonKey: policyKey },
+    update: {}
+  });
+}
+
+async function queueManualBackupIfNeeded(policy: Awaited<ReturnType<typeof ensurePolicy>>) {
+  const existing = await prisma.platformBackupRun.findFirst({
+    where: { status: "QUEUED" },
+    orderBy: { queuedAt: "asc" }
+  });
+  if (existing) return;
+
+  await prisma.platformBackupRun.create({
+    data: {
+      status: "QUEUED",
+      triggerType: "MANUAL",
+      storageKind: policy.backupStorageKind,
+      locationLabel: storageKindLabel(policy.backupStorageKind)
+    }
+  });
+}
+
+async function queueAutomaticBackupIfNeeded(policy: Awaited<ReturnType<typeof ensurePolicy>>, force: boolean) {
+  if (!policy.backupEnabled) return;
+
+  const todayStart = startOfVietnamDay(new Date());
+  const existing = await prisma.platformBackupRun.findFirst({
+    where: {
+      triggerType: "AUTOMATIC",
+      createdAt: { gte: todayStart },
+      status: { in: ["QUEUED", "RUNNING", "SUCCESS"] }
+    }
+  });
+
+  if (existing && !force) return;
+
+  await prisma.platformBackupRun.create({
+    data: {
+      status: "QUEUED",
+      triggerType: "AUTOMATIC",
+      storageKind: policy.backupStorageKind,
+      locationLabel: storageKindLabel(policy.backupStorageKind)
+    }
+  });
+}
+
+async function processNextBackup() {
+  const run = await prisma.platformBackupRun.findFirst({
+    where: { status: "QUEUED" },
+    orderBy: { queuedAt: "asc" }
+  });
+  if (!run) return;
+
+  const startedAt = new Date();
+  await prisma.platformBackupRun.update({
+    where: { id: run.id },
+    data: { status: "RUNNING", startedAt }
+  });
+
+  try {
+    const stamp = startedAt.toISOString().replace(/[:.]/g, "-");
+    const runDirName = `${stamp}-${run.id}`;
+    const runDir = path.join(backupRoot, runDirName);
+    await mkdir(runDir, { recursive: true });
+
+    const databaseDumpName = `${runDirName}/database.dump`;
+    const uploadsArchiveName = `${runDirName}/uploads.tar.gz`;
+    const databaseDumpPath = path.join(backupRoot, databaseDumpName);
+    const uploadsArchivePath = path.join(backupRoot, uploadsArchiveName);
+    const manifestPath = path.join(runDir, "manifest.json");
+
+    await dumpDatabase(databaseDumpPath);
+    const hasUploads = await archiveUploads(uploadsArchivePath);
+
+    const databaseInfo = await stat(databaseDumpPath);
+    if (!databaseInfo.isFile() || databaseInfo.size <= 0) {
+      throw new Error("BACKUP_DATABASE_FILE_EMPTY");
+    }
+
+    const uploadsInfo = hasUploads ? await stat(uploadsArchivePath) : null;
+    const manifest = {
+      backupId: run.id,
+      createdAt: new Date().toISOString(),
+      files: {
+        database: databaseDumpName,
+        uploads: hasUploads ? uploadsArchiveName : null
+      }
+    };
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+
+    const checksum = await checksumFiles([databaseDumpPath, ...(hasUploads ? [uploadsArchivePath] : []), manifestPath]);
+    const sizeBytes = databaseInfo.size + (uploadsInfo?.size ?? 0) + (await stat(manifestPath)).size;
+
+    await prisma.platformBackupRun.update({
+      where: { id: run.id },
+      data: {
+        status: "SUCCESS",
+        locationLabel: storageKindLabel(run.storageKind),
+        databaseDumpName,
+        uploadsArchiveName: hasUploads ? uploadsArchiveName : null,
+        sizeBytes,
+        checksum,
+        verifiedAt: new Date(),
+        completedAt: new Date(),
+        errorMessage: null
+      }
+    });
+
+    await expireOldSuccessfulBackups();
+  } catch (error) {
+    await prisma.platformBackupRun.update({
+      where: { id: run.id },
+      data: {
+        status: "FAILED",
+        completedAt: new Date(),
+        errorMessage: safeError(error)
+      }
+    });
+  }
+}
+
+async function dumpDatabase(outputPath: string) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL_MISSING");
+
+  await execFileAsync("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file", outputPath], {
+    env: {
+      ...process.env,
+      ...postgresEnv(databaseUrl)
+    },
+    maxBuffer: 1024 * 1024
+  });
+}
+
+async function archiveUploads(outputPath: string) {
+  try {
+    const info = await stat(uploadRoot);
+    if (!info.isDirectory()) return false;
+  } catch {
+    return false;
+  }
+
+  await execFileAsync("tar", ["-czf", outputPath, "-C", path.dirname(uploadRoot), path.basename(uploadRoot)], {
+    maxBuffer: 1024 * 1024
+  });
+  return true;
+}
+
+async function expireOldSuccessfulBackups() {
+  const policy = await ensurePolicy();
+  const oldBackups = await prisma.platformBackupRun.findMany({
+    where: { status: "SUCCESS" },
+    orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+    skip: policy.backupRetentionCount
+  });
+
+  for (const backup of oldBackups) {
+    await removeBackupFiles(backup.databaseDumpName, backup.uploadsArchiveName);
+    await prisma.platformBackupRun.update({
+      where: { id: backup.id },
+      data: { status: "EXPIRED" }
+    });
+  }
+}
+
+async function removeBackupFiles(databaseDumpName: string | null, uploadsArchiveName: string | null) {
+  const candidates = [databaseDumpName, uploadsArchiveName].filter(Boolean) as string[];
+  for (const candidate of candidates) {
+    const filePath = path.resolve(backupRoot, candidate);
+    if (!filePath.startsWith(backupRoot)) continue;
+    await rm(filePath, { force: true });
+  }
+  const first = candidates[0];
+  if (first) {
+    const runDir = path.resolve(backupRoot, path.dirname(first));
+    if (runDir.startsWith(backupRoot) && runDir !== backupRoot) {
+      await rm(runDir, { recursive: true, force: true });
+    }
+  }
+}
+
+async function queueCleanup() {
+  const existing = await prisma.platformMaintenanceRun.findFirst({
+    where: {
+      taskType: "CLEANUP_TEMPORARY_DATA",
+      status: { in: ["QUEUED", "RUNNING"] }
+    }
+  });
+  if (existing) return;
+
+  await prisma.platformMaintenanceRun.create({
+    data: {
+      taskType: "CLEANUP_TEMPORARY_DATA",
+      status: "QUEUED"
+    }
+  });
+}
+
+async function processNextCleanup() {
+  const run = await prisma.platformMaintenanceRun.findFirst({
+    where: { status: "QUEUED" },
+    orderBy: { queuedAt: "asc" }
+  });
+  if (!run) return;
+
+  await prisma.platformMaintenanceRun.update({
+    where: { id: run.id },
+    data: { status: "RUNNING", startedAt: new Date() }
+  });
+
+  try {
+    const policy = await ensurePolicy();
+    const now = new Date();
+    const notificationCutoff = daysAgo(policy.notificationRetentionDays);
+    const temporaryCutoff = daysAgo(policy.temporaryDataRetentionDays);
+
+    const deletedNotifications = await prisma.notification.deleteMany({
+      where: {
+        isRead: true,
+        createdAt: { lt: notificationCutoff }
+      }
+    });
+
+    const deletedDeviceSessions = await prisma.staffDeviceSession.deleteMany({
+      where: {
+        isActive: false,
+        onShift: false,
+        updatedAt: { lt: temporaryCutoff }
+      }
+    });
+
+    await prisma.$transaction([
+      prisma.platformMaintenanceRun.update({
+        where: { id: run.id },
+        data: {
+          status: "SUCCESS",
+          deletedNotifications: deletedNotifications.count,
+          deletedDeviceSessions: deletedDeviceSessions.count,
+          completedAt: now,
+          errorMessage: null
+        }
+      }),
+      prisma.platformDataPolicy.update({
+        where: { id: policy.id },
+        data: {
+          lastCleanupAt: now,
+          nextCleanupAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          lastTaskStatus: "SUCCESS"
+        }
+      })
+    ]);
+  } catch (error) {
+    const policy = await ensurePolicy();
+    await prisma.$transaction([
+      prisma.platformMaintenanceRun.update({
+        where: { id: run.id },
+        data: {
+          status: "FAILED",
+          completedAt: new Date(),
+          errorMessage: safeError(error)
+        }
+      }),
+      prisma.platformDataPolicy.update({
+        where: { id: policy.id },
+        data: { lastTaskStatus: "FAILED" }
+      })
+    ]);
+  }
+}
+
+function postgresEnv(databaseUrl: string) {
+  const url = new URL(databaseUrl);
+  return {
+    PGHOST: url.hostname,
+    PGPORT: url.port || "5432",
+    PGDATABASE: url.pathname.replace(/^\//, ""),
+    PGUSER: decodeURIComponent(url.username),
+    PGPASSWORD: decodeURIComponent(url.password)
+  };
+}
+
+function storageKindLabel(value: string) {
+  return value === "S3_COMPATIBLE" ? "Kho lưu trữ ngoài máy chủ" : "Máy chủ hiện tại";
+}
+
+function daysAgo(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
+function startOfVietnamDay(value: Date) {
+  const vietnamNow = new Date(value.getTime() + vietnamUtcOffsetHours * 60 * 60 * 1000);
+  const vietnamDay = new Date(Date.UTC(vietnamNow.getUTCFullYear(), vietnamNow.getUTCMonth(), vietnamNow.getUTCDate(), 0, 0, 0, 0));
+  return new Date(vietnamDay.getTime() - vietnamUtcOffsetHours * 60 * 60 * 1000);
+}
+
+async function checksumFiles(files: string[]) {
+  const hash = createHash("sha256");
+  for (const file of files) {
+    await new Promise<void>((resolve, reject) => {
+      const stream = createReadStream(file);
+      stream.on("data", (chunk) => hash.update(chunk));
+      stream.on("error", reject);
+      stream.on("end", resolve);
+    });
+  }
+  return hash.digest("hex");
+}
+
+function safeError(error: unknown) {
+  if (error instanceof Error) return error.message.slice(0, 500);
+  return "Tác vụ chưa thành công.";
+}
+
+main()
+  .catch(async (error) => {
+    console.error(safeError(error));
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

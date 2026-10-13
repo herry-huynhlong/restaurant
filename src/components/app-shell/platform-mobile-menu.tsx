@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Activity, Building2, CreditCard, Home, Menu, Settings, UserRoundCog, X } from "lucide-react";
+import { Activity, Building2, CreditCard, HardDrive, Home, Menu, Settings, UserRoundCog, X } from "lucide-react";
 import { productBrand } from "@/lib/brand";
 import { platformRoutes } from "@/lib/routes";
 
@@ -11,6 +11,7 @@ const navItems = [
   { label: "Nhà hàng", href: platformRoutes.restaurants, Icon: Building2 },
   { label: "Gói dịch vụ", href: platformRoutes.plans, Icon: CreditCard },
   { label: "Tài khoản chủ quán", href: platformRoutes.owners, Icon: UserRoundCog },
+  { label: "Dung lượng & Sao lưu", href: platformRoutes.storage, Icon: HardDrive },
   { label: "Hoạt động hệ thống", href: platformRoutes.activity, Icon: Activity },
   { label: "Cài đặt nền tảng", href: platformRoutes.settings, Icon: Settings }
 ];

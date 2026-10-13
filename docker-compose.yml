@@ -36,5 +36,28 @@ services:
     volumes:
       - ./public/uploads:/app/public/uploads
 
+  maintenance-worker:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+    profiles: ["maintenance"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://restaurant_user:${POSTGRES_PASSWORD}@postgres:5432/restaurant_saas?schema=public
+      BACKUP_DIR: /app/backups
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
+    volumes:
+      - ./public/uploads:/app/public/uploads:ro
+      - ./backups:/app/backups
+    command: ["pnpm", "platform:worker"]
+    restart: "no"
+
 volumes:
   postgres_data:

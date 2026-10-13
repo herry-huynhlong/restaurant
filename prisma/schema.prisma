@@ -162,6 +162,7 @@ model Restaurant {
   serviceRequests    ServiceRequest[]
   notifications      Notification[]
   auditLogs          AuditLog[]
+  storageUsage       RestaurantStorageUsage?
   pushSubscriptions  PushSubscription[]
 
   @@index([status])
@@ -579,4 +580,73 @@ model AuditLog {
   @@index([restaurantId, createdAt])
   @@index([userId])
   @@index([action])
+}
+
+model PlatformDataPolicy {
+  id                         String   @id @default(cuid())
+  singletonKey               String   @unique @default("default")
+  backupEnabled              Boolean  @default(true)
+  backupTime                 String   @default("02:00")
+  backupRetentionCount       Int      @default(3)
+  notificationRetentionDays  Int      @default(3)
+  temporaryDataRetentionDays Int      @default(60)
+  backupStorageKind          String   @default("LOCAL")
+  lastCleanupAt              DateTime?
+  nextCleanupAt              DateTime?
+  lastTaskStatus             String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model PlatformBackupRun {
+  id                  String    @id @default(cuid())
+  status              String    @default("QUEUED")
+  triggerType         String    @default("MANUAL")
+  storageKind         String    @default("LOCAL")
+  locationLabel       String?
+  databaseDumpName    String?
+  uploadsArchiveName  String?
+  sizeBytes           BigInt    @default(0)
+  checksum            String?
+  verifiedAt          DateTime?
+  errorMessage        String?
+  queuedAt            DateTime  @default(now())
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([status, queuedAt])
+  @@index([createdAt])
+}
+
+model PlatformMaintenanceRun {
+  id                    String    @id @default(cuid())
+  taskType              String
+  status                String    @default("QUEUED")
+  deletedNotifications  Int       @default(0)
+  deletedDeviceSessions Int       @default(0)
+  errorMessage          String?
+  queuedAt              DateTime  @default(now())
+  startedAt             DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([taskType, status, queuedAt])
+  @@index([createdAt])
+}
+
+model RestaurantStorageUsage {
+  id             String     @id @default(cuid())
+  restaurantId   String     @unique
+  estimatedBytes BigInt     @default(0)
+  dataBytes      BigInt     @default(0)
+  uploadBytes    BigInt     @default(0)
+  calculatedAt   DateTime   @default(now())
+  note           String?
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([estimatedBytes])
+  @@index([calculatedAt])
 }

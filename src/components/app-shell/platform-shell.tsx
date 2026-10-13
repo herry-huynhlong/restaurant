@@ -9,6 +9,7 @@ const navItems = [
   ["Nhà hàng", platformRoutes.restaurants],
   ["Gói dịch vụ", platformRoutes.plans],
   ["Tài khoản chủ quán", platformRoutes.owners],
+  ["Dung lượng & Sao lưu", platformRoutes.storage],
   ["Hoạt động hệ thống", platformRoutes.activity],
   ["Cài đặt nền tảng", platformRoutes.settings]
 ] as const;
