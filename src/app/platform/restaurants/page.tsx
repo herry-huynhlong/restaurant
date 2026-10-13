@@ -7,6 +7,7 @@ import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
 import { getPlatformRestaurants } from "@/server/services/platform-service";
+import { confirmSubscriptionRequestAction, rejectSubscriptionRequestAction } from "./actions";
 
 export default async function PlatformRestaurantsPage({
   searchParams
@@ -31,11 +32,11 @@ export default async function PlatformRestaurantsPage({
           Đã xóa
         </Link>
       </div>
-      <div className="overflow-auto rounded-lg border bg-white shadow-sm">
-        <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+      <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+        <table className="w-full border-collapse text-left text-sm">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
-              {["Cơ sở", "Mã đường dẫn", "Loại", "Trạng thái", "Gói", "Bắt đầu", "Hết hạn", "Bàn", "Nhân viên", "Ngày tạo", "Thao tác"].map((item) => (
+              {["Cơ sở", "Loại", "Trạng thái", "Gói dịch vụ", "Quy mô", "Thao tác"].map((item) => (
                 <th key={item} className="px-3 py-3 font-medium">{item}</th>
               ))}
             </tr>
@@ -47,9 +48,9 @@ export default async function PlatformRestaurantsPage({
                 <tr key={restaurant.id} className="border-t align-top">
                   <td className="px-3 py-3">
                     <p className="font-medium">{restaurant.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">/{restaurant.slug}</p>
                     <p className="mt-1 text-xs text-slate-500">{owner ? `${owner.name} · ${owner.email}` : "Chưa có chủ quán"}</p>
                   </td>
-                  <td className="px-3 py-3">{restaurant.slug}</td>
                   <td className="px-3 py-3">
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{getBusinessTypeLabel(restaurant.businessType)}</span>
                   </td>
@@ -57,12 +58,35 @@ export default async function PlatformRestaurantsPage({
                     <p>{restaurantStatusLabel(restaurant.status)}</p>
                     <p className="mt-1 text-xs text-slate-500">{subscriptionStatusLabel(restaurant.subscriptionStatus)}</p>
                   </td>
-                  <td className="px-3 py-3">{restaurant.plan}</td>
-                  <td className="px-3 py-3">{formatDate(restaurant.subscriptionStart)}</td>
-                  <td className="px-3 py-3">{formatDate(restaurant.subscriptionEnd)}</td>
-                  <td className="px-3 py-3">{restaurant._count.tables}</td>
-                  <td className="px-3 py-3">{restaurant._count.users}</td>
-                  <td className="px-3 py-3">{formatDate(restaurant.createdAt)}</td>
+                  <td className="px-3 py-3">
+                    <p className="font-semibold">{restaurant.plan}</p>
+                    <p className="mt-1 text-xs text-slate-500">Hết hạn: {formatDate(restaurant.subscriptionEnd)}</p>
+                    {restaurant.subscriptionRequests.length > 0 ? (
+                      <div className="mt-2 space-y-2">
+                        {restaurant.subscriptionRequests.map((request) => (
+                          <div key={request.id} className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                            <p className="font-semibold">Chờ xác nhận: {request.plan} · {request.termMonths} tháng · {formatVnd(request.priceVnd)}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <form action={confirmSubscriptionRequestAction}>
+                                <input name="requestId" type="hidden" value={request.id} />
+                                <input name="returnTo" type="hidden" value={showDeleted ? `${platformRoutes.restaurants}?view=deleted` : platformRoutes.restaurants} />
+                                <button className="rounded bg-teal-700 px-2 py-1 font-semibold text-white" type="submit">Xác nhận</button>
+                              </form>
+                              <form action={rejectSubscriptionRequestAction}>
+                                <input name="requestId" type="hidden" value={request.id} />
+                                <input name="returnTo" type="hidden" value={showDeleted ? `${platformRoutes.restaurants}?view=deleted` : platformRoutes.restaurants} />
+                                <button className="rounded border border-amber-300 bg-white px-2 py-1 font-semibold" type="submit">Từ chối</button>
+                              </form>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-3">
+                    <p>{restaurant._count.tables} bàn</p>
+                    <p className="mt-1 text-xs text-slate-500">{restaurant._count.users} nhân sự</p>
+                  </td>
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap gap-2">
                       <Link className="rounded-md border px-2 py-1 text-sm" href={platformRoutes.restaurantEdit(restaurant.id)}>Sửa</Link>
@@ -90,4 +114,8 @@ export default async function PlatformRestaurantsPage({
 
 function formatDate(date: Date | null) {
   return date ? new Intl.DateTimeFormat("vi-VN").format(date) : "-";
+}
+
+function formatVnd(value: number) {
+  return `${value.toLocaleString("vi-VN")}đ`;
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { RestaurantRole } from "@prisma/client";
-import { BarChart3, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Store, Trophy, Users } from "lucide-react";
+import { BarChart3, CreditCard, Grid3X3, Home, ListOrdered, Menu as MenuIcon, Settings, Store, Trophy, Users } from "lucide-react";
 import type { Notification } from "@prisma/client";
 import { InstallAppButton } from "@/components/app-shell/install-app-button";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
@@ -59,6 +59,7 @@ export function RestaurantAdminShell({
     { label: "Nhân viên", href: restaurantRoutes.adminStaff(slug), Icon: Users, icon: "staff" },
     { label: "Top món", href: restaurantRoutes.adminTopItems(slug), Icon: Trophy, icon: "top-items" },
     ...reportNavItems,
+    { label: "Đăng ký gói", href: restaurantRoutes.adminSubscription(slug), Icon: CreditCard, icon: "settings" },
     { label: "Cài đặt", href: restaurantRoutes.adminSettings(slug), Icon: Settings, icon: "settings" }
   ];
   const mobileNavItems = navItems.map(({ label, href, icon }) => ({ label, href, icon }));

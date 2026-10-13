@@ -1,11 +1,14 @@
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { PushNotificationButton } from "@/components/app-shell/push-notification-button";
+import Link from "next/link";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SettingsImageUpload } from "@/components/admin/settings-image-upload";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getRecentNotifications } from "@/server/services/notification-service";
+import { restaurantRoutes } from "@/lib/routes";
+import { daysRemaining } from "@/server/services/subscription-service";
 import { changeOwnerPasswordAction, updateRestaurantSettingsAction } from "@/app/[rSlug]/admin/actions";
 
 export default async function SettingsPage({
@@ -31,6 +34,7 @@ export default async function SettingsPage({
   const notificationEnabled = settings
     ? settings.notifyNewOrder || settings.notifyServiceRequest || settings.notifyPaymentRequest
     : true;
+  const remainingDays = daysRemaining(restaurant.subscriptionEnd);
 
   return (
     <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Cài đặt" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
@@ -128,6 +132,25 @@ export default async function SettingsPage({
           </SettingsSection>
         </form>
       ) : null}
+
+      <section className="mt-6 rounded-lg border bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Gói dịch vụ hiện tại</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {restaurant.plan === "PRO" ? "PRO" : "BASIC"} · {remainingDays == null ? "Chưa có ngày hết hạn" : remainingDays > 0 ? `Còn ${remainingDays} ngày` : "Đã hết hạn"}
+            </p>
+          </div>
+          <Link className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" href={restaurantRoutes.adminSubscription(access.restaurant.slug)}>
+            Xem gói dịch vụ
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Info label="Ngày kích hoạt" value={formatDate(restaurant.subscriptionStart)} />
+          <Info label="Ngày hết hạn" value={formatDate(restaurant.subscriptionEnd)} />
+          <Info label="Trạng thái" value={remainingDays != null && remainingDays <= 0 ? "Đã hết hạn" : "Đang hoạt động"} />
+        </div>
+      </section>
     </RestaurantAdminShell>
   );
 }
@@ -157,4 +180,18 @@ function Check({ label, name, defaultChecked }: { label: string; name: string; d
       {label}
     </label>
   );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-slate-50 p-3 text-sm">
+      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function formatDate(value: Date | null | undefined) {
+  if (!value) return "Chưa có";
+  return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }).format(value);
 }

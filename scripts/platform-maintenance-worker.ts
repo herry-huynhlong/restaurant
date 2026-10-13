@@ -45,6 +45,7 @@ async function main() {
   await queueAutomaticBackupIfNeeded(policy, false);
   await processNextBackup();
   await processNextCleanup();
+  await processSubscriptionLifecycle();
   await cleanupOldTaskHistory();
   await touchWorker("OK", "Đã kiểm tra xong tác vụ nền.");
 }
@@ -72,6 +73,7 @@ async function runLoop() {
       await queueAutomaticBackupIfNeeded(policy, false);
       await processNextBackup();
       await processNextCleanup();
+      await processSubscriptionLifecycle();
       await cleanupOldTaskHistory();
       await touchWorker("OK", "Dịch vụ sao lưu đang sẵn sàng.");
     } catch (error) {
@@ -427,6 +429,59 @@ async function cleanupOldTaskHistory() {
       }
     })
   ]);
+}
+
+async function processSubscriptionLifecycle() {
+  const now = new Date();
+  const restaurants = await prisma.restaurant.findMany({
+    where: {
+      status: { not: "DELETED" },
+      subscriptionEnd: { not: null }
+    },
+    select: {
+      id: true,
+      plan: true,
+      subscriptionEnd: true,
+      subscriptionStatus: true
+    }
+  });
+
+  for (const restaurant of restaurants) {
+    if (!restaurant.subscriptionEnd) continue;
+    const remainingDays = Math.ceil((restaurant.subscriptionEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+    const alertMilestone = [14, 7, 3, 1].includes(remainingDays) ? remainingDays : remainingDays <= 0 ? 0 : null;
+
+    if (remainingDays <= 0 && restaurant.subscriptionStatus !== "EXPIRED") {
+      await prisma.restaurant.update({
+        where: { id: restaurant.id },
+        data: { subscriptionStatus: "EXPIRED" }
+      });
+    }
+
+    if (alertMilestone === null) continue;
+    const action = alertMilestone === 0 ? "SUBSCRIPTION_EXPIRED_ALERT" : `SUBSCRIPTION_EXPIRING_${alertMilestone}_DAYS`;
+    const existing = await prisma.restaurantSubscriptionEvent.findFirst({
+      where: {
+        restaurantId: restaurant.id,
+        action,
+        endAt: restaurant.subscriptionEnd
+      },
+      select: { id: true }
+    });
+    if (existing) continue;
+
+    await prisma.restaurantSubscriptionEvent.create({
+      data: {
+        restaurantId: restaurant.id,
+        action,
+        plan: restaurant.plan,
+        endAt: restaurant.subscriptionEnd,
+        metadataJson: {
+          remainingDays: alertMilestone
+        }
+      }
+    });
+  }
 }
 
 function postgresEnv(databaseUrl: string) {

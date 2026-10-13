@@ -71,7 +71,7 @@ export async function getPlatformOverview() {
 }
 
 export async function getPlatformRestaurants({ includeDeleted = false }: { includeDeleted?: boolean } = {}) {
-  return prisma.restaurant.findMany({
+  const restaurants = await prisma.restaurant.findMany({
     where: includeDeleted ? { status: "DELETED" } : { status: { not: "DELETED" } },
     orderBy: { createdAt: "desc" },
     include: {
@@ -88,6 +88,23 @@ export async function getPlatformRestaurants({ includeDeleted = false }: { inclu
       }
     }
   });
+
+  const pendingRequests = await prisma.restaurantSubscriptionRequest.findMany({
+    where: {
+      status: "PENDING",
+      restaurantId: { in: restaurants.map((restaurant) => restaurant.id) }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  const pendingByRestaurant = new Map<string, typeof pendingRequests>();
+  for (const request of pendingRequests) {
+    pendingByRestaurant.set(request.restaurantId, [...(pendingByRestaurant.get(request.restaurantId) ?? []), request]);
+  }
+
+  return restaurants.map((restaurant) => ({
+    ...restaurant,
+    subscriptionRequests: pendingByRestaurant.get(restaurant.id) ?? []
+  }));
 }
 
 export async function getPlatformRestaurantDetail(restaurantId: string) {

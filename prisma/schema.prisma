@@ -663,3 +663,85 @@ model RestaurantStorageUsage {
   @@index([estimatedBytes])
   @@index([calculatedAt])
 }
+
+model PlatformPlanPrice {
+  id               String         @id @default(cuid())
+  plan             RestaurantPlan
+  termMonths       Int
+  priceVnd         Int
+  monthlyPriceVnd  Int
+  isActive         Boolean        @default(true)
+  isRecommended    Boolean        @default(false)
+  description      String?
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([plan, termMonths])
+  @@index([plan, isActive])
+  @@index([sortOrder])
+}
+
+model PlatformPlanPriceHistory {
+  id                 String   @id @default(cuid())
+  priceId            String?
+  plan               String
+  termMonths         Int
+  oldPriceVnd        Int?
+  newPriceVnd        Int
+  oldIsActive        Boolean?
+  newIsActive        Boolean
+  oldIsRecommended   Boolean?
+  newIsRecommended   Boolean
+  oldDescription     String?
+  newDescription     String?
+  actorUserId        String?
+  createdAt          DateTime @default(now())
+
+  @@index([plan, termMonths])
+  @@index([createdAt])
+}
+
+model RestaurantSubscriptionRequest {
+  id                String         @id @default(cuid())
+  restaurantId      String
+  requestedByUserId String
+  plan              RestaurantPlan
+  termMonths        Int
+  priceVnd          Int
+  monthlyPriceVnd   Int
+  status            String         @default("PENDING")
+  note              String?
+  adminNote         String?
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+  rejectedByUserId  String?
+  rejectedAt        DateTime?
+  activatedStart    DateTime?
+  activatedEnd      DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([restaurantId, status])
+  @@index([status, createdAt])
+  @@index([requestedByUserId])
+}
+
+model RestaurantSubscriptionEvent {
+  id           String   @id @default(cuid())
+  restaurantId String
+  requestId    String?
+  actorUserId  String?
+  action       String
+  plan         String?
+  termMonths   Int?
+  priceVnd     Int?
+  startAt      DateTime?
+  endAt        DateTime?
+  metadataJson Json?
+  createdAt    DateTime @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([requestId])
+  @@index([action])
+}

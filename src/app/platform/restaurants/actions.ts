@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import { platformRoutes } from "@/lib/routes";
 import { enforceBusinessPlan } from "@/lib/business-type";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
+import { confirmSubscriptionRequest, rejectSubscriptionRequest } from "@/server/services/subscription-service";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 const restaurantDeleteSchema = z.object({
@@ -33,6 +34,10 @@ const updateOwnerNameSchema = z.object({
   restaurantId: z.string().min(1),
   ownerUserId: z.string().min(1),
   name: z.string().trim().min(1, "Họ tên là bắt buộc.").max(120, "Họ tên quá dài.")
+});
+const subscriptionRequestActionSchema = z.object({
+  requestId: z.string().min(1),
+  adminNote: z.string().trim().max(500).optional()
 });
 function slugify(input: string) {
   return input
@@ -879,4 +884,45 @@ export async function updateOwnerNameAction(formData: FormData) {
   revalidatePath(platformRoutes.restaurants);
   revalidatePath(platformRoutes.restaurantDetail(parsed.data.restaurantId));
   redirectWithSuccess(returnTo, "Đã cập nhật họ tên chủ quán.");
+}
+
+export async function confirmSubscriptionRequestAction(formData: FormData) {
+  const actor = await requirePlatformAdmin();
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = subscriptionRequestActionSchema.safeParse({
+    requestId: readString(formData, "requestId")
+  });
+  if (!parsed.success) {
+    redirectWithError(returnTo, "Yêu cầu đăng ký không hợp lệ.");
+  }
+
+  try {
+    const request = await confirmSubscriptionRequest(parsed.data.requestId, actor.id);
+    revalidatePath(platformRoutes.restaurants);
+    revalidatePath(platformRoutes.restaurantDetail(request.restaurantId));
+    redirectWithSuccess(returnTo, "Đã xác nhận thanh toán và kích hoạt gói dịch vụ.");
+  } catch (error) {
+    redirectWithError(returnTo, error instanceof Error ? error.message : "Chưa thể xác nhận yêu cầu đăng ký.");
+  }
+}
+
+export async function rejectSubscriptionRequestAction(formData: FormData) {
+  const actor = await requirePlatformAdmin();
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = subscriptionRequestActionSchema.safeParse({
+    requestId: readString(formData, "requestId"),
+    adminNote: optionalString(formData, "adminNote")
+  });
+  if (!parsed.success) {
+    redirectWithError(returnTo, "Yêu cầu đăng ký không hợp lệ.");
+  }
+
+  try {
+    const request = await rejectSubscriptionRequest(parsed.data.requestId, actor.id, parsed.data.adminNote);
+    revalidatePath(platformRoutes.restaurants);
+    revalidatePath(platformRoutes.restaurantDetail(request.restaurantId));
+    redirectWithSuccess(returnTo, "Đã từ chối yêu cầu đăng ký.");
+  } catch (error) {
+    redirectWithError(returnTo, error instanceof Error ? error.message : "Chưa thể từ chối yêu cầu đăng ký.");
+  }
 }
