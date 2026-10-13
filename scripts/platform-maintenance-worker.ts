@@ -14,6 +14,7 @@ const policyKey = "default";
 const workerKey = "backup-worker";
 const vietnamUtcOffsetHours = 7;
 const loopIntervalMs = Number(process.env.MAINTENANCE_WORKER_INTERVAL_MS ?? 30000);
+const taskHistoryRetentionDays = 7;
 
 async function main() {
   const mode = process.argv[2] ?? "worker";
@@ -44,6 +45,7 @@ async function main() {
   await queueAutomaticBackupIfNeeded(policy, false);
   await processNextBackup();
   await processNextCleanup();
+  await cleanupOldTaskHistory();
   await touchWorker("OK", "Đã kiểm tra xong tác vụ nền.");
 }
 
@@ -70,6 +72,7 @@ async function runLoop() {
       await queueAutomaticBackupIfNeeded(policy, false);
       await processNextBackup();
       await processNextCleanup();
+      await cleanupOldTaskHistory();
       await touchWorker("OK", "Dịch vụ sao lưu đang sẵn sàng.");
     } catch (error) {
       await touchWorker("ERROR", safeError(error));
@@ -151,6 +154,8 @@ async function processNextBackup() {
   });
 
   try {
+    await verifyPostgresBackupCompatibility();
+
     const stamp = startedAt.toISOString().replace(/[:.]/g, "-");
     const runDirName = `${stamp}-${run.id}`;
     const runDir = path.join(backupRoot, runDirName);
@@ -161,6 +166,14 @@ async function processNextBackup() {
     const databaseDumpPath = path.join(backupRoot, databaseDumpName);
     const uploadsArchivePath = path.join(backupRoot, uploadsArchiveName);
     const manifestPath = path.join(runDir, "manifest.json");
+
+    await prisma.platformBackupRun.update({
+      where: { id: run.id },
+      data: {
+        databaseDumpName,
+        uploadsArchiveName
+      }
+    });
 
     await dumpDatabase(databaseDumpPath);
     const hasUploads = await archiveUploads(uploadsArchivePath);
@@ -206,9 +219,31 @@ async function processNextBackup() {
       data: {
         status: "FAILED",
         completedAt: new Date(),
-        errorMessage: safeError(error)
+        errorMessage: backupFailureMessage(error)
       }
     });
+  }
+}
+
+async function verifyPostgresBackupCompatibility() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL_MISSING");
+
+  const [{ stdout: dumpVersion }, { stdout: serverVersion }] = await Promise.all([
+    execFileAsync("pg_dump", ["--version"], { maxBuffer: 1024 * 1024 }),
+    execFileAsync("psql", ["-Atqc", "show server_version_num"], {
+      env: {
+        ...process.env,
+        ...postgresEnv(databaseUrl)
+      },
+      maxBuffer: 1024 * 1024
+    })
+  ]);
+
+  const clientMajor = Number(dumpVersion.match(/(\d+)(?:\.\d+)?/)?.[1]);
+  const serverMajor = Math.floor(Number(serverVersion.trim()) / 10000);
+  if (!Number.isFinite(clientMajor) || !Number.isFinite(serverMajor) || clientMajor !== serverMajor) {
+    throw new Error(`PG_DUMP_MAJOR_MISMATCH server=${serverMajor || "unknown"} client=${clientMajor || "unknown"}`);
   }
 }
 
@@ -361,6 +396,39 @@ async function processNextCleanup() {
   }
 }
 
+async function cleanupOldTaskHistory() {
+  const cutoff = daysAgo(taskHistoryRetentionDays);
+  const failedBackups = await prisma.platformBackupRun.findMany({
+    where: {
+      status: "FAILED",
+      completedAt: { lt: cutoff }
+    },
+    select: {
+      databaseDumpName: true,
+      uploadsArchiveName: true
+    }
+  });
+
+  for (const backup of failedBackups) {
+    await removeBackupFiles(backup.databaseDumpName, backup.uploadsArchiveName);
+  }
+
+  await prisma.$transaction([
+    prisma.platformBackupRun.deleteMany({
+      where: {
+        status: "FAILED",
+        completedAt: { lt: cutoff }
+      }
+    }),
+    prisma.platformMaintenanceRun.deleteMany({
+      where: {
+        status: { in: ["SUCCESS", "FAILED"] },
+        completedAt: { lt: cutoff }
+      }
+    })
+  ]);
+}
+
 function postgresEnv(databaseUrl: string) {
   const url = new URL(databaseUrl);
   return {
@@ -416,6 +484,26 @@ async function checksumFiles(files: string[]) {
 function safeError(error: unknown) {
   if (error instanceof Error) return error.message.slice(0, 500);
   return "Tác vụ chưa thành công.";
+}
+
+function backupFailureMessage(error: unknown) {
+  const message = safeError(error);
+  if (message.includes("PG_DUMP_MAJOR_MISMATCH")) {
+    return "PG_DUMP_MAJOR_MISMATCH";
+  }
+  if (message.includes("server version mismatch") || message.includes("pg_dump version")) {
+    return "PG_DUMP_MAJOR_MISMATCH";
+  }
+  if (message.includes("DATABASE_URL_MISSING")) {
+    return "DATABASE_URL_MISSING";
+  }
+  if (message.includes("BACKUP_DATABASE_FILE_EMPTY")) {
+    return "BACKUP_DATABASE_FILE_EMPTY";
+  }
+  if (message.includes("ENOENT")) {
+    return "BACKUP_TOOL_NOT_AVAILABLE";
+  }
+  return "BACKUP_FAILED";
 }
 
 main()

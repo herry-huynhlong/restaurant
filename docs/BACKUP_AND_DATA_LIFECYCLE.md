@@ -52,9 +52,29 @@ Dịch vụ này:
 - Cập nhật trạng thái sẵn sàng cho Platform Admin.
 - Nhận các tác vụ sao lưu thủ công trong hàng chờ.
 - Tự tạo sao lưu hằng ngày sau giờ cấu hình.
+- Kiểm tra phiên bản công cụ sao lưu trước khi chạy.
 - Đánh dấu thất bại nếu tác vụ chạy lỗi.
+- Dọn lịch sử sao lưu thất bại và lịch sử dọn dữ liệu đã quá 7 ngày.
 
 Nếu dịch vụ này chưa chạy, giao diện sẽ báo **Dịch vụ sao lưu chưa sẵn sàng**.
+
+## Kiểm tra phiên bản công cụ sao lưu
+
+PostgreSQL server đang dùng phiên bản 16, vì vậy worker cần `pg_dump` cùng phiên bản chính 16.
+
+Kiểm tra trong container:
+
+```bash
+docker compose --profile maintenance run --rm maintenance-worker pg_dump --version
+```
+
+Kết quả nên là:
+
+```text
+pg_dump (PostgreSQL) 16.x
+```
+
+Nếu phiên bản không khớp, backup sẽ bị đánh dấu chưa thành công và không tự động thử lại liên tục trong cùng ngày.
 
 ## Chạy dọn dữ liệu tạm
 
@@ -69,6 +89,8 @@ Tác vụ này chỉ dọn:
 
 - Thông báo đã đọc quá thời gian cấu hình.
 - Phiên thiết bị nhân viên đã kết thúc quá thời gian cấu hình.
+- Lịch sử sao lưu thất bại quá 7 ngày.
+- Lịch sử dọn dữ liệu đã hoàn tất quá 7 ngày.
 
 Tác vụ này không xóa đơn hàng, thanh toán hoặc chứng từ.
 

@@ -1,6 +1,7 @@
 import { AlertTriangle, Archive, CalendarClock, CheckCircle2, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
+import { BackupHistoryCard } from "@/components/platform/backup-history-card";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
 import { productBrand } from "@/lib/brand";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
@@ -197,14 +198,17 @@ export default async function PlatformStoragePage({
       </section>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <HistoryCard
-          title="Lịch sử sao lưu"
-          emptyText="Chưa có tác vụ sao lưu."
+        <BackupHistoryCard
           rows={dashboard.backupRuns.map((run) => ({
             id: run.id,
+            status: run.status,
             title: statusLabel(run.status),
             meta: `${run.triggerType === "MANUAL" ? "Thủ công" : "Tự động"} · ${formatDateTime(run.completedAt ?? run.startedAt ?? run.queuedAt)}`,
-            value: run.status === "SUCCESS" ? formatBytes(run.sizeBytes) : run.errorMessage ?? ""
+            sizeLabel: run.status === "SUCCESS" ? formatBytes(run.sizeBytes) : null,
+            errorMessage: run.status === "FAILED" ? run.errorMessage : null,
+            diagnosticMessage: run.diagnosticMessage,
+            startedAtLabel: formatDateTime(run.startedAt),
+            completedAtLabel: formatDateTime(run.completedAt)
           }))}
         />
         <HistoryCard

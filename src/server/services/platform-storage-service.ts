@@ -135,13 +135,46 @@ export async function getPlatformStorageDashboard() {
       locationLabel: run.locationLabel,
       sizeBytes: toSafeNumber(run.sizeBytes),
       verifiedAt: run.verifiedAt,
-      errorMessage: run.errorMessage,
+      errorMessage: publicBackupError(run.errorMessage),
+      diagnosticMessage: diagnosticBackupError(run.errorMessage),
       queuedAt: run.queuedAt,
       startedAt: run.startedAt,
       completedAt: run.completedAt
     })),
     maintenanceRuns
   };
+}
+
+function publicBackupError(message: string | null) {
+  if (!message) return null;
+  return "Không thể hoàn tất sao lưu. Vui lòng kiểm tra dịch vụ sao lưu.";
+}
+
+function diagnosticBackupError(message: string | null) {
+  if (!message) return null;
+  const lower = message.toLowerCase();
+  if (lower.includes("server version mismatch") || lower.includes("pg_dump version")) {
+    return "Công cụ sao lưu chưa cùng phiên bản chính với PostgreSQL đang chạy.";
+  }
+  if (lower.includes("database_url_missing")) {
+    return "Dịch vụ sao lưu thiếu cấu hình kết nối dữ liệu.";
+  }
+  if (lower.includes("backup_database_file_empty")) {
+    return "File dữ liệu sao lưu không hợp lệ.";
+  }
+  if (lower.includes("pg_dump_major_mismatch")) {
+    return "Phiên bản công cụ sao lưu không tương thích với PostgreSQL.";
+  }
+  if (lower.includes("backup_tool_not_available")) {
+    return "Dịch vụ sao lưu thiếu công cụ cần thiết.";
+  }
+  if (lower.includes("backup_failed")) {
+    return "Tác vụ sao lưu chưa hoàn tất.";
+  }
+  if (lower.includes("command failed")) {
+    return "Lệnh sao lưu chưa hoàn tất. Hãy kiểm tra log dịch vụ sao lưu trên máy chủ.";
+  }
+  return "Tác vụ chưa hoàn tất. Hãy kiểm tra log dịch vụ sao lưu trên máy chủ.";
 }
 
 async function markTimedOutBackupRuns() {
