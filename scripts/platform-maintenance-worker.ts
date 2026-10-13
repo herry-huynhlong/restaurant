@@ -121,8 +121,7 @@ async function queueAutomaticBackupIfNeeded(policy: Awaited<ReturnType<typeof en
   const existing = await prisma.platformBackupRun.findFirst({
     where: {
       triggerType: "AUTOMATIC",
-      createdAt: { gte: todayStart },
-      status: { in: ["QUEUED", "RUNNING", "SUCCESS"] }
+      createdAt: { gte: todayStart }
     }
   });
 

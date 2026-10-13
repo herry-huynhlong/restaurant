@@ -1,7 +1,14 @@
 FROM node:22-bookworm-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl ca-certificates postgresql-client tar gzip && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl ca-certificates wget gnupg tar gzip \
+  && wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
+  && echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+  && apt-get update -y \
+  && apt-get install -y --no-install-recommends postgresql-client-16 \
+  && apt-get purge -y --auto-remove wget gnupg \
+  && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@11.19.0 --activate
 WORKDIR /app
 
