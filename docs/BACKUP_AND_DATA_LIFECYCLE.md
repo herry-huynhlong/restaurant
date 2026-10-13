@@ -38,6 +38,24 @@ cd /opt/websites/restaurant
 docker compose --profile maintenance run --rm maintenance-worker pnpm platform:backup
 ```
 
+## Chạy dịch vụ sao lưu nền
+
+Để nút **Chạy sao lưu thủ công** được xử lý tự động, cần chạy dịch vụ nền:
+
+```bash
+cd /opt/websites/restaurant
+docker compose --profile maintenance up -d maintenance-worker
+```
+
+Dịch vụ này:
+
+- Cập nhật trạng thái sẵn sàng cho Platform Admin.
+- Nhận các tác vụ sao lưu thủ công trong hàng chờ.
+- Tự tạo sao lưu hằng ngày sau giờ cấu hình.
+- Đánh dấu thất bại nếu tác vụ chạy lỗi.
+
+Nếu dịch vụ này chưa chạy, giao diện sẽ báo **Dịch vụ sao lưu chưa sẵn sàng**.
+
 ## Chạy dọn dữ liệu tạm
 
 Nút **Xếp lịch dọn dữ liệu tạm** chỉ đưa tác vụ vào hàng chờ. Sau đó chạy worker:
@@ -63,6 +81,40 @@ Khuyến nghị dùng systemd timer hoặc cron của máy chủ để gọi wor
 ```
 
 Thời gian hiển thị trong giao diện là giờ Việt Nam. Cron nên đặt trễ vài phút so với giờ cấu hình để tránh trùng lúc máy chủ đang khởi động.
+
+Nếu đã chạy `maintenance-worker` ở chế độ nền, không cần cron cho backup hằng ngày. Chỉ nên chọn một trong hai cách để tránh chạy trùng.
+
+## Đo tài nguyên VPS
+
+Ứng dụng web không đọc trực tiếp thông tin máy chủ host. Máy chủ cần chạy collector nhẹ để ghi số liệu tổng hợp vào file, sau đó container web chỉ đọc file này.
+
+Tạo thư mục:
+
+```bash
+cd /opt/websites/restaurant
+mkdir -p host-metrics
+```
+
+Chạy thử collector trên host:
+
+```bash
+bash scripts/collect-host-metrics.sh
+cat host-metrics/metrics.json
+```
+
+Cron gợi ý, cập nhật mỗi 10 giây:
+
+```cron
+* * * * * cd /opt/websites/restaurant && for i in 1 2 3 4 5 6; do bash scripts/collect-host-metrics.sh; sleep 10; done
+```
+
+Collector đọc:
+
+- RAM và Swap từ `/proc/meminfo`.
+- Ổ cứng từ phân vùng chứa `/opt/websites/restaurant`.
+- Dung lượng thư mục `backups`.
+
+Không mount Docker socket vào web container và không cho client chỉ định đường dẫn cần đọc.
 
 ## Vị trí lưu bản sao
 

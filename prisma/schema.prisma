@@ -637,6 +637,19 @@ model PlatformMaintenanceRun {
   @@index([createdAt])
 }
 
+model PlatformWorkerHeartbeat {
+  id           String   @id @default(cuid())
+  singletonKey String   @unique
+  serviceName  String
+  status       String   @default("OK")
+  message      String?
+  lastSeenAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([serviceName, lastSeenAt])
+}
+
 model RestaurantStorageUsage {
   id             String     @id @default(cuid())
   restaurantId   String     @unique

@@ -1,6 +1,7 @@
-import { AlertTriangle, Archive, CalendarClock, CheckCircle2, DatabaseBackup, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Archive, CalendarClock, CheckCircle2, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
+import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
 import { productBrand } from "@/lib/brand";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
@@ -15,10 +16,12 @@ export default async function PlatformStoragePage({
   const dashboard = await getPlatformStorageDashboard();
 
   return (
-    <PlatformShell title="Dung lượng & Sao lưu" subtitle={productBrand.platformSubtitle}>
+    <PlatformShell title="Tài nguyên & Sao lưu" subtitle={productBrand.platformSubtitle}>
       <FeedbackBanner success={searchParams?.success} error={searchParams?.error} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <ServerResourceMonitor />
+
+      <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={<HardDrive className="h-5 w-5" />}
           label="Tổng dung lượng ước tính"
@@ -110,6 +113,13 @@ export default async function PlatformStoragePage({
             <WarningCard
               title="Có lần sao lưu chưa thành công"
               message="Hãy kiểm tra tác vụ gần nhất và chạy lại sau khi xử lý nguyên nhân."
+            />
+          ) : null}
+
+          {!dashboard.backupWorker.ready ? (
+            <WarningCard
+              title="Dịch vụ sao lưu chưa sẵn sàng"
+              message={dashboard.backupWorker.message}
             />
           ) : null}
 

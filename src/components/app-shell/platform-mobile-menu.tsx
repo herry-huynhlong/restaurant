@@ -11,7 +11,7 @@ const navItems = [
   { label: "Nhà hàng", href: platformRoutes.restaurants, Icon: Building2 },
   { label: "Gói dịch vụ", href: platformRoutes.plans, Icon: CreditCard },
   { label: "Tài khoản chủ quán", href: platformRoutes.owners, Icon: UserRoundCog },
-  { label: "Dung lượng & Sao lưu", href: platformRoutes.storage, Icon: HardDrive },
+  { label: "Tài nguyên & Sao lưu", href: platformRoutes.storage, Icon: HardDrive },
   { label: "Hoạt động hệ thống", href: platformRoutes.activity, Icon: Activity },
   { label: "Cài đặt nền tảng", href: platformRoutes.settings, Icon: Settings }
 ];

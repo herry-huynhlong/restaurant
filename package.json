@@ -13,6 +13,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
     "platform:worker": "tsx scripts/platform-maintenance-worker.ts",
+    "platform:worker:loop": "tsx scripts/platform-maintenance-worker.ts loop",
     "platform:backup": "tsx scripts/platform-maintenance-worker.ts backup",
     "platform:cleanup": "tsx scripts/platform-maintenance-worker.ts cleanup"
   },

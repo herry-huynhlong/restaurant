@@ -11,27 +11,40 @@ const prisma = new PrismaClient();
 const backupRoot = path.resolve(process.env.BACKUP_DIR ?? path.join(process.cwd(), "backups"));
 const uploadRoot = path.resolve(process.cwd(), "public", "uploads");
 const policyKey = "default";
+const workerKey = "backup-worker";
 const vietnamUtcOffsetHours = 7;
+const loopIntervalMs = Number(process.env.MAINTENANCE_WORKER_INTERVAL_MS ?? 30000);
 
 async function main() {
   const mode = process.argv[2] ?? "worker";
   const policy = await ensurePolicy();
 
+  if (mode === "loop") {
+    await runLoop();
+    return;
+  }
+
   if (mode === "backup") {
+    await touchWorker("OK", "Đang xử lý sao lưu thủ công.");
     await queueManualBackupIfNeeded(policy);
     await processNextBackup();
+    await touchWorker("OK", "Đã xử lý xong lượt sao lưu thủ công.");
     return;
   }
 
   if (mode === "cleanup") {
+    await touchWorker("OK", "Đang xử lý dọn dữ liệu tạm.");
     await queueCleanup();
     await processNextCleanup();
+    await touchWorker("OK", "Đã xử lý xong lượt dọn dữ liệu tạm.");
     return;
   }
 
+  await touchWorker("OK", "Đang kiểm tra tác vụ nền.");
   await queueAutomaticBackupIfNeeded(policy, false);
   await processNextBackup();
   await processNextCleanup();
+  await touchWorker("OK", "Đã kiểm tra xong tác vụ nền.");
 }
 
 async function ensurePolicy() {
@@ -39,6 +52,47 @@ async function ensurePolicy() {
     where: { singletonKey: policyKey },
     create: { singletonKey: policyKey },
     update: {}
+  });
+}
+
+async function runLoop() {
+  process.on("SIGTERM", () => {
+    process.exitCode = 0;
+  });
+  process.on("SIGINT", () => {
+    process.exitCode = 0;
+  });
+
+  while (process.exitCode === undefined) {
+    try {
+      const policy = await ensurePolicy();
+      await touchWorker("OK", "Dịch vụ sao lưu đang sẵn sàng.");
+      await queueAutomaticBackupIfNeeded(policy, false);
+      await processNextBackup();
+      await processNextCleanup();
+      await touchWorker("OK", "Dịch vụ sao lưu đang sẵn sàng.");
+    } catch (error) {
+      await touchWorker("ERROR", safeError(error));
+    }
+    await sleep(loopIntervalMs);
+  }
+}
+
+async function touchWorker(status: string, message: string) {
+  await prisma.platformWorkerHeartbeat.upsert({
+    where: { singletonKey: workerKey },
+    create: {
+      singletonKey: workerKey,
+      serviceName: "Sao lưu nền",
+      status,
+      message,
+      lastSeenAt: new Date()
+    },
+    update: {
+      status,
+      message,
+      lastSeenAt: new Date()
+    }
   });
 }
 
@@ -61,6 +115,7 @@ async function queueManualBackupIfNeeded(policy: Awaited<ReturnType<typeof ensur
 
 async function queueAutomaticBackupIfNeeded(policy: Awaited<ReturnType<typeof ensurePolicy>>, force: boolean) {
   if (!policy.backupEnabled) return;
+  if (!force && !isPastBackupTime(policy.backupTime)) return;
 
   const todayStart = startOfVietnamDay(new Date());
   const existing = await prisma.platformBackupRun.findFirst({
@@ -330,6 +385,20 @@ function startOfVietnamDay(value: Date) {
   const vietnamNow = new Date(value.getTime() + vietnamUtcOffsetHours * 60 * 60 * 1000);
   const vietnamDay = new Date(Date.UTC(vietnamNow.getUTCFullYear(), vietnamNow.getUTCMonth(), vietnamNow.getUTCDate(), 0, 0, 0, 0));
   return new Date(vietnamDay.getTime() - vietnamUtcOffsetHours * 60 * 60 * 1000);
+}
+
+function isPastBackupTime(backupTime: string) {
+  const [hourText, minuteText] = backupTime.split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const now = new Date();
+  const vietnamNow = new Date(now.getTime() + vietnamUtcOffsetHours * 60 * 60 * 1000);
+  const scheduled = new Date(Date.UTC(vietnamNow.getUTCFullYear(), vietnamNow.getUTCMonth(), vietnamNow.getUTCDate(), hour, minute, 0, 0));
+  return vietnamNow.getTime() >= scheduled.getTime();
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function checksumFiles(files: string[]) {

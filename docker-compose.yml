@@ -35,6 +35,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - ./public/uploads:/app/public/uploads
+      - ./host-metrics:/app/host-metrics:ro
 
   maintenance-worker:
     build:
@@ -56,8 +57,9 @@ services:
     volumes:
       - ./public/uploads:/app/public/uploads:ro
       - ./backups:/app/backups
-    command: ["pnpm", "platform:worker"]
-    restart: "no"
+      - ./host-metrics:/app/host-metrics:ro
+    command: ["pnpm", "platform:worker:loop"]
+    restart: unless-stopped
 
 volumes:
   postgres_data:

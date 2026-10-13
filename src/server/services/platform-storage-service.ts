@@ -5,6 +5,10 @@ import { prisma } from "@/lib/db/prisma";
 const UPLOAD_ROOT = path.resolve(process.cwd(), "public", "uploads");
 const POLICY_KEY = "default";
 const VIETNAM_UTC_OFFSET_HOURS = 7;
+const BACKUP_WORKER_KEY = "backup-worker";
+const WORKER_STALE_MS = 5 * 60 * 1000;
+const QUEUED_TIMEOUT_MS = 30 * 60 * 1000;
+const RUNNING_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 
 const ESTIMATED_ROW_BYTES = {
   restaurant: 2048,
@@ -36,13 +40,14 @@ export async function ensurePlatformDataPolicy() {
 }
 
 export async function getPlatformStorageDashboard() {
+  await markTimedOutBackupRuns();
   const policy = await ensurePlatformDataPolicy();
   const usageCount = await prisma.restaurantStorageUsage.count();
   if (usageCount === 0) {
     await refreshRestaurantStorageUsage();
   }
 
-  const [restaurantUsages, backupRuns, maintenanceRuns, successfulBackups, latestFailedBackup] = await Promise.all([
+  const [restaurantUsages, backupRuns, maintenanceRuns, successfulBackups, latestFailedBackup, workerHeartbeat] = await Promise.all([
     prisma.restaurantStorageUsage.findMany({
       orderBy: { estimatedBytes: "desc" },
       include: {
@@ -73,6 +78,9 @@ export async function getPlatformStorageDashboard() {
     prisma.platformBackupRun.findFirst({
       where: { status: "FAILED" },
       orderBy: [{ completedAt: "desc" }, { updatedAt: "desc" }]
+    }),
+    prisma.platformWorkerHeartbeat.findUnique({
+      where: { singletonKey: BACKUP_WORKER_KEY }
     })
   ]);
 
@@ -103,6 +111,7 @@ export async function getPlatformStorageDashboard() {
       restaurantCount: restaurantUsages.length
     },
     nextBackupAt: getNextBackupDate(policy.backupTime),
+    backupWorker: buildBackupWorkerStatus(workerHeartbeat, backupRuns),
     latestSuccessfulBackup,
     latestFailedBackup: failedAfterLastSuccess ? latestFailedBackup : null,
     restaurantUsages: restaurantUsages.map((usage) => ({
@@ -132,6 +141,54 @@ export async function getPlatformStorageDashboard() {
       completedAt: run.completedAt
     })),
     maintenanceRuns
+  };
+}
+
+async function markTimedOutBackupRuns() {
+  const now = new Date();
+  await prisma.platformBackupRun.updateMany({
+    where: {
+      status: "QUEUED",
+      queuedAt: { lt: new Date(now.getTime() - QUEUED_TIMEOUT_MS) }
+    },
+    data: {
+      status: "FAILED",
+      completedAt: now,
+      errorMessage: "Dịch vụ sao lưu chưa xử lý tác vụ trong thời gian cho phép."
+    }
+  });
+
+  await prisma.platformBackupRun.updateMany({
+    where: {
+      status: "RUNNING",
+      startedAt: { lt: new Date(now.getTime() - RUNNING_TIMEOUT_MS) }
+    },
+    data: {
+      status: "FAILED",
+      completedAt: now,
+      errorMessage: "Tác vụ sao lưu chạy quá lâu và đã được đánh dấu chưa thành công."
+    }
+  });
+}
+
+function buildBackupWorkerStatus(
+  heartbeat: { lastSeenAt: Date; status: string; message: string | null } | null,
+  backupRuns: Array<{ status: string; queuedAt: Date }>
+) {
+  const now = Date.now();
+  const hasPending = backupRuns.some((run) => run.status === "QUEUED" || run.status === "RUNNING");
+  const lastSeenAt = heartbeat?.lastSeenAt ?? null;
+  const ready = Boolean(heartbeat && now - heartbeat.lastSeenAt.getTime() <= WORKER_STALE_MS);
+
+  return {
+    ready,
+    lastSeenAt,
+    status: heartbeat?.status ?? "UNKNOWN",
+    message: ready
+      ? heartbeat?.message ?? "Dịch vụ sao lưu đang sẵn sàng."
+      : hasPending
+        ? "Dịch vụ sao lưu chưa sẵn sàng. Tác vụ có thể chưa được xử lý ngay."
+        : "Chưa ghi nhận dịch vụ sao lưu đang chạy."
   };
 }
 

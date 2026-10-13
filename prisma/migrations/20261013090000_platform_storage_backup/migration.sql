@@ -58,6 +58,21 @@ CREATE TABLE "PlatformMaintenanceRun" (
 CREATE INDEX "PlatformMaintenanceRun_taskType_status_queuedAt_idx" ON "PlatformMaintenanceRun"("taskType", "status", "queuedAt");
 CREATE INDEX "PlatformMaintenanceRun_createdAt_idx" ON "PlatformMaintenanceRun"("createdAt");
 
+CREATE TABLE "PlatformWorkerHeartbeat" (
+  "id" TEXT NOT NULL,
+  "singletonKey" TEXT NOT NULL,
+  "serviceName" TEXT NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'OK',
+  "message" TEXT,
+  "lastSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
+  CONSTRAINT "PlatformWorkerHeartbeat_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX "PlatformWorkerHeartbeat_singletonKey_key" ON "PlatformWorkerHeartbeat"("singletonKey");
+CREATE INDEX "PlatformWorkerHeartbeat_serviceName_lastSeenAt_idx" ON "PlatformWorkerHeartbeat"("serviceName", "lastSeenAt");
+
 CREATE TABLE "RestaurantStorageUsage" (
   "id" TEXT NOT NULL,
   "restaurantId" TEXT NOT NULL,
