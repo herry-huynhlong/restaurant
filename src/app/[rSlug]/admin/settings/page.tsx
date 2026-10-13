@@ -41,8 +41,8 @@ export default async function SettingsPage({
           <SettingsImageUpload name="logoFile" label="Logo quán" currentUrl={logoUrl} />
           <Text name="address" label="Địa chỉ" defaultValue={settings?.address} />
           <Text name="phone" label="Số điện thoại" defaultValue={settings?.phone} />
-          <Text name="timezone" label="Timezone" defaultValue={settings?.timezone ?? "Asia/Ho_Chi_Minh"} required />
-          <Text name="currency" label="Currency" defaultValue={settings?.currency ?? "VND"} required />
+          <Text name="timezone" label="Múi giờ" defaultValue={settings?.timezone ?? "Asia/Ho_Chi_Minh"} required />
+          <Text name="currency" label="Đơn vị tiền tệ" defaultValue={settings?.currency ?? "VND"} required />
         </SettingsSection>
 
         <SettingsSection title="Ngôn ngữ">

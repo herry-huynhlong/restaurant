@@ -43,7 +43,7 @@ export async function changePlatformAdminPasswordAction(formData: FormData) {
   });
 
   if (!user) {
-    redirectWithError(path, "Tài khoản Platform Admin không hợp lệ.");
+    redirectWithError(path, "Tài khoản quản trị nền tảng không hợp lệ.");
   }
 
   const passwordMatches = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
@@ -69,7 +69,7 @@ export async function changePlatformAdminPasswordAction(formData: FormData) {
   ]);
 
   revalidatePath(path);
-  redirectWithSuccess(path, "Đã đổi mật khẩu Platform Admin.");
+  redirectWithSuccess(path, "Đã đổi mật khẩu quản trị nền tảng.");
 }
 
 function readString(formData: FormData, key: string) {

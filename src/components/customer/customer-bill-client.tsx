@@ -136,7 +136,7 @@ export function CustomerBillClient({ slug, mode }: { slug: string; mode: "orders
             <article key={order.id} className="rounded-md border p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-semibold">Order #{order.orderNumber} - {order.customerName}</p>
+                  <p className="font-semibold">Lượt gọi #{order.orderNumber} - {order.customerName}</p>
                   <p className="mt-1 text-xs text-slate-500">{new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(new Date(order.createdAt))}</p>
                 </div>
                 <p className="font-semibold text-teal-700">{formatVnd(order.subtotal)}</p>

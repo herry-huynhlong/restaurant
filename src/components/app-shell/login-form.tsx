@@ -51,7 +51,7 @@ export function LoginForm() {
         />
       </label>
       <label className="block text-sm font-medium">
-        Password
+        Mật khẩu
         <input
           className="mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"
           name="password"

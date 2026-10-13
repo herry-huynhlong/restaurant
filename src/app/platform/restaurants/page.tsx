@@ -35,7 +35,7 @@ export default async function PlatformRestaurantsPage({
         <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead className="bg-slate-100 text-slate-700">
             <tr>
-              {["Cơ sở", "Slug", "Loại", "Trạng thái", "Gói", "Bắt đầu", "Hết hạn", "Bàn", "Nhân viên", "Ngày tạo", "Thao tác"].map((item) => (
+              {["Cơ sở", "Mã đường dẫn", "Loại", "Trạng thái", "Gói", "Bắt đầu", "Hết hạn", "Bàn", "Nhân viên", "Ngày tạo", "Thao tác"].map((item) => (
                 <th key={item} className="px-3 py-3 font-medium">{item}</th>
               ))}
             </tr>
@@ -47,7 +47,7 @@ export default async function PlatformRestaurantsPage({
                 <tr key={restaurant.id} className="border-t align-top">
                   <td className="px-3 py-3">
                     <p className="font-medium">{restaurant.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">{owner ? `${owner.name} · ${owner.email}` : "Chưa có admin"}</p>
+                    <p className="mt-1 text-xs text-slate-500">{owner ? `${owner.name} · ${owner.email}` : "Chưa có chủ quán"}</p>
                   </td>
                   <td className="px-3 py-3">{restaurant.slug}</td>
                   <td className="px-3 py-3">

@@ -104,16 +104,16 @@ async function saveUploadedImage(formData: FormData, key: string, folder: "logos
 
 const createRestaurantSchema = z.object({
   name: z.string().min(1, "Tên nhà hàng là bắt buộc."),
-  slug: z.string().min(1, "Slug là bắt buộc.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug chỉ được chứa chữ thường, số và dấu gạch ngang."),
+  slug: z.string().min(1, "Mã đường dẫn là bắt buộc.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Mã đường dẫn chỉ được chứa chữ thường, số và dấu gạch ngang."),
   logoUrl: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
-  timezone: z.string().min(1, "Timezone là bắt buộc."),
+  timezone: z.string().min(1, "Múi giờ là bắt buộc."),
   primaryLanguage: languageSchema,
-  currency: z.string().min(1, "Currency là bắt buộc."),
+  currency: z.string().min(1, "Đơn vị tiền tệ là bắt buộc."),
   ownerName: z.string().min(1, "Tên chủ quán là bắt buộc."),
-  ownerEmail: z.string().email("Email owner không hợp lệ.").transform((value) => value.toLowerCase()),
-  ownerPassword: z.string().min(8, "Password phải có ít nhất 8 ký tự."),
+  ownerEmail: z.string().email("Email chủ quán không hợp lệ.").transform((value) => value.toLowerCase()),
+  ownerPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự."),
   ownerPhone: z.string().optional(),
   businessType: businessTypeSchema,
   plan: planSchema,
@@ -163,7 +163,7 @@ function prismaCreateRestaurantMessage(error: unknown) {
   }
 
   if (error.code === "P2022") {
-    return "Database production chưa đồng bộ migration. Vui lòng chạy prisma migrate deploy rồi thử lại.";
+    return "Hệ thống lưu trữ chưa được cập nhật cấu trúc mới. Vui lòng cập nhật hệ thống rồi thử lại.";
   }
 
   if (error.code !== "P2002") {
@@ -172,19 +172,19 @@ function prismaCreateRestaurantMessage(error: unknown) {
 
   const target = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : String(error.meta?.target ?? "");
   if (target.includes("slug")) {
-    return "Slug này đã được sử dụng. Vui lòng chọn slug khác.";
+    return "Mã đường dẫn này đã được sử dụng. Vui lòng chọn mã khác.";
   }
   if (target.includes("email")) {
-    return "Email owner đã tồn tại trong hệ thống.";
+    return "Email chủ quán đã tồn tại trong hệ thống.";
   }
   if (target.includes("restaurantId") && target.includes("username")) {
-    return "Username owner đã tồn tại trong nhà hàng này.";
+    return "Tên đăng nhập chủ quán đã tồn tại trong nhà hàng này.";
   }
   if (target.includes("restaurantId") && target.includes("userId")) {
-    return "Owner này đã thuộc nhà hàng này.";
+    return "Chủ quán này đã thuộc nhà hàng này.";
   }
 
-  return "Dữ liệu bị trùng. Vui lòng kiểm tra slug hoặc email owner.";
+  return "Dữ liệu bị trùng. Vui lòng kiểm tra mã đường dẫn hoặc email chủ quán.";
 }
 
 export async function createRestaurantAction(formData: FormData) {
@@ -259,7 +259,7 @@ export async function createRestaurantAction(formData: FormData) {
       slug: parsed.data.slug,
       restaurantId: existingRestaurant.id
     });
-    redirectWithError(platformRoutes.newRestaurant, "Slug này đã được sử dụng. Vui lòng chọn slug khác.");
+    redirectWithError(platformRoutes.newRestaurant, "Mã đường dẫn này đã được sử dụng. Vui lòng chọn mã khác.");
   }
 
   const existingOwner = await prisma.user.findUnique({
@@ -271,7 +271,7 @@ export async function createRestaurantAction(formData: FormData) {
       ownerEmail: parsed.data.ownerEmail,
       userId: existingOwner.id
     });
-    redirectWithError(platformRoutes.newRestaurant, "Email owner đang là tài khoản Platform Admin. Vui lòng dùng email owner riêng cho nhà hàng.");
+    redirectWithError(platformRoutes.newRestaurant, "Email chủ quán đang là tài khoản quản trị nền tảng. Vui lòng dùng email riêng cho nhà hàng.");
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.ownerPassword, 12);
@@ -483,7 +483,7 @@ export async function updateRestaurantAction(formData: FormData) {
   } catch (error) {
     console.error("UPDATE RESTAURANT DATABASE ERROR", error);
     const message = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
-      ? "Slug đã tồn tại."
+      ? "Mã đường dẫn đã tồn tại."
       : "Không thể cập nhật nhà hàng. Vui lòng kiểm tra dữ liệu.";
     redirectWithError(platformRoutes.restaurantEdit(restaurantId), message);
   }
@@ -535,7 +535,7 @@ export async function softDeleteRestaurantAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError(returnTo, "Vui lòng nhập slug để xác nhận xóa.");
+    redirectWithError(returnTo, "Vui lòng nhập mã đường dẫn để xác nhận xóa.");
   }
 
   const restaurant = await prisma.restaurant.findUnique({
@@ -548,7 +548,7 @@ export async function softDeleteRestaurantAction(formData: FormData) {
   }
 
   if (parsed.data.confirmSlug !== restaurant.slug) {
-    redirectWithError(returnTo, "Slug xác nhận không đúng.");
+    redirectWithError(returnTo, "Mã đường dẫn xác nhận không đúng.");
   }
 
   if (restaurant.status === "DELETED") {
@@ -600,7 +600,7 @@ export async function restoreRestaurantAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError(returnTo, "Vui lòng nhập slug để xác nhận khôi phục.");
+    redirectWithError(returnTo, "Vui lòng nhập mã đường dẫn để xác nhận khôi phục.");
   }
 
   const restaurant = await prisma.restaurant.findUnique({
@@ -613,7 +613,7 @@ export async function restoreRestaurantAction(formData: FormData) {
   }
 
   if (parsed.data.confirmSlug !== restaurant.slug) {
-    redirectWithError(returnTo, "Slug xác nhận không đúng.");
+    redirectWithError(returnTo, "Mã đường dẫn xác nhận không đúng.");
   }
 
   if (restaurant.status !== "DELETED") {
@@ -657,7 +657,7 @@ export async function permanentlyDeleteRestaurantAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    redirectWithError(returnTo, "Vui lòng nhập slug để xác nhận xóa vĩnh viễn.");
+    redirectWithError(returnTo, "Vui lòng nhập mã đường dẫn để xác nhận xóa vĩnh viễn.");
   }
 
   const restaurant = await prisma.restaurant.findUnique({
@@ -683,7 +683,7 @@ export async function permanentlyDeleteRestaurantAction(formData: FormData) {
   }
 
   if (parsed.data.confirmSlug !== restaurant.slug) {
-    redirectWithError(returnTo, "Slug xác nhận không đúng.");
+    redirectWithError(returnTo, "Mã đường dẫn xác nhận không đúng.");
   }
 
   if (restaurant.status !== "DELETED") {
@@ -695,7 +695,7 @@ export async function permanentlyDeleteRestaurantAction(formData: FormData) {
     || restaurant._count.diningSessions > 0
     || restaurant._count.serviceRequests > 0;
   if (hasBusinessHistory) {
-    redirectWithError(returnTo, "Không thể xóa vĩnh viễn vì nhà hàng có lịch sử order/thanh toán/yêu cầu. Hãy giữ bản ghi đã xóa để audit.");
+    redirectWithError(returnTo, "Không thể xóa vĩnh viễn vì nhà hàng có lịch sử gọi món, thanh toán hoặc yêu cầu khách. Hãy giữ bản ghi đã xóa để bảo toàn chứng từ.");
   }
 
   await prisma.$transaction(async (tx) => {
@@ -809,7 +809,7 @@ export async function resetOwnerPasswordAction(formData: FormData) {
   });
 
   if (!owner) {
-    redirectWithError(returnTo, "Không tìm thấy tài khoản admin của nhà hàng.");
+    redirectWithError(returnTo, "Không tìm thấy tài khoản chủ quán của nhà hàng.");
   }
 
   await prisma.$transaction([
@@ -829,7 +829,7 @@ export async function resetOwnerPasswordAction(formData: FormData) {
   revalidatePath(platformRoutes.restaurants);
   revalidatePath(platformRoutes.restaurantDetail(parsed.data.restaurantId));
   revalidatePath(platformRoutes.owners);
-  redirectWithSuccess(returnTo, parsed.data.ownerUserId ? "Đã reset mật khẩu chủ quán." : "Đã reset mật khẩu admin.");
+  redirectWithSuccess(returnTo, parsed.data.ownerUserId ? "Đã đặt lại mật khẩu chủ quán." : "Đã đặt lại mật khẩu chủ quán.");
 }
 
 export async function updateOwnerNameAction(formData: FormData) {

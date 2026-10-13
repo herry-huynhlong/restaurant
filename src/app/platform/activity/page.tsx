@@ -11,11 +11,32 @@ export default async function PlatformActivityPage() {
         <div className="space-y-2">
           {logs.map((log) => (
             <p key={log.id} className="rounded-md bg-slate-50 px-3 py-2 text-sm">
-              {log.action} · {log.restaurant?.name ?? "Platform"} · {log.user?.email ?? "system"}
+              {activityLabel(log.action)} · {log.restaurant?.name ?? "Nền tảng"} · {log.user?.email ?? "Hệ thống"}
             </p>
           ))}
         </div>
       </section>
     </PlatformShell>
   );
+}
+
+function activityLabel(action: string) {
+  const labels: Record<string, string> = {
+    RESTAURANT_CREATED: "Tạo nhà hàng",
+    RESTAURANT_UPDATED: "Cập nhật nhà hàng",
+    RESTAURANT_STATUS_CHANGED: "Đổi trạng thái nhà hàng",
+    RESTAURANT_SOFT_DELETED: "Xóa nhà hàng",
+    RESTAURANT_RESTORED: "Khôi phục nhà hàng",
+    RESTAURANT_PERMANENT_DELETE_REQUESTED: "Xóa vĩnh viễn nhà hàng",
+    SUBSCRIPTION_EXTENDED: "Gia hạn gói dịch vụ",
+    PLAN_CHANGED: "Đổi gói dịch vụ",
+    OWNER_PASSWORD_RESET: "Đặt lại mật khẩu chủ quán",
+    OWNER_UPDATED: "Cập nhật tài khoản chủ quán",
+    OWNER_NAME_UPDATED: "Cập nhật họ tên chủ quán",
+    ADMIN_PASSWORD_RESET: "Đặt lại mật khẩu chủ quán",
+    PLATFORM_ADMIN_PASSWORD_CHANGED: "Đổi mật khẩu quản trị nền tảng",
+    PLAN_PERMISSION_MATRIX_CONFIRMED: "Xác nhận quyền lợi gói dịch vụ"
+  };
+
+  return labels[action] ?? "Cập nhật hệ thống";
 }

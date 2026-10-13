@@ -25,6 +25,7 @@ import {
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformRestaurantActions } from "@/components/platform/restaurant-row-actions";
+import { productBrand } from "@/lib/brand";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
@@ -61,7 +62,7 @@ export default async function RestaurantDetailPage({
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-        <Link className="hover:text-teal-700" href={platformRoutes.dashboard}>Platform Admin</Link>
+        <Link className="hover:text-teal-700" href={platformRoutes.dashboard}>{productBrand.adminName}</Link>
         <span>/</span>
         <Link className="hover:text-teal-700" href={platformRoutes.restaurants}>Nhà hàng</Link>
         <span>/</span>
@@ -81,7 +82,7 @@ export default async function RestaurantDetailPage({
                 </div>
                 <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{restaurant.name}</h1>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-teal-50">
-                  <span className="inline-flex items-center gap-1.5"><Hash className="h-4 w-4" /> {restaurant.slug}</span>
+                  <span className="inline-flex items-center gap-1.5"><Hash className="h-4 w-4" /> Mã đường dẫn: {restaurant.slug}</span>
                   <span className="inline-flex items-center gap-1.5"><Store className="h-4 w-4" /> {getBusinessTypeLabel(restaurant.businessType)}</span>
                   <span className="inline-flex items-center gap-1.5"><ReceiptText className="h-4 w-4" /> {subscriptionStatusLabel(restaurant.subscriptionStatus)}</span>
                 </div>
@@ -106,7 +107,7 @@ export default async function RestaurantDetailPage({
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
               {isDeleted
-                ? "Nhà hàng này đang ở trạng thái đã xóa mềm. Dữ liệu lịch sử được giữ lại và chỉ Platform Admin có thể khôi phục."
+                ? "Nhà hàng này đang ở trạng thái đã xóa. Dữ liệu lịch sử được giữ lại và chỉ quản trị viên nền tảng có thể khôi phục."
                 : isExpired
                   ? "Gói dịch vụ đã hết hạn. Hãy gia hạn để tránh gián đoạn vận hành."
                   : `Gói dịch vụ còn ${daysRemaining} ngày. Nên gia hạn sớm để duy trì hoạt động ổn định.`}
@@ -129,7 +130,7 @@ export default async function RestaurantDetailPage({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Gói dịch vụ & Gia hạn</h2>
-              <p className="mt-1 text-sm text-slate-500">Quản lý gói thương mại, hạn sử dụng và trạng thái thuê bao.</p>
+              <p className="mt-1 text-sm text-slate-500">Quản lý gói dịch vụ, hạn sử dụng và trạng thái sử dụng.</p>
             </div>
             <Badge className={planBadgeClass(restaurant.plan)}>{restaurant.plan}</Badge>
           </div>
@@ -175,11 +176,11 @@ export default async function RestaurantDetailPage({
           <h2 className="text-lg font-semibold">Thông tin nhà hàng</h2>
           <div className="mt-4 grid gap-3">
             <InfoRow icon={Building2} label="Tên nhà hàng" value={restaurant.name} />
-            <InfoRow icon={Hash} label="Slug" value={restaurant.slug} monospace />
+            <InfoRow icon={Hash} label="Mã đường dẫn" value={restaurant.slug} monospace />
             <InfoRow icon={Store} label="Loại hình" value={getBusinessTypeLabel(restaurant.businessType)} />
             <InfoRow icon={Phone} label="Số điện thoại" value={restaurant.settings?.phone} />
             <InfoRow icon={MapPin} label="Địa chỉ" value={restaurant.settings?.address} />
-            <InfoRow icon={Clock3} label="Timezone" value={restaurant.settings?.timezone} />
+            <InfoRow icon={Clock3} label="Múi giờ" value={restaurant.settings?.timezone} />
             <InfoRow icon={Users} label="Chủ quán" value={ownerMembership?.user.name} />
             <InfoRow icon={Mail} label="Email chủ quán" value={ownerMembership?.user.email} />
           </div>
@@ -190,7 +191,7 @@ export default async function RestaurantDetailPage({
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold">Owner & Nhân viên</h2>
+          <h2 className="text-lg font-semibold">Chủ quán & Nhân viên</h2>
               <p className="mt-1 text-sm text-slate-500">{staffMemberships.length} nhân viên ngoài chủ quán</p>
             </div>
           </div>
@@ -230,7 +231,7 @@ export default async function RestaurantDetailPage({
             {restaurant.tables.length ? restaurant.tables.slice(0, 12).map((table) => (
               <div key={table.id} className="rounded-xl border bg-slate-50 px-3 py-2 text-sm">
                 <p className="font-semibold">{table.name}</p>
-                <p className="mt-1 text-xs text-slate-500">{table.area.name} · {table.status}</p>
+                <p className="mt-1 text-xs text-slate-500">{table.area.name} · {tableStatusLabel(table.status)}</p>
               </div>
             )) : <EmptyText text="Chưa có bàn." />}
           </div>
@@ -250,11 +251,10 @@ export default async function RestaurantDetailPage({
               </div>
               <div className="min-w-0 flex-1 rounded-xl border bg-slate-50 p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-semibold">{log.action}</p>
+                  <p className="font-semibold">{activityLabel(log.action)}</p>
                   <time className="text-xs text-slate-500">{formatDateTime(log.createdAt)}</time>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">Người thực hiện: {log.user?.email ?? "system"}</p>
-                {log.metadataJson ? <p className="mt-2 break-words text-xs text-slate-500">{formatMetadata(log.metadataJson)}</p> : null}
+                <p className="mt-1 text-sm text-slate-600">Người thực hiện: {log.user?.email ?? "Hệ thống"}</p>
               </div>
             </article>
           )) : <EmptyText text="Chưa có nhật ký hoạt động." />}
@@ -266,10 +266,10 @@ export default async function RestaurantDetailPage({
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-red-800">
               <ShieldAlert className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Danger Zone</h2>
+              <h2 className="text-lg font-semibold">Khu vực thao tác nhạy cảm</h2>
             </div>
             <p className="mt-2 text-sm text-red-800">
-              Khóa nhà hàng sẽ chặn toàn bộ owner, nhân viên và khách. Xóa nhà hàng cần xác nhận slug và chỉ xóa mềm mặc định để bảo toàn dữ liệu lịch sử.
+              Khóa nhà hàng sẽ chặn toàn bộ chủ quán, nhân viên và khách. Xóa nhà hàng cần xác nhận mã đường dẫn và mặc định chỉ đánh dấu đã xóa để bảo toàn dữ liệu lịch sử.
             </p>
           </div>
           <PlatformRestaurantActions
@@ -397,6 +397,38 @@ function auditTone(action: string) {
   return "bg-slate-100 text-slate-700";
 }
 
+function activityLabel(action: string) {
+  const labels: Record<string, string> = {
+    RESTAURANT_CREATED: "Tạo nhà hàng",
+    RESTAURANT_UPDATED: "Cập nhật nhà hàng",
+    RESTAURANT_STATUS_CHANGED: "Đổi trạng thái nhà hàng",
+    RESTAURANT_SOFT_DELETED: "Xóa nhà hàng",
+    RESTAURANT_RESTORED: "Khôi phục nhà hàng",
+    RESTAURANT_PERMANENT_DELETE_REQUESTED: "Xóa vĩnh viễn nhà hàng",
+    SUBSCRIPTION_EXTENDED: "Gia hạn gói dịch vụ",
+    PLAN_CHANGED: "Đổi gói dịch vụ",
+    OWNER_PASSWORD_RESET: "Đặt lại mật khẩu chủ quán",
+    OWNER_UPDATED: "Cập nhật tài khoản chủ quán",
+    OWNER_NAME_UPDATED: "Cập nhật họ tên chủ quán",
+    ADMIN_PASSWORD_RESET: "Đặt lại mật khẩu chủ quán",
+    PLATFORM_ADMIN_PASSWORD_CHANGED: "Đổi mật khẩu quản trị nền tảng",
+    PLAN_PERMISSION_MATRIX_CONFIRMED: "Xác nhận quyền lợi gói dịch vụ"
+  };
+
+  return labels[action] ?? "Cập nhật hệ thống";
+}
+
+function tableStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    AVAILABLE: "Đang trống",
+    OCCUPIED: "Đang phục vụ",
+    PAYMENT_REQUESTED: "Chờ thanh toán",
+    DISABLED: "Ngừng sử dụng"
+  };
+
+  return labels[status] ?? "Đang cập nhật";
+}
+
 function getInitial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "N";
 }
@@ -425,11 +457,3 @@ function formatDateTime(date: Date) {
   return new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
-function formatMetadata(value: unknown) {
-  if (!value || typeof value !== "object") return String(value ?? "");
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return "";
-  }
-}

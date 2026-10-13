@@ -33,12 +33,12 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
     <section className="space-y-4">
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <label className="block text-sm font-medium">
-          Tìm theo tên / username / nhà hàng
+          Tìm theo tên / tài khoản / nhà hàng
           <input
             className="mt-2 h-10 w-full rounded-md border px-3 outline-none focus:border-teal-600"
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder="Nhập tên, username hoặc nhà hàng"
+            placeholder="Nhập tên, tài khoản hoặc nhà hàng"
           />
         </label>
       </div>
@@ -83,7 +83,7 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
             <div className="mt-4 grid gap-2 text-sm">
               <Info label="Nhà hàng" value={owner.restaurantName} />
               <Info label="Trạng thái" value={owner.isActive ? "Đang hoạt động" : "Ngừng sử dụng"} />
-              {owner.restaurantStatus !== "ACTIVE" ? <Info label="Tenant" value="Nhà hàng đã khóa" /> : null}
+              {owner.restaurantStatus !== "ACTIVE" ? <Info label="Nhà hàng" value="Đã khóa" /> : null}
             </div>
             <div className="mt-4">
               <OwnerActions owner={owner} returnTo={returnTo} />
@@ -116,7 +116,7 @@ function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }
         Sửa
       </button>
       <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => resetDialogRef.current?.showModal()}>
-        Reset pass
+        Đặt lại mật khẩu
       </button>
 
       <dialog ref={editDialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
@@ -147,7 +147,7 @@ function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }
           <input name="ownerUserId" type="hidden" value={owner.ownerUserId} />
           <input name="returnTo" type="hidden" value={returnTo} />
           <div>
-            <h2 className="text-lg font-semibold">Reset mật khẩu</h2>
+            <h2 className="text-lg font-semibold">Đặt lại mật khẩu</h2>
             <p className="mt-1 text-sm text-slate-600">Nhà hàng: {owner.restaurantName}</p>
             <p className="mt-1 text-sm text-slate-600">Tài khoản: {owner.username}</p>
           </div>

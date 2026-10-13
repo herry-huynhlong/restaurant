@@ -95,7 +95,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
                     <p className="font-semibold">Bàn {session.table.name}</p>
                     <p className="text-sm text-slate-600">{getSessionCustomerName(session)}</p>
                   </div>
-                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium">{session.status}</span>
+                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium">{diningSessionStatusLabel(session.status)}</span>
                 </div>
                 <BillSummaryBlock session={session} settings={settings} />
                 <p className="mt-1 text-xs text-slate-500">Mở lúc {new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(session.openedAt)}</p>
@@ -103,7 +103,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
               </article>
             ))
           ) : (
-            <EmptyState title="Bàn đang có khách" description="Chưa có dining session đang mở." />
+            <EmptyState title="Bàn đang có khách" description="Chưa có phiên phục vụ đang mở." />
           )}
         </section>
         <section className="space-y-3">
@@ -142,7 +142,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
               <div className="mt-3 space-y-3">
                 {latestBillSession.orders.length ? latestBillSession.orders.map((order) => (
                   <div key={order.id} className="rounded-md bg-slate-50 p-3">
-                    <p className="text-sm font-semibold">Order #{order.orderNumber} · {order.status}</p>
+                    <p className="text-sm font-semibold">Lượt gọi #{order.orderNumber} · {orderStatusLabel(order.status)}</p>
                     <ul className="mt-2 divide-y text-sm">
                       {order.items.map((item) => (
                         <li key={item.id} className="flex justify-between gap-3 py-1.5">
@@ -175,6 +175,23 @@ function BillSummaryBlock({ session, settings }: { session: any; settings: any }
       <div className="flex justify-between gap-3 border-t pt-2 text-base"><span className="font-semibold">Tổng</span><span className="font-bold text-teal-700">{formatVnd(bill.grandTotal)}</span></div>
     </div>
   );
+}
+
+function diningSessionStatusLabel(status: string) {
+  if (status === "OPEN") return "Đang phục vụ";
+  if (status === "AWAITING_PAYMENT") return "Chờ thanh toán";
+  if (status === "CLOSED") return "Đã đóng";
+  return "Đang cập nhật";
+}
+
+function orderStatusLabel(status: string) {
+  if (status === "NEW") return "Mới";
+  if (status === "CONFIRMED") return "Đã nhận";
+  if (status === "PREPARING") return "Đang làm";
+  if (status === "READY") return "Sẵn sàng";
+  if (status === "SERVED") return "Đã phục vụ";
+  if (status === "CANCELLED") return "Đã hủy";
+  return "Đang cập nhật";
 }
 
 function PaymentActions({ slug, session, settings, restaurantName, cashierName }: { slug: string; session: any; settings: any; restaurantName: string; cashierName?: string | null }) {

@@ -1,6 +1,7 @@
-import { CheckCircle2, ClipboardCheck, Crown, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Crown, ShieldCheck } from "lucide-react";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { productBrand } from "@/lib/brand";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import {
   basicPlanFeatures,
@@ -45,24 +46,17 @@ export default async function PlatformPlansPage({
   const groups = groupFeaturesByLabel();
 
   return (
-    <PlatformShell title="Gói dịch vụ">
+    <PlatformShell title="Quản lý gói dịch vụ" subtitle={productBrand.plansSubtitle}>
       <FeedbackBanner success={searchParams.success} error={searchParams.error} />
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
-            <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Ma trận quyền</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">BASIC và PRO đang mở quyền gì?</h2>
+            <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Quyền lợi gói dịch vụ</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-950">So sánh quyền lợi các gói dịch vụ</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Các checkbox bên dưới phản ánh trực tiếp feature gating hiện tại trong hệ thống. Đây là màn hình đối soát nhanh cho Platform Admin trước khi đổi gói cho nhà hàng.
+              Theo dõi và quản lý những tính năng được cung cấp trong từng gói dịch vụ, giúp cửa hàng lựa chọn giải pháp phù hợp với nhu cầu kinh doanh.
             </p>
-          </div>
-          <div className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-900">
-            <div className="flex items-center gap-2 font-semibold">
-              <ClipboardCheck className="h-4 w-4" />
-              Source of truth
-            </div>
-            <p className="mt-1 text-teal-800">src/lib/plan/features.ts</p>
           </div>
         </div>
 
@@ -80,7 +74,7 @@ export default async function PlatformPlansPage({
             <p className="mt-1 text-sm text-slate-500">Tích xanh là quyền đang được bật cho từng gói.</p>
           </div>
           <button className="inline-flex h-11 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
-            Lưu xác nhận
+            Xác nhận đã kiểm tra
           </button>
         </div>
 
@@ -130,7 +124,7 @@ export default async function PlatformPlansPage({
         </div>
 
         <div className="border-t bg-slate-50 px-5 py-4 text-sm text-slate-600">
-          Lưu xác nhận sẽ ghi audit log cho cấu hình quyền hiện tại. Nếu cần cho phép tự chỉnh quyền runtime theo từng gói, bước tiếp theo nên thêm bảng cấu hình quyền trong database để backend đọc từ DB thay vì hardcode.
+          Bảng này hiển thị quyền lợi đang áp dụng cho từng gói. Khi cần thay đổi quyền thực tế, hãy cập nhật cấu hình gói dịch vụ tương ứng.
         </div>
       </form>
     </PlatformShell>

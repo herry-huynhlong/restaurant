@@ -95,7 +95,7 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
       {isStale ? (
         <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
           <AlertCircle className="h-3.5 w-3.5" />
-          Đang kết nối lại dữ liệu realtime
+          Đang cập nhật lại dữ liệu
         </div>
       ) : null}
 
@@ -110,7 +110,7 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
         <KpiCard icon={ListOrdered} label="Số đơn hôm nay" value={overview.orderCountToday} helper="Tổng lượt gọi món trong ngày" tone="slate" />
         <KpiCard icon={Table2} label="Bàn đang sử dụng" value={overview.occupiedTables} helper={`${overview.tableUtilization}% công suất bàn`} tone="champagne" />
         <KpiCard icon={CheckCircle2} label="Bàn trống" value={overview.availableTables} helper={`${overview.totalTables} bàn đang hoạt động`} tone="green" />
-        <KpiCard icon={CreditCard} label="Bàn đã thanh toán" value={overview.paidTablesToday} helper="Payment PAID trong hôm nay" tone="slate" />
+        <KpiCard icon={CreditCard} label="Bàn đã thanh toán" value={overview.paidTablesToday} helper="Thanh toán đã xác nhận hôm nay" tone="slate" />
         <KpiCard icon={BellRing} label="Yêu cầu đang chờ" value={overview.pendingRequests} helper="Cần nhân viên xử lý" tone={overview.pendingRequests > 0 ? "red" : "green"} />
       </section>
 
@@ -121,7 +121,7 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
                 <LayoutDashboard className="h-5 w-5" />
                 <h2 className="text-lg font-semibold">Phân tích doanh thu</h2>
               </div>
-              <p className="mt-1 text-sm text-slate-500">Doanh thu 7 ngày gần nhất từ các payment đã thanh toán.</p>
+              <p className="mt-1 text-sm text-slate-500">Doanh thu 7 ngày gần nhất từ các thanh toán đã xác nhận.</p>
             </div>
             <div className="rounded-xl border border-amber-100 bg-[#fff8e7] px-3 py-2 text-right">
               <p className="text-xs font-medium uppercase tracking-wide text-amber-700">7 ngày</p>
@@ -151,7 +151,7 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
               </div>
             </div>
           ) : (
-            <EmptyState icon={CalendarDays} title="Chưa có dữ liệu doanh thu" description="Khi có payment PAID, biểu đồ doanh thu 7 ngày sẽ hiển thị tại đây." />
+            <EmptyState icon={CalendarDays} title="Chưa có dữ liệu doanh thu" description="Khi có thanh toán đã xác nhận, biểu đồ doanh thu 7 ngày sẽ hiển thị tại đây." />
           )}
       </section>
 
@@ -175,7 +175,7 @@ export function DashboardLiveOverview({ slug, initialOverview }: { slug: string;
             {overview.recentOrders.map((order) => (
               <article key={order.id} className="grid gap-2 bg-white px-4 py-3 text-sm sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center">
                 <div>
-                  <p className="font-semibold">Order #{order.orderNumber}</p>
+                  <p className="font-semibold">Lượt gọi #{order.orderNumber}</p>
                   <p className="text-xs text-slate-500">Bàn {order.tableName}</p>
                 </div>
                 <p className="inline-flex items-center gap-1 text-slate-600">

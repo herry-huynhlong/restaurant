@@ -18,28 +18,28 @@ export default async function NewRestaurantPage({
       <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={createRestaurantAction} encType="multipart/form-data">
         <FormSection title="Thông tin nhà hàng">
           <TextField label="Tên nhà hàng *" name="name" required />
-          <RestaurantSlugField label="Slug *" name="slug" required />
+          <RestaurantSlugField label="Mã đường dẫn *" name="slug" required />
           <LogoUploadField />
           <TextField label="Số điện thoại" name="phone" />
           <TextField label="Địa chỉ" name="address" />
-          <TextField label="Timezone" name="timezone" defaultValue="Asia/Ho_Chi_Minh" required />
+          <TextField label="Múi giờ" name="timezone" defaultValue="Asia/Ho_Chi_Minh" required />
           <SelectField label="Ngôn ngữ mặc định" name="primaryLanguage" options={[["vi", "Tiếng Việt"], ["en", "English"]]} />
-          <TextField label="Currency" name="currency" defaultValue="VND" required />
+          <TextField label="Đơn vị tiền tệ" name="currency" defaultValue="VND" required />
         </FormSection>
 
-        <FormSection title="Owner">
+        <FormSection title="Chủ quán">
           <TextField label="Tên chủ quán *" name="ownerName" required />
-          <TextField label="Email owner *" name="ownerEmail" type="email" required />
-          <TextField label="Password khởi tạo *" name="ownerPassword" type="password" required />
-          <TextField label="Phone owner" name="ownerPhone" />
+          <TextField label="Email chủ quán *" name="ownerEmail" type="email" required />
+          <TextField label="Mật khẩu khởi tạo *" name="ownerPassword" type="password" required />
+          <TextField label="Số điện thoại chủ quán" name="ownerPhone" />
         </FormSection>
 
         <FormSection title="Gói dịch vụ và trạng thái">
           <BusinessPlanFields defaultBusinessType="RESTAURANT" defaultPlan="BASIC" />
           <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" />
           <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" />
-          <SelectField label="Subscription status" name="subscriptionStatus" options={[["ACTIVE", "ACTIVE"], ["EXPIRED", "EXPIRED"], ["SUSPENDED", "SUSPENDED"]]} />
-          <SelectField label="Status nhà hàng" name="status" options={[["ACTIVE", "ACTIVE"], ["SUSPENDED", "SUSPENDED"], ["INACTIVE", "INACTIVE"]]} />
+          <SelectField label="Trạng thái gói dịch vụ" name="subscriptionStatus" options={[["ACTIVE", "Đang hoạt động"], ["EXPIRED", "Hết hạn"], ["SUSPENDED", "Tạm ngừng"]]} />
+          <SelectField label="Trạng thái nhà hàng" name="status" options={[["ACTIVE", "Đang hoạt động"], ["SUSPENDED", "Đã khóa"], ["INACTIVE", "Chưa hoạt động"]]} />
         </FormSection>
 
         <CreateRestaurantSubmitButton />

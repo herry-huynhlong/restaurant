@@ -106,13 +106,13 @@ export function PaymentReportTable({
         <div className="space-y-3 border-b p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Danh sách thanh toán</h2>
-            <span className="text-sm text-slate-500">{filteredPayments.length}/{payments.length} bill</span>
+            <span className="text-sm text-slate-500">{filteredPayments.length}/{payments.length} hóa đơn</span>
           </div>
           <input
             className="h-10 w-full rounded-md border px-3 text-sm outline-none focus:border-teal-600"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Tìm mã bill / bàn / người xác nhận..."
+            placeholder="Tìm mã hóa đơn / bàn / người xác nhận..."
           />
           {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
         </div>
@@ -121,13 +121,13 @@ export function PaymentReportTable({
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-4 py-3">Thời gian</th>
-                <th className="px-4 py-3">Bill</th>
+                <th className="px-4 py-3">Hóa đơn</th>
                 <th className="px-4 py-3">Bàn</th>
                 <th className="px-4 py-3">Phương thức</th>
                 <th className="px-4 py-3">Người xác nhận</th>
                 <th className="px-4 py-3 text-right">Số tiền</th>
                 <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3">Action</th>
+                <th className="px-4 py-3">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -143,10 +143,10 @@ export function PaymentReportTable({
                   <td className="px-4 py-3">{paymentMethodLabels[payment.paymentMethod]}</td>
                   <td className="px-4 py-3">{payment.confirmedByName ?? "-"}</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatVnd(payment.amount)}</td>
-                  <td className="px-4 py-3"><span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700">{payment.status}</span></td>
+                  <td className="px-4 py-3"><span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal-700">{paymentStatusLabel(payment.status)}</span></td>
                   <td className="px-4 py-3">
                     <button className="rounded-md border px-3 py-1.5 text-sm hover:bg-slate-50 disabled:opacity-60" type="button" disabled={isPending} onClick={() => openBill(payment.id)}>
-                      Xem bill
+                      Xem hóa đơn
                     </button>
                   </td>
                 </tr>
@@ -203,12 +203,12 @@ function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: () => v
         </div>
         <div className="overflow-y-auto p-4">
           <div className="grid gap-2 rounded-md bg-slate-50 p-3 text-sm sm:grid-cols-2">
-            <Info label="Mã bill" value={bill.invoiceNumber ?? bill.id} />
+            <Info label="Mã hóa đơn" value={bill.invoiceNumber ?? bill.id} />
             <Info label="Bàn" value={bill.tableName} />
             <Info label="Thời gian" value={bill.paidAt ?? "-"} />
             <Info label="Người xác nhận" value={bill.cashierName ?? "-"} />
             <Info label="Phương thức" value={paymentMethodLabels[bill.paymentMethod]} />
-            <Info label="Trạng thái" value={bill.status === "PAID" ? "Đã thanh toán" : bill.status} />
+            <Info label="Trạng thái" value={paymentStatusLabel(bill.status)} />
             {bill.customerName ? <Info label="Khách" value={bill.customerName} /> : null}
           </div>
 
@@ -238,11 +238,11 @@ function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: () => v
 
           {bill.orders.length ? (
             <section className="mt-5">
-              <h3 className="font-semibold">Theo order</h3>
+              <h3 className="font-semibold">Theo lượt gọi món</h3>
               <div className="mt-3 space-y-2">
                 {bill.orders.map((order) => (
                   <details key={order.id} className="rounded-md border p-3">
-                    <summary className="cursor-pointer font-medium">Order #{order.orderNumber} · {order.customerName} · {formatVnd(order.subtotal)}</summary>
+                    <summary className="cursor-pointer font-medium">Lượt gọi #{order.orderNumber} · {order.customerName} · {formatVnd(order.subtotal)}</summary>
                     <div className="mt-2 divide-y text-sm">
                       {order.items.map((item) => (
                         <div key={item.id} className="flex justify-between gap-3 py-2">
@@ -284,4 +284,10 @@ function SummaryRow({ label, value }: { label: string; value: number }) {
       <p className="font-semibold">{formatVnd(value)}</p>
     </div>
   );
+}
+
+function paymentStatusLabel(status: PaymentStatus) {
+  if (status === "PAID") return "Đã thanh toán";
+  if (status === "PENDING") return "Chờ thanh toán";
+  return "Đang cập nhật";
 }

@@ -230,16 +230,16 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
       if (!response.ok) {
         const data = await response.json().catch(() => ({})) as { error?: string };
         setMessage(localShown
-          ? `Đã hiện thông báo local, nhưng push server lỗi: ${data.error ?? response.status}.`
-          : `Chưa hiện được thông báo local và push server lỗi: ${data.error ?? response.status}.`);
+          ? `Đã hiện thông báo trên thiết bị, nhưng chưa gửi được thông báo đẩy. Mã lỗi: ${data.error ?? response.status}.`
+          : `Chưa hiện được thông báo trên thiết bị và chưa gửi được thông báo đẩy. Mã lỗi: ${data.error ?? response.status}.`);
         return;
       }
 
       setPushReady(true);
       const data = await response.json().catch(() => ({})) as { tag?: string };
       setMessage(localShown
-        ? `Đã tạo thông báo local và server đã gửi push (${data.tag ?? "ok"}). Nếu không thấy pop-up, mở cài đặt Android của app/site và bật thông báo dạng cảnh báo/hiển thị nổi.`
-        : `Server đã gửi push (${data.tag ?? "ok"}), nhưng Android/browser không cho hiện notification local. Kiểm tra quyền thông báo, pop-up và chế độ Không làm phiền.`);
+        ? `Đã gửi thông báo thử (${data.tag ?? "ok"}). Nếu không thấy pop-up, mở cài đặt Android của app/site và bật thông báo dạng cảnh báo hoặc hiển thị nổi.`
+        : `Đã gửi thông báo thử (${data.tag ?? "ok"}), nhưng thiết bị chưa cho hiện pop-up. Kiểm tra quyền thông báo, kiểu pop-up và chế độ Không làm phiền.`);
     } finally {
       setBusy(false);
     }

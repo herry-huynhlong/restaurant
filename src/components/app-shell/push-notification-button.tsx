@@ -130,7 +130,7 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       ) : null}
       {status === "unsupported" ? (
         <p className="max-w-md text-xs text-slate-600">
-          Trình duyệt hoặc chế độ hiện tại không hỗ trợ Service Worker Push API.
+          Trình duyệt hoặc chế độ hiện tại không hỗ trợ thông báo đẩy.
         </p>
       ) : null}
     </div>

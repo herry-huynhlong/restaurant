@@ -21,7 +21,7 @@ export default async function PlatformSettingsPage({
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">Tài khoản Platform Admin</h2>
+            <h2 className="text-lg font-semibold">Tài khoản quản trị nền tảng</h2>
             <p className="mt-1 text-sm text-slate-500">
               Quản lý thông tin đăng nhập của tài khoản quản trị nền tảng đang sử dụng.
             </p>
@@ -35,7 +35,7 @@ export default async function PlatformSettingsPage({
                 {(user.name ?? user.email ?? "A").trim().charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="truncate font-semibold">{user.name || "Platform Admin"}</p>
+                <p className="truncate font-semibold">{user.name || "Quản trị viên nền tảng"}</p>
                 <p className="truncate text-sm text-slate-500">{user.email}</p>
               </div>
             </div>
@@ -54,7 +54,7 @@ export default async function PlatformSettingsPage({
               <h3 className="font-semibold">Đổi mật khẩu đăng nhập</h3>
             </div>
             <p className="mt-1 text-sm text-slate-500">
-              Mật khẩu mới dùng cho trang đăng nhập Platform Admin. Không ảnh hưởng mật khẩu chủ quán.
+              Mật khẩu mới dùng cho trang đăng nhập quản trị nền tảng. Không ảnh hưởng mật khẩu chủ quán.
             </p>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -87,7 +87,7 @@ export default async function PlatformSettingsPage({
       </section>
 
       <section className="mt-5 rounded-2xl border bg-white p-5 text-sm text-slate-600 shadow-sm">
-        Các thiết lập global khác sẽ được thêm khi có requirement cụ thể.
+        Các thiết lập chung khác sẽ được bổ sung khi cần.
       </section>
     </PlatformShell>
   );

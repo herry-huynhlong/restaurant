@@ -96,7 +96,7 @@ export function PlatformRestaurantActions({
       ) : null}
 
       {!isDeleted && showResetPasswordAction ? <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => dialogRef.current?.showModal()}>
-        Reset pass admin
+        Đặt lại mật khẩu
       </button> : null}
 
       {!isDeleted && showDeleteAction ? (
@@ -121,7 +121,7 @@ export function PlatformRestaurantActions({
           <input name="restaurantId" type="hidden" value={restaurantId} />
           <input name="returnTo" type="hidden" value={returnTo} />
           <div>
-            <h2 className="text-lg font-semibold">Reset mật khẩu admin</h2>
+            <h2 className="text-lg font-semibold">Đặt lại mật khẩu chủ quán</h2>
             <p className="mt-1 text-sm text-slate-600">Nhà hàng: {restaurantName}</p>
           </div>
           <label className="block text-sm font-medium" htmlFor={passwordId}>
@@ -171,11 +171,11 @@ export function PlatformRestaurantActions({
             title="Xóa nhà hàng"
             restaurantName={restaurantName}
             slug={restaurantSlug}
-            slugLabel="Slug nhà hàng"
-            warning="Nhà hàng sẽ bị đánh dấu đã xóa, không còn xuất hiện trong danh sách đang hoạt động và toàn bộ tài khoản/khách hàng không thể tiếp tục sử dụng. Dữ liệu lịch sử vẫn được giữ để phục hồi/audit."
+            slugLabel="Mã đường dẫn nhà hàng"
+            warning="Nhà hàng sẽ bị đánh dấu đã xóa, không còn xuất hiện trong danh sách đang hoạt động và toàn bộ tài khoản/khách hàng không thể tiếp tục sử dụng. Dữ liệu lịch sử vẫn được giữ để có thể khôi phục khi cần."
           />
           <label className="block text-sm font-medium" htmlFor={deleteSlugId}>
-            Nhập chính xác slug để xác nhận
+            Nhập chính xác mã đường dẫn để xác nhận
             <input
               id={deleteSlugId}
               className="mt-1 h-10 w-full rounded-md border px-3 outline-none focus:border-red-600"
@@ -202,10 +202,10 @@ export function PlatformRestaurantActions({
           <div>
             <h2 className="text-lg font-semibold">Khôi phục nhà hàng</h2>
             <p className="mt-1 text-sm text-slate-600">Nhà hàng: {restaurantName}</p>
-            <p className="mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Sau khi khôi phục, nhà hàng ở trạng thái Chưa hoạt động để Platform Admin kiểm tra trước khi mở lại.</p>
+            <p className="mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800">Sau khi khôi phục, nhà hàng ở trạng thái Chưa hoạt động để quản trị viên kiểm tra trước khi mở lại.</p>
           </div>
           <label className="block text-sm font-medium" htmlFor={restoreSlugId}>
-            Nhập chính xác slug để xác nhận
+            Nhập chính xác mã đường dẫn để xác nhận
             <input
               id={restoreSlugId}
               className="mt-1 h-10 w-full rounded-md border px-3 outline-none focus:border-teal-600"
@@ -233,11 +233,11 @@ export function PlatformRestaurantActions({
             title="Xóa vĩnh viễn"
             restaurantName={restaurantName}
             slug={restaurantSlug}
-            slugLabel="Slug nhà hàng"
-            warning="Thao tác này không thể hoàn tác. Hệ thống sẽ từ chối nếu nhà hàng còn lịch sử order, thanh toán, phiên phục vụ hoặc yêu cầu khách để bảo toàn chứng từ/audit."
+            slugLabel="Mã đường dẫn nhà hàng"
+            warning="Thao tác này không thể hoàn tác. Hệ thống sẽ từ chối nếu nhà hàng còn lịch sử gọi món, thanh toán, phiên phục vụ hoặc yêu cầu khách để bảo toàn chứng từ."
           />
           <label className="block text-sm font-medium" htmlFor={permanentDeleteSlugId}>
-            Nhập chính xác slug để xác nhận
+            Nhập chính xác mã đường dẫn để xác nhận
             <input
               id={permanentDeleteSlugId}
               className="mt-1 h-10 w-full rounded-md border px-3 outline-none focus:border-red-600"

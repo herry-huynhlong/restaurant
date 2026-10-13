@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
 import { PlatformMobileMenu } from "@/components/app-shell/platform-mobile-menu";
+import { productBrand } from "@/lib/brand";
 import { platformRoutes } from "@/lib/routes";
 
 const navItems = [
@@ -15,17 +16,19 @@ const navItems = [
 export function PlatformShell({
   children,
   title,
-  action
+  action,
+  subtitle = productBrand.platformSubtitle
 }: {
   children: React.ReactNode;
   title: string;
   action?: React.ReactNode;
+  subtitle?: string;
 }) {
   return (
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto flex w-full max-w-7xl gap-6 px-4 py-6">
         <aside className="hidden w-60 shrink-0 rounded-lg border bg-white p-3 shadow-sm md:block">
-          <p className="px-3 py-2 text-sm font-semibold text-teal-700">Platform Admin</p>
+          <p className="px-3 py-2 text-sm font-semibold text-teal-700">{productBrand.adminName}</p>
           <nav className="mt-2 space-y-1">
             {navItems.map(([label, href]) => (
               <Link key={href} className="block rounded-md px-3 py-2 text-sm hover:bg-slate-100" href={href}>
@@ -40,7 +43,7 @@ export function PlatformShell({
               <PlatformMobileMenu />
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold">{title}</h1>
-                <p className="mt-1 text-sm text-slate-600">Quản trị SaaS đa nhà hàng</p>
+                <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">

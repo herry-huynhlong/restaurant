@@ -42,13 +42,13 @@ export default async function EditRestaurantPage({
           <h2 className="text-base font-semibold">Thông tin nhà hàng</h2>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <TextField label="Tên nhà hàng *" name="name" defaultValue={restaurant.name} required />
-            <TextField label="Slug *" name="slug" defaultValue={restaurant.slug} required />
+            <TextField label="Mã đường dẫn *" name="slug" defaultValue={restaurant.slug} required />
             <LogoUploadField currentLogoUrl={servedUploadUrl(restaurant.logoUrl)} />
             <TextField label="Số điện thoại" name="phone" defaultValue={restaurant.settings?.phone} />
             <TextField label="Địa chỉ" name="address" defaultValue={restaurant.settings?.address} />
-            <TextField label="Timezone" name="timezone" defaultValue={restaurant.settings?.timezone ?? "Asia/Ho_Chi_Minh"} required />
+            <TextField label="Múi giờ" name="timezone" defaultValue={restaurant.settings?.timezone ?? "Asia/Ho_Chi_Minh"} required />
             <SelectField label="Ngôn ngữ mặc định" name="primaryLanguage" defaultValue={restaurant.settings?.primaryLanguage} options={[["vi", "Tiếng Việt"], ["en", "English"]]} />
-            <TextField label="Currency" name="currency" defaultValue={restaurant.settings?.currency ?? "VND"} required />
+            <TextField label="Đơn vị tiền tệ" name="currency" defaultValue={restaurant.settings?.currency ?? "VND"} required />
           </div>
         </section>
         <section>
@@ -57,8 +57,8 @@ export default async function EditRestaurantPage({
             <BusinessPlanFields defaultBusinessType={restaurant.businessType} defaultPlan={restaurant.plan === "PRO" ? "PRO" : "BASIC"} />
             <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" defaultValue={toDateInput(restaurant.subscriptionStart)} />
             <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" defaultValue={toDateInput(restaurant.subscriptionEnd)} />
-            <SelectField label="Subscription status" name="subscriptionStatus" defaultValue={restaurant.subscriptionStatus} options={[["ACTIVE", "ACTIVE"], ["EXPIRED", "EXPIRED"], ["SUSPENDED", "SUSPENDED"]]} />
-            <SelectField label="Status nhà hàng" name="status" defaultValue={restaurant.status} options={[["ACTIVE", "ACTIVE"], ["SUSPENDED", "SUSPENDED"], ["INACTIVE", "INACTIVE"]]} />
+            <SelectField label="Trạng thái gói dịch vụ" name="subscriptionStatus" defaultValue={restaurant.subscriptionStatus} options={[["ACTIVE", "Đang hoạt động"], ["EXPIRED", "Đã hết hạn"], ["SUSPENDED", "Tạm ngưng"]]} />
+            <SelectField label="Trạng thái nhà hàng" name="status" defaultValue={restaurant.status} options={[["ACTIVE", "Đang hoạt động"], ["SUSPENDED", "Đã khóa"], ["INACTIVE", "Chưa hoạt động"]]} />
           </div>
         </section>
         <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Lưu thay đổi</button>

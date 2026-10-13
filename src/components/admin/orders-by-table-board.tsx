@@ -290,7 +290,7 @@ export function OrdersByTableBoard({
                           <article key={order.id} className="rounded-md border p-3">
                             <div className="flex flex-wrap justify-between gap-2">
                               <div>
-                                <p className="font-semibold">Order #{order.orderNumber} - {formatTime(order.createdAt)}</p>
+                                <p className="font-semibold">Lượt gọi #{order.orderNumber} - {formatTime(order.createdAt)}</p>
                                 <p className="text-xs text-slate-500">{order.customerName} · {orderStatusLabels[order.status] ?? order.status}</p>
                               </div>
                               <p className="font-semibold">{formatMoney(order.subtotal)}</p>

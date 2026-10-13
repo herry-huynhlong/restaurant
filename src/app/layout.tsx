@@ -3,11 +3,12 @@ import { getServerSession } from "next-auth";
 import { SessionProvider } from "@/components/app-shell/session-provider";
 import { RegisterServiceWorker } from "@/components/app-shell/register-service-worker";
 import { authOptions } from "@/lib/auth/options";
+import { productBrand } from "@/lib/brand";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Restaurant SaaS",
-  description: "Multi-tenant restaurant ordering SaaS",
+  title: productBrand.name,
+  description: "Phần mềm quản lý cửa hàng F&B",
   icons: {
     icon: [
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },

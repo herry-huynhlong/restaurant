@@ -33,14 +33,13 @@ export async function confirmPlanPermissionsAction(formData: FormData) {
       entityType: "PlatformPlan",
       metadataJson: {
         submitted,
-        current,
-        source: "src/lib/plan/features.ts"
+        current
       }
     }
   });
 
   revalidatePath(platformRoutes.plans);
-  redirect(`${platformRoutes.plans}?success=${encodeURIComponent("Đã ghi nhận cấu hình quyền gói dịch vụ hiện tại.")}`);
+  redirect(`${platformRoutes.plans}?success=${encodeURIComponent("Đã ghi nhận xác nhận quyền lợi gói dịch vụ.")}`);
 }
 
 function readSubmittedMatrix(formData: FormData) {
