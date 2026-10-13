@@ -37,19 +37,28 @@ export async function ensureDefaultPlanPrices() {
   });
 }
 
+export async function ensureSubscriptionPolicy() {
+  return prisma.platformSubscriptionPolicy.upsert({
+    where: { singletonKey: "default" },
+    create: { singletonKey: "default" },
+    update: {}
+  });
+}
+
 export async function getPlanPricingDashboard() {
   await ensureDefaultPlanPrices();
-  const [prices, history] = await Promise.all([
+  const [prices, history, policy] = await Promise.all([
     prisma.platformPlanPrice.findMany({
       orderBy: [{ plan: "asc" }, { termMonths: "asc" }]
     }),
     prisma.platformPlanPriceHistory.findMany({
       take: 20,
       orderBy: { createdAt: "desc" }
-    })
+    }),
+    ensureSubscriptionPolicy()
   ]);
 
-  return { prices, history };
+  return { prices, history, policy };
 }
 
 export async function getPublicPlanPrices() {

@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import { platformRoutes } from "@/lib/routes";
 import { enforceBusinessPlan } from "@/lib/business-type";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
-import { confirmSubscriptionRequest, rejectSubscriptionRequest } from "@/server/services/subscription-service";
+import { confirmSubscriptionRequest, ensureSubscriptionPolicy, rejectSubscriptionRequest } from "@/server/services/subscription-service";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 const restaurantDeleteSchema = z.object({
@@ -162,6 +162,12 @@ function validateSubscriptionDates(start: Date | null, end: Date | null) {
   return null;
 }
 
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 function prismaCreateRestaurantMessage(error: unknown) {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
     return "Không thể tạo nhà hàng. Vui lòng kiểm tra dữ liệu.";
@@ -250,8 +256,11 @@ export async function createRestaurantAction(formData: FormData) {
     status: parsed.data.status
   });
 
-  const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart"));
-  const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
+  const policy = await ensureSubscriptionPolicy();
+  const trialUsedCount = await prisma.restaurant.count({ where: { subscriptionStart: { not: null } } });
+  const canApplyTrial = policy.trialEnabled && policy.trialDays > 0 && (policy.trialRestaurantLimit === 0 || trialUsedCount < policy.trialRestaurantLimit);
+  const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart")) ?? (canApplyTrial ? new Date() : null);
+  const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd")) ?? (subscriptionStart && canApplyTrial ? addDays(subscriptionStart, policy.trialDays) : null);
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.newRestaurant, dateError);
 

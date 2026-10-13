@@ -598,6 +598,17 @@ model PlatformDataPolicy {
   updatedAt                  DateTime @updatedAt
 }
 
+model PlatformSubscriptionPolicy {
+  id                    String   @id @default(cuid())
+  singletonKey          String   @unique @default("default")
+  trialEnabled          Boolean  @default(true)
+  trialDays             Int      @default(60)
+  trialRestaurantLimit  Int      @default(20)
+  gracePeriodDays       Int      @default(3)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
 model PlatformBackupRun {
   id                  String    @id @default(cuid())
   status              String    @default("QUEUED")

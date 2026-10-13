@@ -433,6 +433,11 @@ async function cleanupOldTaskHistory() {
 
 async function processSubscriptionLifecycle() {
   const now = new Date();
+  const subscriptionPolicy = await prisma.platformSubscriptionPolicy.upsert({
+    where: { singletonKey: "default" },
+    create: { singletonKey: "default" },
+    update: {}
+  });
   const restaurants = await prisma.restaurant.findMany({
     where: {
       status: { not: "DELETED" },
@@ -451,7 +456,7 @@ async function processSubscriptionLifecycle() {
     const remainingDays = Math.ceil((restaurant.subscriptionEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
     const alertMilestone = [14, 7, 3, 1].includes(remainingDays) ? remainingDays : remainingDays <= 0 ? 0 : null;
 
-    if (remainingDays <= 0 && restaurant.subscriptionStatus !== "EXPIRED") {
+    if (remainingDays < -subscriptionPolicy.gracePeriodDays && restaurant.subscriptionStatus !== "EXPIRED") {
       await prisma.restaurant.update({
         where: { id: restaurant.id },
         data: { subscriptionStatus: "EXPIRED" }
