@@ -49,7 +49,7 @@ export function ServerResourceMonitor() {
 
   useEffect(() => {
     loadMetrics();
-    const timer = window.setInterval(loadMetrics, 10000);
+    const timer = window.setInterval(loadMetrics, 60000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -78,9 +78,9 @@ export function ServerResourceMonitor() {
       ) : null}
 
       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ResourceCard icon={<HardDrive className="h-5 w-5" />} title="Dung lượng lưu trữ" metric={metrics?.host.disk ?? null} />
-        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="Bộ nhớ RAM" metric={metrics?.host.memory ?? null} />
-        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="Bộ nhớ dự phòng" metric={metrics?.host.swap ?? null} />
+        <ResourceCard icon={<HardDrive className="h-5 w-5" />} title="Dung lượng lưu trữ" metric={metrics?.host.disk ?? null} stale={metrics?.host.stale ?? false} />
+        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="Bộ nhớ RAM" metric={metrics?.host.memory ?? null} stale={metrics?.host.stale ?? false} />
+        <ResourceCard icon={<MemoryStick className="h-5 w-5" />} title="Bộ nhớ dự phòng" metric={metrics?.host.swap ?? null} stale={metrics?.host.stale ?? false} />
         <BackupCard metrics={metrics} />
       </div>
 
@@ -91,10 +91,20 @@ export function ServerResourceMonitor() {
   );
 }
 
-function ResourceCard({ icon, title, metric }: { icon: React.ReactNode; title: string; metric: MetricValue | Omit<MetricValue, "availableBytes"> | null }) {
+function ResourceCard({
+  icon,
+  title,
+  metric,
+  stale
+}: {
+  icon: React.ReactNode;
+  title: string;
+  metric: MetricValue | Omit<MetricValue, "availableBytes"> | null;
+  stale: boolean;
+}) {
   const level = metric ? usageLevel(metric.percentUsed) : "unknown";
   return (
-    <article className="rounded-2xl border bg-slate-50 p-4">
+    <article className={`rounded-2xl border bg-slate-50 p-4 ${stale ? "border-amber-200 bg-amber-50/50" : ""}`}>
       <div className="flex items-center gap-3 text-teal-700">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white">{icon}</span>
         <h3 className="font-semibold text-slate-950">{title}</h3>
@@ -104,7 +114,7 @@ function ResourceCard({ icon, title, metric }: { icon: React.ReactNode; title: s
       </p>
       <ProgressBar value={metric?.percentUsed ?? 0} level={level} />
       <p className="mt-2 text-sm text-slate-500">
-        {metric ? `${metric.percentUsed.toFixed(1)}% đang sử dụng` : "Chưa có dữ liệu"}
+        {metric ? `${stale ? "Số liệu gần nhất · " : ""}${metric.percentUsed.toFixed(1)}% đang sử dụng` : "Chưa có dữ liệu"}
       </p>
     </article>
   );

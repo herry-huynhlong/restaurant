@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TARGET_PATH="${HOST_METRICS_TARGET_PATH:-/opt/websites/restaurant}"
+TARGET_PATH="${HOST_METRICS_TARGET_PATH:-/}"
 OUTPUT_FILE="${HOST_METRICS_OUTPUT_FILE:-/opt/websites/restaurant/host-metrics/metrics.json}"
 BACKUP_DIR="${HOST_BACKUP_DIR:-/opt/websites/restaurant/backups}"
 
 mkdir -p "$(dirname "$OUTPUT_FILE")"
 
-disk_line="$(df -Pk "$TARGET_PATH" | awk 'NR==2 {print $2" "$3" "$4}')"
-read -r disk_total_kb disk_used_kb disk_available_kb <<< "$disk_line"
+target_path="$(readlink -f "$TARGET_PATH")"
+disk_line="$(df -PkP "$target_path" | awk 'NR==2 {print $1" "$2" "$3" "$4" "$6}')"
+read -r disk_filesystem disk_total_kb disk_used_kb disk_available_kb disk_mount_point <<< "$disk_line"
 
 mem_total_kb="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
 mem_available_kb="$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)"
@@ -40,11 +41,14 @@ mem_available_bytes=$((mem_available_kb * 1024))
 swap_total_bytes=$((swap_total_kb * 1024))
 swap_used_bytes=$((swap_used_kb * 1024))
 
-tmp_file="${OUTPUT_FILE}.tmp"
+tmp_file="$(mktemp "${OUTPUT_FILE}.tmp.XXXXXX")"
 cat > "$tmp_file" <<JSON
 {
   "collectedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "disk": {
+    "targetPath": "$target_path",
+    "filesystem": "$disk_filesystem",
+    "mountPoint": "$disk_mount_point",
     "totalBytes": $disk_total_bytes,
     "usedBytes": $disk_used_bytes,
     "availableBytes": $disk_available_bytes,

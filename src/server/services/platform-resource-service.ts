@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { ensurePlatformDataPolicy } from "@/server/services/platform-storage-service";
 
 const metricsFile = process.env.SERVER_METRICS_FILE ?? "/app/host-metrics/metrics.json";
-const METRICS_STALE_MS = 30 * 1000;
+const METRICS_STALE_MS = 3 * 60 * 1000;
 
 type RawMetrics = {
   collectedAt?: string;
@@ -56,7 +56,7 @@ async function readHostMetrics() {
   try {
     const raw = await readFile(metricsFile, "utf8");
     const parsed = JSON.parse(raw) as RawMetrics;
-    const collectedAt = parsed.collectedAt ? new Date(parsed.collectedAt) : null;
+    const collectedAt = parseCollectedAt(parsed.collectedAt);
     const stale = !collectedAt || Date.now() - collectedAt.getTime() > METRICS_STALE_MS;
 
     return {
@@ -88,6 +88,12 @@ function normalizeStorage(value: RawMetrics["disk"] | RawMetrics["memory"]) {
   const availableBytes = isFiniteNumber(value.availableBytes) ? Math.max(0, Math.floor(value.availableBytes)) : Math.max(0, totalBytes - usedBytes);
   const percentUsed = isFiniteNumber(value.percentUsed) ? clampPercent(value.percentUsed) : percentage(usedBytes, totalBytes);
   return { totalBytes, usedBytes, availableBytes, percentUsed };
+}
+
+function parseCollectedAt(value: string | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function normalizeSwap(value: RawMetrics["swap"]) {

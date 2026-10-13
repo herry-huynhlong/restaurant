@@ -124,16 +124,16 @@ bash scripts/collect-host-metrics.sh
 cat host-metrics/metrics.json
 ```
 
-Cron gợi ý, cập nhật mỗi 10 giây:
+Cron gợi ý, cập nhật mỗi phút:
 
 ```cron
-* * * * * cd /opt/websites/restaurant && for i in 1 2 3 4 5 6; do bash scripts/collect-host-metrics.sh; sleep 10; done
+* * * * * cd /opt/websites/restaurant && bash scripts/collect-host-metrics.sh
 ```
 
 Collector đọc:
 
 - RAM và Swap từ `/proc/meminfo`.
-- Ổ cứng từ phân vùng chứa `/opt/websites/restaurant`.
+- Ổ cứng từ phân vùng chứa `/` theo mặc định. Có thể đổi bằng `HOST_METRICS_TARGET_PATH` nếu dữ liệu chạy trên phân vùng riêng.
 - Dung lượng thư mục `backups`.
 
 Không mount Docker socket vào web container và không cho client chỉ định đường dẫn cần đọc.
