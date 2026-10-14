@@ -3,6 +3,7 @@ import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import type { Sharp } from "sharp";
+import { debugLog } from "@/lib/debug-log";
 
 export const MAX_UPLOAD_IMAGE_SIZE = 5 * 1024 * 1024;
 export const allowedUploadImageTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -59,7 +60,7 @@ export async function saveOptimizedUploadImage(file: File, folder: UploadFolder)
     writeFile(path.join(uploadDir, thumbnailName), thumbnail.buffer)
   ]);
 
-  console.info("IMAGE OPTIMIZED", {
+  debugLog("IMAGE OPTIMIZED", {
     folder,
     originalSize: file.size,
     optimizedSize: optimized.buffer.length,

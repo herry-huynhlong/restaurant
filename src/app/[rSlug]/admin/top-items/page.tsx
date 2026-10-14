@@ -2,7 +2,7 @@ import Link from "next/link";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { formatVnd } from "@/lib/money";
 import { getReportPeriodLabel } from "@/lib/period";
-import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { getRestaurantTopItems, normalizeTopItemsPeriod, type TopItemsPeriod } from "@/server/services/top-items-service";
 
@@ -16,6 +16,7 @@ export default async function AdminTopItemsPage({
   searchParams: { period?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
+  requireRestaurantFeature(access, "REPORTS");
   const period = normalizeTopItemsPeriod(searchParams.period);
   const report = await getRestaurantTopItems(access.restaurant.id, period);
   const maxQuantity = Math.max(...report.items.map((item) => item.quantity), 1);

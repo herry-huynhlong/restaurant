@@ -4,6 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
+import { debugLog } from "@/lib/debug-log";
 import { normalizeUsername } from "@/lib/username";
 
 const credentialsSchema = z.object({
@@ -186,7 +187,7 @@ function logTenantLoginAttempt(
   passwordValid: boolean,
   result: string
 ) {
-  console.info("LOGIN_ATTEMPT", {
+  debugLog("LOGIN_ATTEMPT", {
     slug: context.slug,
     submittedUsername: context.submittedUsername,
     normalizedUsername: context.normalizedUsername,

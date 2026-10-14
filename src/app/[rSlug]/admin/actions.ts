@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
+import { debugLog } from "@/lib/debug-log";
 import { generateQrToken } from "@/lib/qr";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
@@ -35,7 +36,7 @@ async function saveUploadedImage(formData: FormData, key: string, folder: "produ
     return undefined;
   }
 
-  console.log("UPLOAD FILE", {
+  debugLog("UPLOAD FILE", {
     name: file.name,
     type: file.type,
     sizeBytes: file.size,
@@ -440,7 +441,7 @@ export async function saveSimpleProductAction(slug: string, formData: FormData) 
     const access = await requireAdminContext(slug);
     const path = restaurantRoutes.adminMenu(slug);
     const data = await simpleProductDataFromForm(access.restaurant.id, access.restaurant.businessType, formData);
-    console.log("CREATE MENU PAYLOAD", {
+    debugLog("CREATE MENU PAYLOAD", {
       slug,
       restaurantId: access.restaurant.id,
       userId: access.user.id,
@@ -1010,7 +1011,7 @@ export async function updateStaffAction(slug: string, formData: FormData) {
       role: readString(formData, "role"),
       isActive: readBoolean(formData, "isActive")
     });
-    console.log("UPDATE STAFF PAYLOAD", {
+    debugLog("UPDATE STAFF PAYLOAD", {
       membershipId: parsed.membershipId,
       name: parsed.name,
       username: parsed.username,

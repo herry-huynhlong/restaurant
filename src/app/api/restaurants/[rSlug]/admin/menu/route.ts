@@ -1,10 +1,10 @@
-import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
+import { debugLog } from "@/lib/debug-log";
 import { parseVndInteger } from "@/lib/money";
+import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { publicApiError, safeErrorMessage } from "@/lib/safe-user-message";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
@@ -20,38 +20,22 @@ const menuItemSchema = z.object({
   isSoldOut: z.boolean(),
   isFeatured: z.boolean()
 });
+
+type MenuItemInput = z.infer<typeof menuItemSchema>;
+type MenuAccess = Awaited<ReturnType<typeof requireMenuAccess>>;
+type ParsedMenuRequest =
+  | { error: NextResponse }
+  | {
+      access: MenuAccess;
+      formData: FormData;
+      parsed: MenuItemInput;
+      categoryId: string;
+      imageUrl?: string;
+    };
+
 async function requireMenuAccess(slug: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return { error: NextResponse.json({ ok: false, code: "UNAUTHENTICATED", error: "Bạn cần đăng nhập lại." }, { status: 401 }) };
-  }
-
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { slug },
-    select: { id: true, slug: true, status: true, businessType: true }
-  });
-  if (!restaurant) {
-    return { error: NextResponse.json({ ok: false, code: "TENANT_NOT_FOUND", error: "Không tìm thấy nhà hàng." }, { status: 404 }) };
-  }
-  if (restaurant.status !== "ACTIVE") {
-    return { error: NextResponse.json({ ok: false, code: "TENANT_LOCKED", error: "Nhà hàng hiện đang bị khóa." }, { status: 403 }) };
-  }
-
-  const membership = await prisma.restaurantUser.findUnique({
-    where: {
-      restaurantId_userId: {
-        restaurantId: restaurant.id,
-        userId: session.user.id
-      }
-    },
-    select: { role: true, isActive: true }
-  });
-
-  if (!membership?.isActive || !["OWNER", "MANAGER"].includes(membership.role)) {
-    return { error: NextResponse.json({ ok: false, code: "FORBIDDEN", error: "Bạn không có quyền sửa menu." }, { status: 403 }) };
-  }
-
-  return { restaurant, userId: session.user.id, role: membership.role };
+  const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER"]);
+  return { restaurant: access.restaurant, userId: access.user.id, role: access.membership.role };
 }
 
 function readString(formData: FormData, key: string) {
@@ -66,7 +50,7 @@ async function saveUploadedImage(formData: FormData) {
   const file = formData.get("imageFile");
   if (!(file instanceof File) || file.size === 0) return undefined;
 
-  console.log("UPLOAD FILE", {
+  debugLog("UPLOAD FILE", {
     name: file.name,
     type: file.type,
     sizeBytes: file.size,
@@ -88,7 +72,7 @@ async function saveUploadedImage(formData: FormData) {
     console.error("MENU IMAGE OPTIMIZE ERROR", error);
     return { error: NextResponse.json({ ok: false, code: "IMAGE_OPTIMIZE_FAILED", error: "Không thể tối ưu ảnh. Vui lòng thử ảnh khác." }, { status: 400 }) };
   }
-  console.log("SAVED MENU IMAGE PATH", optimized?.imageUrl);
+  debugLog("SAVED MENU IMAGE PATH", { imageUrl: optimized?.imageUrl ?? null });
   return { imageUrl: optimized?.imageUrl };
 }
 
@@ -128,14 +112,11 @@ function prismaError(error: unknown) {
   return NextResponse.json(publicApiError(safeErrorMessage(error, "Không thể lưu món. Vui lòng thử lại.")), { status: 500 });
 }
 
-async function parseRequest(request: NextRequest, slug: string) {
+async function parseRequest(request: NextRequest, slug: string): Promise<ParsedMenuRequest> {
   const access = await requireMenuAccess(slug);
-  if ("error" in access) return { error: access.error };
 
   const formData = await request.formData();
-  for (const [key, value] of formData.entries()) {
-    console.log("MENU FORMDATA", key, value instanceof File ? { name: value.name, type: value.type, size: value.size } : value);
-  }
+  debugLog("MENU FORMDATA RECEIVED", { keys: Array.from(formData.keys()) });
 
   const imageResult = await saveUploadedImage(formData);
   if (imageResult?.error) return { error: imageResult.error };
@@ -155,7 +136,7 @@ async function parseRequest(request: NextRequest, slug: string) {
     isFeatured: readBoolean(formData, "isFeatured")
   };
 
-  console.log("MENU PAYLOAD", {
+  debugLog("MENU PAYLOAD", {
     method: request.method,
     slug,
     restaurantId: access.restaurant.id,

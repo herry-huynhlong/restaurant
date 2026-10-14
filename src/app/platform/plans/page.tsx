@@ -22,7 +22,7 @@ const planFeatures: Record<CommercialPlan, PlanFeature[]> = {
 
 const planDescriptions: Record<CommercialPlan, string> = {
   BASIC: "Gói vận hành cơ bản cho QR bàn, menu, gọi món, phục vụ và báo cáo.",
-  PRO: "Gói đầy đủ cho quản lý, bếp, thu ngân, thanh toán và báo cáo nâng cao."
+  PRO: "Gói đầy đủ cho quản lý, bếp, thu ngân, thanh toán và báo cáo."
 };
 
 const planStyles: Record<CommercialPlan, { badge: string; border: string; icon: React.ReactNode }> = {

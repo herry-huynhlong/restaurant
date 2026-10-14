@@ -12,8 +12,7 @@ export type PlanFeature =
   | "PAYMENT_REQUEST"
   | "PAYMENT_CONFIRM"
   | "BILL_PRINT"
-  | "REPORTS"
-  | "ADVANCED_REPORTS";
+  | "REPORTS";
 
 export const planFeatureLabels: Record<PlanFeature, { title: string; description: string; group: string }> = {
   WAITER_ACCESS: {
@@ -62,13 +61,8 @@ export const planFeatureLabels: Record<PlanFeature, { title: string; description
     group: "Thanh toán"
   },
   REPORTS: {
-    title: "Báo cáo cơ bản",
-    description: "Doanh thu, giao dịch gần đây, bộ lọc kỳ.",
-    group: "Báo cáo"
-  },
-  ADVANCED_REPORTS: {
-    title: "Báo cáo nâng cao",
-    description: "Các chỉ số phân tích mở rộng khi cần.",
+    title: "Xem báo cáo",
+    description: "Doanh thu, giao dịch, phương thức thanh toán và top món.",
     group: "Báo cáo"
   }
 };
@@ -83,8 +77,7 @@ export const planFeatureOrder: PlanFeature[] = [
   "PAYMENT_REQUEST",
   "PAYMENT_CONFIRM",
   "BILL_PRINT",
-  "REPORTS",
-  "ADVANCED_REPORTS"
+  "REPORTS"
 ];
 
 export const basicPlanFeatures: PlanFeature[] = [
@@ -105,8 +98,7 @@ export const proPlanFeatures: PlanFeature[] = [
   "PAYMENT_REQUEST",
   "PAYMENT_CONFIRM",
   "BILL_PRINT",
-  "REPORTS",
-  "ADVANCED_REPORTS"
+  "REPORTS"
 ];
 
 const basicFeatures = new Set<PlanFeature>(basicPlanFeatures);

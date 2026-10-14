@@ -180,11 +180,7 @@ export function TablesLivePanel({
         throw new Error(data.message || data.error || `Không xác nhận được thanh toán (${response.status}).`);
       }
 
-      const data = await response.json().catch(() => ({}));
-      console.log("CONFIRM PAYMENT RESPONSE", {
-        status: response.status,
-        data
-      });
+      await response.json().catch(() => ({}));
       setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
       await refreshTables();
     } catch (error) {

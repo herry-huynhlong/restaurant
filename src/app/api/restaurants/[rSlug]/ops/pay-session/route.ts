@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { readPaymentMethod } from "@/server/services/billing-service";
 import { confirmDiningSessionPaid } from "@/server/services/payment-service";
+import { debugLog } from "@/lib/debug-log";
 import { hasPlanFeature } from "@/lib/plan/features";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { rethrowNextNavigation } from "@/lib/safe-user-message";
@@ -22,7 +23,7 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     const body = await request.json().catch(() => ({}));
     const diningSessionId = typeof body.diningSessionId === "string" ? body.diningSessionId : "";
 
-    console.log("CONFIRM PAYMENT REQUEST", {
+    debugLog("CONFIRM PAYMENT REQUEST", {
       slug: params.rSlug,
       restaurantId: access.restaurant.id,
       userId: access.user.id,
@@ -59,8 +60,7 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
       return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", message: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      console.error("PRISMA CODE", error.code);
-      console.error("PRISMA META", error.meta);
+      debugLog("CONFIRM PAYMENT PRISMA ERROR", { code: error.code, meta: error.meta });
     }
 
     return NextResponse.json({

@@ -5,7 +5,7 @@ import { BackupHistoryCard } from "@/components/platform/backup-history-card";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
 import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
-import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
+import { checkBackupRestoreReadinessAction, queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
 
 export default async function PlatformStoragePage({
   searchParams
@@ -179,6 +179,8 @@ export default async function PlatformStoragePage({
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <BackupHistoryCard
+          canManageRestore={canManageStorage}
+          checkRestoreAction={checkBackupRestoreReadinessAction}
           rows={dashboard.backupRuns.map((run) => ({
             id: run.id,
             status: run.status,
@@ -188,7 +190,9 @@ export default async function PlatformStoragePage({
             errorMessage: run.status === "FAILED" ? run.errorMessage : null,
             diagnosticMessage: run.diagnosticMessage,
             startedAtLabel: formatDateTime(run.startedAt),
-            completedAtLabel: formatDateTime(run.completedAt)
+            completedAtLabel: formatDateTime(run.completedAt),
+            verifiedAtLabel: formatDateTime(run.verifiedAtLabel),
+            restoreReadiness: run.restoreReadiness
           }))}
         />
         <HistoryCard

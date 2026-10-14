@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
+import { debugLog } from "@/lib/debug-log";
 import { isStaffDeviceRole } from "@/server/services/staff-device-session-service";
 
 const subscriptionSchema = z.object({
@@ -94,7 +95,7 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     });
   }
 
-  console.info("[push] subscription saved", {
+  debugLog("[push] subscription saved", {
     restaurantId: access.restaurant.id,
     userId: access.user.id,
     subscriptionId: subscription.id,
@@ -122,7 +123,7 @@ export async function DELETE(request: Request, { params }: { params: { rSlug: st
     data: { isActive: false }
   });
 
-  console.info("[push] subscription disabled", {
+  debugLog("[push] subscription disabled", {
     restaurantId: access.restaurant.id,
     userId: access.user.id,
     endpointSuffix: body.endpoint.slice(-18),

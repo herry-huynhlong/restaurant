@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import path from "node:path";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { prisma } from "@/lib/db/prisma";
 
 const UPLOAD_ROOT = path.resolve(process.cwd(), "public", "uploads");
@@ -9,6 +11,22 @@ const BACKUP_WORKER_KEY = "backup-worker";
 const WORKER_STALE_MS = 5 * 60 * 1000;
 const QUEUED_TIMEOUT_MS = 30 * 60 * 1000;
 const RUNNING_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+
+type RestoreCheckStatus = "PASS" | "WARN" | "FAIL";
+
+export type BackupRestoreReadiness = {
+  backupId: string;
+  status: "READY" | "NEEDS_CHECK" | "NOT_READY";
+  checkedAt: Date;
+  canRestoreProduction: false;
+  productionRestoreMessage: string;
+  checks: Array<{
+    key: string;
+    title: string;
+    status: RestoreCheckStatus;
+    message: string;
+  }>;
+};
 
 const ESTIMATED_ROW_BYTES = {
   restaurant: 2048,
@@ -89,6 +107,12 @@ export async function getPlatformStorageDashboard() {
     latestFailedBackup &&
     (!latestSuccessfulBackup ||
       latestFailedBackup.updatedAt.getTime() > (latestSuccessfulBackup.completedAt ?? latestSuccessfulBackup.updatedAt).getTime());
+  const backupRunsWithRestore = await Promise.all(
+    backupRuns.map(async (run) => ({
+      run,
+      restoreReadiness: await buildBackupRestoreReadiness(run, { verifyChecksum: false })
+    }))
+  );
 
   return {
     policy: {
@@ -127,7 +151,7 @@ export async function getPlatformStorageDashboard() {
       calculatedAt: usage.calculatedAt,
       note: usage.note
     })),
-    backupRuns: backupRuns.map((run) => ({
+    backupRuns: backupRunsWithRestore.map(({ run, restoreReadiness }) => ({
       id: run.id,
       status: run.status,
       triggerType: run.triggerType,
@@ -139,7 +163,9 @@ export async function getPlatformStorageDashboard() {
       diagnosticMessage: diagnosticBackupError(run.errorMessage),
       queuedAt: run.queuedAt,
       startedAt: run.startedAt,
-      completedAt: run.completedAt
+      completedAt: run.completedAt,
+      verifiedAtLabel: run.verifiedAt,
+      restoreReadiness
     })),
     maintenanceRuns
   };
@@ -175,6 +201,270 @@ function diagnosticBackupError(message: string | null) {
     return "Lần sao lưu chưa hoàn tất. Hãy kiểm tra tình trạng hệ thống.";
   }
   return "Yêu cầu chưa hoàn tất. Hãy kiểm tra tình trạng hệ thống.";
+}
+
+export async function checkBackupRestoreReadiness(backupRunId: string) {
+  const run = await prisma.platformBackupRun.findUnique({
+    where: { id: backupRunId }
+  });
+
+  if (!run) {
+    return {
+      backupId: backupRunId,
+      status: "NOT_READY" as const,
+      checkedAt: new Date(),
+      canRestoreProduction: false as const,
+      productionRestoreMessage: productionRestoreLockedMessage(),
+      checks: [
+        {
+          key: "backup_record",
+          title: "Bản ghi sao lưu",
+          status: "FAIL" as const,
+          message: "Không tìm thấy bản sao lưu."
+        }
+      ]
+    };
+  }
+
+  return buildBackupRestoreReadiness(run, { verifyChecksum: true });
+}
+
+async function buildBackupRestoreReadiness(
+  run: {
+    id: string;
+    status: string;
+    databaseDumpName: string | null;
+    uploadsArchiveName: string | null;
+    checksum: string | null;
+    verifiedAt: Date | null;
+  },
+  options: { verifyChecksum: boolean }
+): Promise<BackupRestoreReadiness> {
+  const checks: BackupRestoreReadiness["checks"] = [];
+  const checkedAt = new Date();
+
+  if (run.status !== "SUCCESS") {
+    checks.push({
+      key: "backup_status",
+      title: "Trạng thái sao lưu",
+      status: "FAIL",
+      message: "Chỉ bản sao lưu thành công mới được kiểm tra khôi phục."
+    });
+    return restoreReadiness(run.id, checkedAt, checks);
+  }
+
+  checks.push({
+    key: "backup_status",
+    title: "Trạng thái sao lưu",
+    status: "PASS",
+    message: "Bản sao lưu đã hoàn tất."
+  });
+
+  if (!run.verifiedAt) {
+    checks.push({
+      key: "backup_verified",
+      title: "Xác minh khi tạo",
+      status: "FAIL",
+      message: "Bản sao lưu chưa có dấu xác minh khi tạo."
+    });
+  } else {
+    checks.push({
+      key: "backup_verified",
+      title: "Xác minh khi tạo",
+      status: "PASS",
+      message: "Bản sao lưu đã được ghi nhận xác minh khi tạo."
+    });
+  }
+
+  const databasePath = safeBackupPath(run.databaseDumpName);
+  const uploadsPath = safeBackupPath(run.uploadsArchiveName);
+  const manifestPath = run.databaseDumpName ? safeBackupPath(path.join(path.dirname(run.databaseDumpName), "manifest.json")) : null;
+
+  if (!databasePath) {
+    checks.push({
+      key: "database_dump",
+      title: "Dữ liệu hệ thống",
+      status: "FAIL",
+      message: "Không tìm thấy thông tin file dữ liệu trong bản sao lưu."
+    });
+  } else {
+    await checkFile(databasePath, checks, "database_dump", "Dữ liệu hệ thống");
+  }
+
+  if (run.uploadsArchiveName) {
+    if (!uploadsPath) {
+      checks.push({
+        key: "uploads_archive",
+        title: "Ảnh tải lên",
+        status: "FAIL",
+        message: "Đường dẫn file ảnh trong bản sao lưu không hợp lệ."
+      });
+    } else {
+      await checkFile(uploadsPath, checks, "uploads_archive", "Ảnh tải lên");
+    }
+  } else {
+    checks.push({
+      key: "uploads_archive",
+      title: "Ảnh tải lên",
+      status: "WARN",
+      message: "Bản sao lưu này không có file ảnh tải lên."
+    });
+  }
+
+  if (!manifestPath) {
+    checks.push({
+      key: "manifest",
+      title: "Thông tin bản sao lưu",
+      status: "FAIL",
+      message: "Không tìm thấy thông tin manifest."
+    });
+  } else {
+    await checkManifest(manifestPath, run, checks);
+  }
+
+  if (!run.checksum) {
+    checks.push({
+      key: "checksum",
+      title: "Checksum",
+      status: "FAIL",
+      message: "Bản sao lưu chưa có checksum để đối chiếu."
+    });
+  } else if (!options.verifyChecksum) {
+    checks.push({
+      key: "checksum",
+      title: "Checksum",
+      status: "WARN",
+      message: "Checksum sẽ được đối chiếu khi bấm kiểm tra khả năng khôi phục."
+    });
+  } else if (databasePath && manifestPath && !hasFailedRequiredChecks(checks)) {
+    const filePaths = [databasePath, ...(uploadsPath ? [uploadsPath] : []), manifestPath];
+    const checksum = await checksumFiles(filePaths);
+    checks.push({
+      key: "checksum",
+      title: "Checksum",
+      status: checksum === run.checksum ? "PASS" : "FAIL",
+      message: checksum === run.checksum ? "Checksum khớp với bản ghi sao lưu." : "Checksum không khớp. Không được khôi phục bản sao lưu này."
+    });
+  }
+
+  if (options.verifyChecksum && !hasFailedRequiredChecks(checks)) {
+    checks.push({
+      key: "staging_restore",
+      title: "Restore staging",
+      status: "WARN",
+      message: "Chưa chạy restore vào môi trường cô lập từ giao diện này. Khôi phục production vẫn bị khóa."
+    });
+  }
+
+  return restoreReadiness(run.id, checkedAt, checks);
+}
+
+async function checkFile(filePath: string, checks: BackupRestoreReadiness["checks"], key: string, title: string) {
+  try {
+    const info = await stat(filePath);
+    checks.push({
+      key,
+      title,
+      status: info.isFile() && info.size > 0 ? "PASS" : "FAIL",
+      message: info.isFile() && info.size > 0 ? "File còn tồn tại và có dữ liệu." : "File không hợp lệ hoặc rỗng."
+    });
+  } catch {
+    checks.push({
+      key,
+      title,
+      status: "FAIL",
+      message: "File không còn tồn tại hoặc không thể truy cập."
+    });
+  }
+}
+
+async function checkManifest(
+  manifestPath: string,
+  run: { id: string; databaseDumpName: string | null; uploadsArchiveName: string | null },
+  checks: BackupRestoreReadiness["checks"]
+) {
+  try {
+    const info = await stat(manifestPath);
+    if (!info.isFile() || info.size <= 0) {
+      checks.push({
+        key: "manifest",
+        title: "Thông tin bản sao lưu",
+        status: "FAIL",
+        message: "Manifest không hợp lệ hoặc rỗng."
+      });
+      return;
+    }
+
+    const parsed = JSON.parse(await readFile(manifestPath, "utf8")) as {
+      backupId?: unknown;
+      files?: { database?: unknown; uploads?: unknown };
+    };
+    const matches =
+      parsed.backupId === run.id &&
+      parsed.files?.database === run.databaseDumpName &&
+      (parsed.files?.uploads ?? null) === (run.uploadsArchiveName ?? null);
+
+    checks.push({
+      key: "manifest",
+      title: "Thông tin bản sao lưu",
+      status: matches ? "PASS" : "FAIL",
+      message: matches ? "Manifest khớp với bản ghi sao lưu." : "Manifest không khớp với bản ghi sao lưu."
+    });
+  } catch {
+    checks.push({
+      key: "manifest",
+      title: "Thông tin bản sao lưu",
+      status: "FAIL",
+      message: "Không thể đọc manifest của bản sao lưu."
+    });
+  }
+}
+
+function restoreReadiness(backupId: string, checkedAt: Date, checks: BackupRestoreReadiness["checks"]): BackupRestoreReadiness {
+  const failed = hasFailedRequiredChecks(checks);
+  const needsManualStaging = checks.some((check) => check.key === "staging_restore" && check.status === "WARN");
+  const pendingChecksum = checks.some((check) => check.key === "checksum" && check.status === "WARN");
+
+  return {
+    backupId,
+    status: failed ? "NOT_READY" : needsManualStaging || pendingChecksum ? "NEEDS_CHECK" : "READY",
+    checkedAt,
+    canRestoreProduction: false,
+    productionRestoreMessage: productionRestoreLockedMessage(),
+    checks
+  };
+}
+
+function hasFailedRequiredChecks(checks: BackupRestoreReadiness["checks"]) {
+  return checks.some((check) => check.status === "FAIL");
+}
+
+function productionRestoreLockedMessage() {
+  return "Khôi phục production đang khóa cho đến khi có restore worker cô lập, chế độ bảo trì và bản dự phòng trước khôi phục.";
+}
+
+function safeBackupPath(relativePath: string | null) {
+  if (!relativePath || path.isAbsolute(relativePath) || relativePath.includes("..")) return null;
+  const root = getBackupRoot();
+  const filePath = path.resolve(root, relativePath);
+  return filePath === root || filePath.startsWith(`${root}${path.sep}`) ? filePath : null;
+}
+
+function getBackupRoot() {
+  return path.resolve(process.env.BACKUP_DIR ?? path.join(process.cwd(), "backups"));
+}
+
+async function checksumFiles(filePaths: string[]) {
+  const hash = createHash("sha256");
+  for (const filePath of filePaths) {
+    await new Promise<void>((resolve, reject) => {
+      const stream = createReadStream(filePath);
+      stream.on("data", (chunk) => hash.update(chunk));
+      stream.on("error", reject);
+      stream.on("end", resolve);
+    });
+  }
+  return hash.digest("hex");
 }
 
 async function markTimedOutBackupRuns() {

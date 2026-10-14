@@ -1,5 +1,6 @@
 import webPush from "web-push";
 import { prisma } from "@/lib/db/prisma";
+import { debugLog } from "@/lib/debug-log";
 import type { PushPayload } from "@/lib/push";
 import type { RestaurantRole } from "@prisma/client";
 import { allowedStaffRolesForPlan } from "@/lib/plan/features";
@@ -57,7 +58,7 @@ export async function sendPushToSubscription(subscriptionId: string, payload: Pu
       where: { id: subscription.id },
       data: { lastUsedAt: new Date(), isActive: true }
     });
-    console.info("[push] sent", {
+    debugLog("[push] sent", {
       subscriptionId: subscription.id,
       userId: subscription.userId,
       restaurantId: subscription.restaurantId,
@@ -132,7 +133,7 @@ export async function sendPushToRestaurantRoles({
     }
   });
 
-  console.info("[push] recipients", {
+  debugLog("[push] recipients", {
     restaurantId,
     roles: effectiveRoles,
     count: subscriptions.length,
@@ -140,7 +141,7 @@ export async function sendPushToRestaurantRoles({
   });
 
   const results = await Promise.all(subscriptions.map((subscription) => sendPushToSubscription(subscription.id, payloadWithRestaurantIcon)));
-  console.info("[push] result", {
+  debugLog("[push] result", {
     restaurantId,
     sent: results.filter((result) => result.ok).length,
     failed: results.filter((result) => !result.ok).length,

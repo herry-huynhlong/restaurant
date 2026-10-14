@@ -6,7 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
-import { ensurePlatformDataPolicy, refreshRestaurantStorageUsage } from "@/server/services/platform-storage-service";
+import { checkBackupRestoreReadiness, ensurePlatformDataPolicy, refreshRestaurantStorageUsage } from "@/server/services/platform-storage-service";
 
 const storagePolicySchema = z.object({
   backupEnabled: z.boolean(),
@@ -122,6 +122,37 @@ export async function queueCleanupAction() {
 
   revalidatePath(platformRoutes.storage);
   redirectWithSuccess("Đã tiếp nhận yêu cầu dọn dữ liệu tạm.");
+}
+
+export async function checkBackupRestoreReadinessAction(formData: FormData) {
+  const actor = await requirePlatformOwner();
+  const backupRunId = readString(formData, "backupRunId");
+  if (!backupRunId) {
+    redirectWithError("Thiếu bản sao lưu cần kiểm tra.");
+  }
+
+  const result = await checkBackupRestoreReadiness(backupRunId);
+  await prisma.auditLog.create({
+    data: {
+      userId: actor.id,
+      action: "PLATFORM_BACKUP_RESTORE_CHECKED",
+      entityType: "PlatformBackupRun",
+      entityId: backupRunId,
+      metadataJson: {
+        status: result.status,
+        canRestoreProduction: result.canRestoreProduction,
+        passedChecks: result.checks.filter((check) => check.status === "PASS").length,
+        warningChecks: result.checks.filter((check) => check.status === "WARN").length,
+        failedChecks: result.checks.filter((check) => check.status === "FAIL").length
+      }
+    }
+  });
+
+  revalidatePath(platformRoutes.storage);
+  if (result.status === "NOT_READY") {
+    redirectWithError("Bản sao lưu chưa đủ điều kiện khôi phục. Hãy xem chi tiết kiểm tra.");
+  }
+  redirectWithSuccess("Đã kiểm tra bản sao lưu. Khôi phục production vẫn đang khóa để bảo vệ dữ liệu.");
 }
 
 function storageKindLabel(value: string) {

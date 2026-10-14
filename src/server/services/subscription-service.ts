@@ -6,7 +6,7 @@ export type SubscriptionTerm = (typeof subscriptionTerms)[number];
 
 const defaultPlanDescriptions: Record<"BASIC" | "PRO", string> = {
   BASIC: "QR bàn, menu, gọi món, phục vụ, thanh toán cơ bản và báo cáo.",
-  PRO: "Đầy đủ quyền quản lý, bếp, thu ngân, in bill và báo cáo nâng cao."
+  PRO: "Đầy đủ quyền quản lý, bếp, thu ngân, in bill và báo cáo."
 };
 
 const defaultPrices: Array<{ plan: "BASIC" | "PRO"; termMonths: SubscriptionTerm; priceVnd: number; isRecommended?: boolean }> = [
@@ -296,6 +296,14 @@ export async function createSubscriptionRequest({
 
 export async function confirmSubscriptionRequest(requestId: string, actorUserId: string) {
   return prisma.$transaction(async (tx) => {
+    const lockedRequest = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "RestaurantSubscriptionRequest"
+      WHERE id = ${requestId}
+      FOR UPDATE
+    `;
+    if (lockedRequest.length === 0) throw new Error("Không tìm thấy yêu cầu đăng ký.");
+
     const request = await tx.restaurantSubscriptionRequest.findUnique({
       where: { id: requestId }
     });

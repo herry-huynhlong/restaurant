@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { isPlatformOwnerRole, isPlatformSubAdminRole, requirePlatformAdmin, requirePlatformOwner } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
+import { debugLog } from "@/lib/debug-log";
 import { platformRoutes } from "@/lib/routes";
 import { safeErrorMessage } from "@/lib/safe-user-message";
 import { enforceBusinessPlan } from "@/lib/business-type";
@@ -224,7 +225,7 @@ function prismaCreateRestaurantMessage(error: unknown) {
 
 export async function createRestaurantAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
-  console.info("CREATE RESTAURANT SUBMIT", safeFormDataSummary(formData));
+  debugLog("CREATE RESTAURANT SUBMIT", { fields: safeFormDataSummary(formData) });
   const normalizedSlug = slugify(readString(formData, "slug") || readString(formData, "name"));
   let uploadedLogoUrl: string | undefined;
   try {
@@ -261,14 +262,14 @@ export async function createRestaurantAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    console.warn("CREATE RESTAURANT VALIDATION ERROR", {
+    debugLog("CREATE RESTAURANT VALIDATION ERROR", {
       normalizedSlug,
       issues: parsed.error.flatten()
     });
     redirectWithError(platformRoutes.newRestaurant, validationMessage(parsed.error));
   }
 
-  console.info("CREATE RESTAURANT PARSED PAYLOAD", {
+  debugLog("CREATE RESTAURANT PARSED PAYLOAD", {
     name: parsed.data.name,
     slug: parsed.data.slug,
     hasLogo: Boolean(parsed.data.logoUrl),
@@ -298,7 +299,7 @@ export async function createRestaurantAction(formData: FormData) {
     select: { id: true }
   });
   if (existingRestaurant) {
-    console.warn("CREATE RESTAURANT DUPLICATE SLUG", {
+    debugLog("CREATE RESTAURANT DUPLICATE SLUG", {
       slug: parsed.data.slug,
       restaurantId: existingRestaurant.id
     });
@@ -310,7 +311,7 @@ export async function createRestaurantAction(formData: FormData) {
     select: { id: true, platformRole: true, memberships: { select: { restaurantId: true, role: true, isActive: true } } }
   });
   if (isPlatformOwnerRole(existingOwner?.platformRole)) {
-    console.warn("CREATE RESTAURANT OWNER_EMAIL_IS_PLATFORM_ADMIN", {
+    debugLog("CREATE RESTAURANT OWNER_EMAIL_IS_PLATFORM_ADMIN", {
       ownerEmail: parsed.data.ownerEmail,
       userId: existingOwner.id
     });
@@ -322,7 +323,7 @@ export async function createRestaurantAction(formData: FormData) {
   let createdRestaurantId: string;
 
   try {
-    console.info("CREATE RESTAURANT TRANSACTION START", {
+    debugLog("CREATE RESTAURANT TRANSACTION START", {
       slug: parsed.data.slug,
       ownerEmail: parsed.data.ownerEmail,
       ownerUserExists: Boolean(existingOwner)
@@ -422,7 +423,7 @@ export async function createRestaurantAction(formData: FormData) {
     redirectWithError(platformRoutes.newRestaurant, prismaCreateRestaurantMessage(error));
   }
 
-  console.info("CREATE RESTAURANT SUCCESS", {
+  debugLog("CREATE RESTAURANT SUCCESS", {
     restaurantId: createdRestaurantId,
     slug: parsed.data.slug,
     ownerEmail: parsed.data.ownerEmail

@@ -51,9 +51,6 @@ export function CreateRestaurantSubmitButton() {
       className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
       type="submit"
       disabled={pending}
-      onClick={() => {
-        console.log("CREATE RESTAURANT SUBMIT");
-      }}
     >
       {pending ? "Đang tạo..." : "Tạo nhà hàng"}
     </button>

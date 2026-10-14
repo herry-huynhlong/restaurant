@@ -72,22 +72,6 @@ function normalizeProduct(raw: unknown): Product | null {
   };
 }
 
-function logFormData(label: string, formData: FormData) {
-  for (const [key, value] of formData.entries()) {
-    if (value instanceof File) {
-      console.log(label, key, {
-        name: value.name,
-        type: value.type,
-        sizeBytes: value.size,
-        sizeKB: value.size / 1024,
-        sizeMB: value.size / 1024 / 1024
-      });
-    } else {
-      console.log(label, key, value);
-    }
-  }
-}
-
 function resultErrorMessage(result: unknown, fallback: string) {
   const value = result && typeof result === "object" ? result as { code?: string; error?: string; fieldErrors?: Record<string, string[] | undefined> } : null;
   const fieldMessages = value?.fieldErrors ? Object.values(value.fieldErrors).flat().filter(Boolean) : [];
@@ -110,11 +94,6 @@ async function saveProductRequest(slug: string, formData: FormData, mode: "creat
   } catch {
     data = null;
   }
-
-  console.log(mode === "create" ? "CREATE MENU RESPONSE" : "SAVE MENU RESPONSE", {
-    status: response.status,
-    body: data
-  });
 
   if (!response.ok) {
     const errorCode = data && typeof data === "object" ? (data as { code?: string }).code : undefined;
@@ -235,7 +214,6 @@ function NewProductCard({
   function submit(formData: FormData) {
     startTransition(async () => {
       try {
-        logFormData("CREATE MENU FORMDATA", formData);
         const result = await saveProductRequest(slug, formData, "create");
 
         const product = normalizeProduct(result.product);
@@ -302,7 +280,6 @@ function ProductCard({
   function submit(formData: FormData) {
     startTransition(async () => {
       try {
-        logFormData("SAVE MENU FORMDATA", formData);
         const result = await saveProductRequest(slug, formData, "update");
 
         const nextProduct = normalizeProduct(result.product);
@@ -489,14 +466,6 @@ function ProductImagePicker({
             onImagePreview(fallbackPreviewUrl);
             return;
           }
-
-          console.log("SELECTED FILE", {
-            name: file.name,
-            type: file.type,
-            sizeBytes: file.size,
-            sizeKB: file.size / 1024,
-            sizeMB: file.size / 1024 / 1024
-          });
 
           const imageError = validateMenuImage(file);
           if (imageError) {

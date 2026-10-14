@@ -1,5 +1,6 @@
 import type { PaymentMethod } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { debugLog } from "@/lib/debug-log";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 import { calculateBillSummary, generateInvoiceNumber } from "@/server/services/billing-service";
 
@@ -70,7 +71,7 @@ export async function confirmDiningSessionPaid({
     const bill = calculateBillSummary(session.orders, session.restaurant.settings);
     const invoiceNumber = generateInvoiceNumber(paidAt);
 
-    console.log("CONFIRM PAYMENT BILL", {
+    debugLog("CONFIRM PAYMENT BILL", {
       restaurantId,
       sessionId: session.id,
       tableId: session.tableId,
