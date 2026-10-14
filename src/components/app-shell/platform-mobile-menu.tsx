@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Activity, Building2, CreditCard, HardDrive, Home, Menu, Settings, UserRoundCog, X } from "lucide-react";
+import { PendingSubscriptionBadge } from "@/components/platform/pending-subscription-badge";
 import { productBrand } from "@/lib/brand";
 import { platformRoutes } from "@/lib/routes";
 
@@ -16,7 +17,7 @@ const navItems = [
   { label: "Cài đặt nền tảng", href: platformRoutes.settings, Icon: Settings }
 ];
 
-export function PlatformMobileMenu() {
+export function PlatformMobileMenu({ pendingSubscriptionRequestCount }: { pendingSubscriptionRequestCount: number }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -80,7 +81,8 @@ export function PlatformMobileMenu() {
                   onClick={() => setOpen(false)}
                 >
                   <Icon className="h-4 w-4" />
-                  {label}
+                  <span>{label}</span>
+                  {href === platformRoutes.restaurants ? <PendingSubscriptionBadge initialCount={pendingSubscriptionRequestCount} /> : null}
                 </Link>
               ))}
             </nav>

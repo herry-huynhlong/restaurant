@@ -1,5 +1,29 @@
 import { prisma } from "@/lib/db/prisma";
 
+function activeSubscriptionRequestWhere(restaurantIds?: string[]) {
+  return {
+    status: "PENDING",
+    ...(restaurantIds ? { restaurantId: { in: restaurantIds } } : {}),
+    OR: [
+      { quoteExpiresAt: null },
+      { quoteExpiresAt: { gt: new Date() } }
+    ]
+  };
+}
+
+export async function getPendingSubscriptionRequestCount() {
+  const restaurants = await prisma.restaurant.findMany({
+    where: { status: { not: "DELETED" } },
+    select: { id: true }
+  });
+
+  if (restaurants.length === 0) return 0;
+
+  return prisma.restaurantSubscriptionRequest.count({
+    where: activeSubscriptionRequestWhere(restaurants.map((restaurant) => restaurant.id))
+  });
+}
+
 export async function getPlatformOverview() {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -91,8 +115,7 @@ export async function getPlatformRestaurants({ includeDeleted = false }: { inclu
 
   const pendingRequests = await prisma.restaurantSubscriptionRequest.findMany({
     where: {
-      status: "PENDING",
-      restaurantId: { in: restaurants.map((restaurant) => restaurant.id) }
+      ...activeSubscriptionRequestWhere(restaurants.map((restaurant) => restaurant.id))
     },
     orderBy: { createdAt: "desc" }
   });
@@ -104,7 +127,11 @@ export async function getPlatformRestaurants({ includeDeleted = false }: { inclu
   return restaurants.map((restaurant) => ({
     ...restaurant,
     subscriptionRequests: pendingByRestaurant.get(restaurant.id) ?? []
-  }));
+  })).sort((a, b) => {
+    const pendingDelta = b.subscriptionRequests.length - a.subscriptionRequests.length;
+    if (pendingDelta !== 0) return pendingDelta;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
 }
 
 export async function getPlatformRestaurantDetail(restaurantId: string) {

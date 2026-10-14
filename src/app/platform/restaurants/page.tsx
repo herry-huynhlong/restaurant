@@ -2,13 +2,13 @@ import Link from "next/link";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformRestaurantActions } from "@/components/platform/restaurant-row-actions";
+import { SubscriptionRequestsDialog } from "@/components/platform/subscription-requests-dialog";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
 import { getPlatformRestaurants } from "@/server/services/platform-service";
 import { getPublicPlanPrices } from "@/server/services/subscription-service";
-import { confirmSubscriptionRequestAction, rejectSubscriptionRequestAction } from "./actions";
 
 export default async function PlatformRestaurantsPage({
   searchParams
@@ -17,10 +17,14 @@ export default async function PlatformRestaurantsPage({
 }) {
   await requirePlatformAdmin();
   const showDeleted = searchParams?.view === "deleted";
+  const showPending = searchParams?.view === "pending";
   const [restaurants, planPrices] = await Promise.all([
     getPlatformRestaurants({ includeDeleted: showDeleted }),
     getPublicPlanPrices()
   ]);
+  const visibleRestaurants = showPending
+    ? restaurants.filter((restaurant) => restaurant.subscriptionRequests.length > 0)
+    : restaurants;
   const priceOptions = planPrices.map((price) => ({
     id: price.id,
     plan: price.plan === "PRO" ? "PRO" as const : "BASIC" as const,
@@ -37,8 +41,11 @@ export default async function PlatformRestaurantsPage({
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
       <div className="mb-4 flex flex-wrap gap-2">
-        <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${!showDeleted ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={platformRoutes.restaurants}>
+        <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${!showDeleted && !showPending ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={platformRoutes.restaurants}>
           Đang quản lý
+        </Link>
+        <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${showPending ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={`${platformRoutes.restaurants}?view=pending`}>
+          Chờ xác nhận
         </Link>
         <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${showDeleted ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={`${platformRoutes.restaurants}?view=deleted`}>
           Đã xóa
@@ -54,8 +61,9 @@ export default async function PlatformRestaurantsPage({
             </tr>
           </thead>
           <tbody>
-            {restaurants.map((restaurant) => {
+            {visibleRestaurants.map((restaurant) => {
               const owner = restaurant.users[0]?.user;
+              const returnTo = showDeleted ? `${platformRoutes.restaurants}?view=deleted` : showPending ? `${platformRoutes.restaurants}?view=pending` : platformRoutes.restaurants;
               return (
                 <tr key={restaurant.id} className="border-t align-top">
                   <td className="px-3 py-3">
@@ -71,35 +79,27 @@ export default async function PlatformRestaurantsPage({
                     <p className="mt-1 text-xs text-slate-500">{subscriptionStatusLabel(restaurant.subscriptionStatus)}</p>
                   </td>
                   <td className="px-3 py-3">
-                    <p className="font-semibold">{restaurant.plan}</p>
+                    <p className="font-semibold">
+                      {restaurant.plan}
+                      {restaurant.subscriptionRequests.length > 0 ? ` — ${restaurant.subscriptionRequests.length} yêu cầu chờ` : ""}
+                    </p>
                     <p className="mt-1 text-xs text-slate-500">Hết hạn: {formatDate(restaurant.subscriptionEnd)}</p>
-                    {restaurant.subscriptionRequests.length > 0 ? (
-                      <div className="mt-2 space-y-2">
-                        {restaurant.subscriptionRequests.map((request) => (
-                          <div key={request.id} className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                            <p className="font-semibold">Chờ xác nhận: {requestTypeLabel(request.requestType)} · {request.plan} · {formatVnd(request.priceVnd)}</p>
-                            <p className="mt-1">Kỳ tham chiếu: {request.termMonths} tháng</p>
-                            {request.requestType === "UPGRADE" ? (
-                              <p className="mt-1">Giữ hạn đến: {formatDate(request.currentSubscriptionEnd)}</p>
-                            ) : (
-                              <p className="mt-1">Hạn hiện tại: {formatDate(restaurant.subscriptionEnd)}</p>
-                            )}
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <form action={confirmSubscriptionRequestAction}>
-                                <input name="requestId" type="hidden" value={request.id} />
-                                <input name="returnTo" type="hidden" value={showDeleted ? `${platformRoutes.restaurants}?view=deleted` : platformRoutes.restaurants} />
-                                <button className="rounded bg-teal-700 px-2 py-1 font-semibold text-white" type="submit">Xác nhận</button>
-                              </form>
-                              <form action={rejectSubscriptionRequestAction}>
-                                <input name="requestId" type="hidden" value={request.id} />
-                                <input name="returnTo" type="hidden" value={showDeleted ? `${platformRoutes.restaurants}?view=deleted` : platformRoutes.restaurants} />
-                                <button className="rounded border border-amber-300 bg-white px-2 py-1 font-semibold" type="submit">Từ chối</button>
-                              </form>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
+                    <SubscriptionRequestsDialog
+                      restaurantName={restaurant.name}
+                      restaurantPlan={restaurant.plan}
+                      subscriptionEnd={restaurant.subscriptionEnd?.toISOString() ?? null}
+                      returnTo={returnTo}
+                      requests={restaurant.subscriptionRequests.map((request) => ({
+                        id: request.id,
+                        requestType: request.requestType,
+                        plan: request.plan,
+                        termMonths: request.termMonths,
+                        priceVnd: request.priceVnd,
+                        status: request.status,
+                        createdAt: request.createdAt.toISOString(),
+                        currentSubscriptionEnd: request.currentSubscriptionEnd?.toISOString() ?? null
+                      }))}
+                    />
                   </td>
                   <td className="px-3 py-3">
                     <p>{restaurant._count.tables} bàn</p>
@@ -115,7 +115,7 @@ export default async function PlatformRestaurantsPage({
                         status={restaurant.status}
                         plan={restaurant.plan}
                         businessType={restaurant.businessType}
-                        returnTo={platformRoutes.restaurants}
+                        returnTo={returnTo}
                         priceOptions={priceOptions}
                         compact
                       />
@@ -126,6 +126,11 @@ export default async function PlatformRestaurantsPage({
             })}
           </tbody>
         </table>
+        {visibleRestaurants.length === 0 ? (
+          <div className="border-t px-4 py-8 text-center text-sm text-slate-500">
+            {showPending ? "Không có yêu cầu chờ xác nhận." : "Chưa có nhà hàng để hiển thị."}
+          </div>
+        ) : null}
       </div>
     </PlatformShell>
   );
@@ -133,13 +138,4 @@ export default async function PlatformRestaurantsPage({
 
 function formatDate(date: Date | null) {
   return date ? new Intl.DateTimeFormat("vi-VN").format(date) : "-";
-}
-
-function formatVnd(value: number) {
-  return `${value.toLocaleString("vi-VN")}đ`;
-}
-
-function requestTypeLabel(type: string) {
-  if (type === "UPGRADE") return "Nâng cấp";
-  return "Gia hạn";
 }
