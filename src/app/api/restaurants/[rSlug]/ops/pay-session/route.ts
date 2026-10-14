@@ -4,6 +4,7 @@ import { readPaymentMethod } from "@/server/services/billing-service";
 import { confirmDiningSessionPaid } from "@/server/services/payment-service";
 import { hasPlanFeature } from "@/lib/plan/features";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
+import { rethrowNextNavigation } from "@/lib/safe-user-message";
 import { assertActiveStaffDeviceForAction } from "@/server/services/staff-device-session-service";
 import { publishNotificationRefresh } from "@/server/services/notification-event-service";
 
@@ -52,6 +53,7 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
       }
     });
   } catch (error) {
+    rethrowNextNavigation(error);
     console.error("CONFIRM PAYMENT ERROR", error);
     if (error instanceof Error && error.message === "DEVICE_REVOKED") {
       return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", message: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
@@ -61,13 +63,10 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
       console.error("PRISMA META", error.meta);
     }
 
-    const isPrismaError = error instanceof Prisma.PrismaClientKnownRequestError;
-    const message = error instanceof Error ? error.message : "Không xác nhận được thanh toán.";
     return NextResponse.json({
       ok: false,
-      error: isPrismaError ? error.code : "CONFIRM_PAYMENT_FAILED",
-      message,
-      prismaMeta: isPrismaError ? error.meta : undefined
+      error: "CONFIRM_PAYMENT_FAILED",
+      message: "Không xác nhận được thanh toán. Vui lòng thử lại."
     }, { status: 500 });
   }
 }

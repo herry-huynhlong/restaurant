@@ -1,4 +1,5 @@
 import { PlatformShell } from "@/components/app-shell/platform-shell";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { BusinessPlanFields } from "@/components/platform/business-plan-fields";
 import { CreateRestaurantSubmitButton, LogoUploadInput, RestaurantSlugField } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
@@ -14,7 +15,7 @@ export default async function NewRestaurantPage({
 
   return (
     <PlatformShell title="Thêm nhà hàng">
-      {searchParams?.error ? <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{searchParams.error}</p> : null}
+      <FeedbackBanner error={searchParams?.error} />
       <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={createRestaurantAction} encType="multipart/form-data">
         <FormSection title="Thông tin nhà hàng">
           <TextField label="Tên nhà hàng *" name="name" required />

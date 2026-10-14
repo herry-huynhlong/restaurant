@@ -92,6 +92,9 @@ function resultErrorMessage(result: unknown, fallback: string) {
   const value = result && typeof result === "object" ? result as { code?: string; error?: string; fieldErrors?: Record<string, string[] | undefined> } : null;
   const fieldMessages = value?.fieldErrors ? Object.values(value.fieldErrors).flat().filter(Boolean) : [];
   const detail = fieldMessages.length ? fieldMessages.join(" ") : value?.error;
+  if (detail && /NEXT_|Prisma|P20\d{2}|SQL|stack|digest|\/app\//i.test(detail)) {
+    return fallback;
+  }
   return detail ?? fallback;
 }
 
@@ -249,7 +252,7 @@ function NewProductCard({
         setPrice("");
       } catch (error) {
         console.error("CREATE MENU ITEM FRONTEND ERROR", error);
-        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể tạo món." });
+        onToast({ type: "error", message: "Không thể tạo món." });
       }
     });
   }
@@ -315,7 +318,7 @@ function ProductCard({
         onToast({ type: "success", message: result.message ?? `Đã cập nhật món ${nextProduct.nameVi}.` });
       } catch (error) {
         console.error("SAVE MENU ITEM ERROR", error);
-        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể lưu món." });
+        onToast({ type: "error", message: "Không thể lưu món." });
       }
     });
   }
@@ -345,7 +348,7 @@ function ProductCard({
       } catch (error) {
         onSaved(product);
         console.error("UPDATE MENU FLAGS ERROR", error);
-        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể cập nhật trạng thái món." });
+        onToast({ type: "error", message: "Không thể cập nhật trạng thái món." });
       }
     });
   }
@@ -373,7 +376,7 @@ function ProductCard({
         onToast({ type: "success", message: result.message ?? `Đã xóa món ${product.nameVi}.` });
       } catch (error) {
         console.error("DELETE MENU ITEM ERROR", error);
-        onToast({ type: "error", message: error instanceof Error ? error.message : "Không thể xóa món." });
+        onToast({ type: "error", message: "Không thể xóa món." });
       }
     });
   }

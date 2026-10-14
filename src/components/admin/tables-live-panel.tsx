@@ -188,7 +188,8 @@ export function TablesLivePanel({
       setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
       await refreshTables();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không xác nhận được thanh toán.");
+      console.error("CONFIRM PAYMENT CLIENT ERROR", error);
+      setMessage("Không xác nhận được thanh toán. Vui lòng thử lại.");
     } finally {
       setPayingSessionId(null);
     }

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
 import { parseVndInteger } from "@/lib/money";
+import { publicApiError, safeErrorMessage } from "@/lib/safe-user-message";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 import { getCategoryIdForSimpleMenuType, type SimpleMenuType } from "@/server/services/simple-menu-service";
@@ -121,10 +122,10 @@ function productPayload(product: {
 function prismaError(error: unknown) {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     console.error("PRISMA CREATE/UPDATE MENU ERROR", { code: error.code, meta: error.meta });
-    return NextResponse.json({ ok: false, code: `PRISMA_${error.code}`, error: error.message, meta: error.meta }, { status: 500 });
+    return NextResponse.json(publicApiError("Không thể lưu món. Vui lòng thử lại."), { status: 500 });
   }
   console.error("CREATE/UPDATE MENU ERROR", error);
-  return NextResponse.json({ ok: false, code: "UNKNOWN_ERROR", error: error instanceof Error ? error.message : "Không thể lưu món." }, { status: 500 });
+  return NextResponse.json(publicApiError(safeErrorMessage(error, "Không thể lưu món. Vui lòng thử lại.")), { status: 500 });
 }
 
 async function parseRequest(request: NextRequest, slug: string) {

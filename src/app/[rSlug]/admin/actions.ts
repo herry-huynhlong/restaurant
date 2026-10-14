@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import { generateQrToken } from "@/lib/qr";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
+import { rethrowNextNavigation } from "@/lib/safe-user-message";
 import { parseVndInteger } from "@/lib/money";
 import { assignableRestaurantRoles } from "@/lib/restaurant-role-labels";
 import { allowedStaffRolesForPlan } from "@/lib/plan/features";
@@ -67,24 +68,21 @@ function actionError(code: string, error: string, fieldErrors?: Record<string, s
   return { ok: false as const, code, error, fieldErrors };
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown error";
-}
-
 function prismaErrorPayload(error: unknown, fallback: string) {
+  rethrowNextNavigation(error);
+
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    const meta = error.meta ? ` ${JSON.stringify(error.meta)}` : "";
     switch (error.code) {
       case "P2002":
-        return actionError("UNIQUE_CONSTRAINT", `Dữ liệu bị trùng.${meta}`);
+        return actionError("UNIQUE_CONSTRAINT", "Dữ liệu bị trùng. Vui lòng kiểm tra lại.");
       case "P2003":
-        return actionError("FOREIGN_KEY_CONSTRAINT", `Dữ liệu liên kết không tồn tại.${meta}`);
+        return actionError("FOREIGN_KEY_CONSTRAINT", "Dữ liệu liên kết không tồn tại.");
       case "P2011":
-        return actionError("NULL_CONSTRAINT", `Thiếu dữ liệu bắt buộc.${meta}`);
+        return actionError("NULL_CONSTRAINT", "Thiếu dữ liệu bắt buộc.");
       case "P2025":
-        return actionError("RECORD_NOT_FOUND", `Không tìm thấy dữ liệu cần cập nhật.${meta}`);
+        return actionError("RECORD_NOT_FOUND", "Không tìm thấy dữ liệu cần cập nhật.");
       default:
-        return actionError(`PRISMA_${error.code}`, `${fallback} (${error.code})${meta}`);
+        return actionError("DATABASE_ERROR", fallback);
     }
   }
 
@@ -95,11 +93,7 @@ function prismaErrorPayload(error: unknown, fallback: string) {
     return actionError("INVALID_IMAGE_SIZE", "Ảnh tối đa 5MB.");
   }
 
-  if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
-    return actionError("AUTH_REQUIRED", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.");
-  }
-
-  return actionError("UNKNOWN_ERROR", `${fallback}: ${errorMessage(error)}`);
+  return actionError("UNKNOWN_ERROR", fallback);
 }
 
 function redirectWithMessage(path: string, key: "error" | "success", message: string): never {
@@ -786,7 +780,7 @@ export async function updateRestaurantSettingsAction(slug: string, formData: For
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã lưu cài đặt nhà hàng.");
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     redirectWithMessage(path, "error", uploadImageErrorMessage(error) ?? "Không lưu được cài đặt nhà hàng.");
   }
 }
@@ -859,7 +853,7 @@ export async function changeOwnerPasswordAction(slug: string, formData: FormData
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã đổi mật khẩu.");
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     if (error instanceof z.ZodError) {
       redirectWithMessage(path, "error", error.issues[0]?.message ?? "Dữ liệu mật khẩu không hợp lệ.");
     }
@@ -941,12 +935,6 @@ function staffActionErrorMessage(error: unknown) {
   return "Không lưu được nhân viên.";
 }
 
-function rethrowNextRedirect(error: unknown) {
-  if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
-    throw error;
-  }
-}
-
 export async function createStaffAction(slug: string, formData: FormData) {
   const access = await requireAdminContext(slug);
   const path = restaurantRoutes.adminStaff(slug);
@@ -1004,7 +992,7 @@ export async function createStaffAction(slug: string, formData: FormData) {
     revalidatePath(path);
     redirectWithMessage(path, "success", `Đã tạo nhân viên ${staff.name}.`);
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
@@ -1070,7 +1058,7 @@ export async function updateStaffAction(slug: string, formData: FormData) {
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã lưu nhân viên.");
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     console.error("UPDATE STAFF ERROR", error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
@@ -1115,7 +1103,7 @@ export async function resetStaffPasswordAction(slug: string, formData: FormData)
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã đổi mật khẩu nhân viên.");
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
@@ -1182,7 +1170,7 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
     revalidatePath(path);
     redirectWithMessage(path, "success", isActive ? "Đã kích hoạt nhân viên." : "Đã ngừng sử dụng nhân viên.");
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
@@ -1249,7 +1237,7 @@ export async function deleteStaffAccountAction(slug: string, formData: FormData)
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã xóa tài khoản nhân viên.");
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
   }
 }
@@ -1311,7 +1299,7 @@ export async function revokeStaffDeviceSessionAction(slug: string, formData: For
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã khóa thiết bị nhân viên.");
   } catch (error) {
-    rethrowNextRedirect(error);
+    rethrowNextNavigation(error);
     redirectWithMessage(path, "error", "Không khóa được thiết bị.");
   }
 }

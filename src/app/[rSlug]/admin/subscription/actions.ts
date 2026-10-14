@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
+import { safeErrorMessage } from "@/lib/safe-user-message";
 import { createSubscriptionRequest, subscriptionTerms } from "@/server/services/subscription-service";
 
 const requestSchema = z.object({
@@ -34,7 +35,7 @@ export async function createRestaurantSubscriptionRequestAction(slug: string, fo
       requestType: parsed.data.requestType
     });
   } catch (error) {
-    redirectWithError(slug, error instanceof Error ? error.message : "Chưa thể gửi yêu cầu đăng ký.");
+    redirectWithError(slug, safeErrorMessage(error, "Chưa thể gửi yêu cầu đăng ký."));
   }
 
   revalidatePath(restaurantRoutes.adminSubscription(slug));

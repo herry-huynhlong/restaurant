@@ -3,13 +3,14 @@
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { sanitizeFeedbackMessage } from "@/lib/safe-user-message";
 import { normalizeUsername } from "@/lib/username";
 
 export function RestaurantLoginForm({ slug, initialError }: { slug: string; initialError?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const [pageError, setPageError] = useState(initialError ?? null);
+  const [pageError, setPageError] = useState(sanitizeFeedbackMessage(initialError, "Không thể đăng nhập. Vui lòng thử lại.") ?? null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {

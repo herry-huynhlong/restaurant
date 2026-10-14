@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
+import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { BusinessPlanFields } from "@/components/platform/business-plan-fields";
 import { LogoUploadInput } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
@@ -34,7 +35,7 @@ export default async function EditRestaurantPage({
 
   return (
     <PlatformShell title={`Chỉnh sửa ${restaurant.name}`}>
-      {searchParams?.error ? <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{searchParams.error}</p> : null}
+      <FeedbackBanner error={searchParams?.error} />
       <form className="space-y-6 rounded-lg border bg-white p-5 shadow-sm" action={updateRestaurantAction} encType="multipart/form-data">
         <input name="restaurantId" type="hidden" value={restaurant.id} />
         <input name="existingLogoUrl" type="hidden" value={restaurant.logoUrl ?? ""} />

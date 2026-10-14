@@ -1,6 +1,7 @@
 import { CustomerShell } from "@/components/app-shell/customer-shell";
 import { getRestaurantBySlug, canRestaurantOperate } from "@/lib/tenant/restaurant";
 import { prisma } from "@/lib/db/prisma";
+import { sanitizeFeedbackMessage } from "@/lib/safe-user-message";
 import { startCustomerSessionAction } from "@/app/[rSlug]/welcome/actions";
 
 export default async function WelcomePage({
@@ -24,7 +25,8 @@ export default async function WelcomePage({
     : null;
   const canUseTable = Boolean(table?.isActive);
   const invalidQrMessage = "Mã QR này không còn hiệu lực. Vui lòng quét mã QR mới tại bàn.";
-  const errorMessage = searchParams?.error ?? (!qrToken ? "QR không hợp lệ." : !table ? invalidQrMessage : !canUseTable ? "Bàn này hiện không hoạt động." : null);
+  const urlError = sanitizeFeedbackMessage(searchParams?.error, "Không thể mở phiên gọi món.");
+  const errorMessage = urlError ?? (!qrToken ? "QR không hợp lệ." : !table ? invalidQrMessage : !canUseTable ? "Bàn này hiện không hoạt động." : null);
   const startAction = startCustomerSessionAction.bind(null, restaurant.slug);
 
   return (

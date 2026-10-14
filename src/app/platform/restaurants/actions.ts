@@ -8,6 +8,7 @@ import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { platformRoutes } from "@/lib/routes";
+import { safeErrorMessage } from "@/lib/safe-user-message";
 import { enforceBusinessPlan } from "@/lib/business-type";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
 import { addCalendarMonths, confirmSubscriptionRequest, rejectSubscriptionRequest } from "@/server/services/subscription-service";
@@ -1043,10 +1044,11 @@ export async function confirmSubscriptionRequestAction(formData: FormData) {
     const request = await confirmSubscriptionRequest(parsed.data.requestId, actor.id);
     revalidatePath(platformRoutes.restaurants);
     revalidatePath(platformRoutes.restaurantDetail(request.restaurantId));
-    redirectWithSuccess(returnTo, "Đã xác nhận thanh toán và kích hoạt gói dịch vụ.");
   } catch (error) {
-    redirectWithError(returnTo, error instanceof Error ? error.message : "Chưa thể xác nhận yêu cầu đăng ký.");
+    redirectWithError(returnTo, safeErrorMessage(error, "Chưa thể xác nhận yêu cầu đăng ký."));
   }
+
+  redirectWithSuccess(returnTo, "Đã xác nhận thanh toán và kích hoạt gói dịch vụ.");
 }
 
 export async function rejectSubscriptionRequestAction(formData: FormData) {
@@ -1064,8 +1066,9 @@ export async function rejectSubscriptionRequestAction(formData: FormData) {
     const request = await rejectSubscriptionRequest(parsed.data.requestId, actor.id, parsed.data.adminNote);
     revalidatePath(platformRoutes.restaurants);
     revalidatePath(platformRoutes.restaurantDetail(request.restaurantId));
-    redirectWithSuccess(returnTo, "Đã từ chối yêu cầu đăng ký.");
   } catch (error) {
-    redirectWithError(returnTo, error instanceof Error ? error.message : "Chưa thể từ chối yêu cầu đăng ký.");
+    redirectWithError(returnTo, safeErrorMessage(error, "Chưa thể từ chối yêu cầu đăng ký."));
   }
+
+  redirectWithSuccess(returnTo, "Đã từ chối yêu cầu đăng ký.");
 }

@@ -86,7 +86,8 @@ export function PushNotificationButton({ slug, compact = false }: { slug: string
       setMessage("Đã bật thông báo đẩy và âm thanh ting ting cho thiết bị này.");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Không thể bật thông báo đẩy. Vui lòng thử lại sau.");
+      console.error("PUSH SUBSCRIBE CLIENT ERROR", error);
+      setMessage("Không thể bật thông báo đẩy. Vui lòng thử lại sau.");
     }
   }
 

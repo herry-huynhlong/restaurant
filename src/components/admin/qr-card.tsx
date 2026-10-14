@@ -56,7 +56,8 @@ export function QrCard({
       setMessage("Đã tạo mã QR mới.");
       await onRegenerated?.();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không đổi được mã QR.");
+      console.error("REGENERATE QR CLIENT ERROR", error);
+      setMessage("Không đổi được mã QR. Vui lòng thử lại.");
     } finally {
       setPending(false);
     }
