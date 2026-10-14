@@ -72,3 +72,63 @@ export function CopyLoginLinkButton({ url }: { url: string }) {
     </button>
   );
 }
+
+export function StaffDirectoryFilters() {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<"ALL" | "WORKING" | "OFF_SHIFT">("ALL");
+
+  useEffect(() => {
+    const normalizedQuery = normalizeText(query);
+    const cards = Array.from(document.querySelectorAll<HTMLElement>("[data-staff-card]"));
+
+    cards.forEach((card) => {
+      const matchesQuery = !normalizedQuery
+        || card.dataset.staffName?.includes(normalizedQuery)
+        || card.dataset.staffUsername?.includes(normalizedQuery);
+      const matchesStatus = status === "ALL" || card.dataset.staffStatus === status;
+      card.hidden = !(matchesQuery && matchesStatus);
+    });
+
+    document.querySelectorAll<HTMLElement>("[data-staff-group]").forEach((group) => {
+      const visibleCards = group.querySelectorAll<HTMLElement>("[data-staff-card]:not([hidden])");
+      const emptyState = group.querySelector<HTMLElement>("[data-staff-group-empty]");
+      if (emptyState) emptyState.hidden = visibleCards.length > 0;
+    });
+  }, [query, status]);
+
+  return (
+    <section className="rounded-2xl border bg-white p-4 shadow-sm">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+        <label className="block text-sm font-medium">
+          Tìm nhân viên
+          <input
+            className="mt-2 h-11 w-full rounded-xl border px-3 outline-none focus:border-teal-600"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            placeholder="Nhập tên hoặc tên đăng nhập"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {[
+            ["ALL", "Tất cả"],
+            ["WORKING", "Đang trong ca"],
+            ["OFF_SHIFT", "Ngoài ca"]
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              className={`h-11 rounded-xl border px-4 text-sm font-semibold transition ${status === value ? "border-teal-700 bg-teal-700 text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
+              type="button"
+              onClick={() => setStatus(value as "ALL" | "WORKING" | "OFF_SHIFT")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function normalizeText(value: string) {
+  return value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}

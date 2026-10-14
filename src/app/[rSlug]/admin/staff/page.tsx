@@ -2,9 +2,10 @@ import type { RestaurantRole } from "@prisma/client";
 import QRCode from "qrcode";
 import Image from "next/image";
 import { headers } from "next/headers";
+import { ChefHat, Clock3, Receipt, Smartphone, UserCog, Users, type LucideIcon } from "lucide-react";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
-import { CopyLoginLinkButton, StaffPageInteractions, StaffSubmitButton } from "@/components/admin/staff-page-interactions";
+import { CopyLoginLinkButton, StaffDirectoryFilters, StaffPageInteractions, StaffSubmitButton } from "@/components/admin/staff-page-interactions";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
@@ -27,13 +28,45 @@ const departmentLabels: Record<"MANAGER" | "WAITER" | "KITCHEN" | "CASHIER", { t
   CASHIER: { title: "Thu ngân", description: "Dành cho quầy thu ngân." }
 };
 
-const staffRoleOrder: RestaurantRole[] = ["WAITER", "KITCHEN", "CASHIER", "MANAGER"];
+const staffRoleOrder: RestaurantRole[] = ["MANAGER", "WAITER", "KITCHEN", "CASHIER"];
 const staffGroupTitles: Record<RestaurantRole, string> = {
   OWNER: "Chủ quán",
   WAITER: "Phục vụ",
-  KITCHEN: "Bếp",
+  KITCHEN: "Bếp / Pha chế",
   CASHIER: "Thu ngân",
   MANAGER: "Quản lý"
+};
+const staffRoleStyles: Record<RestaurantRole, { Icon: LucideIcon; shell: string; icon: string; accent: string }> = {
+  OWNER: {
+    Icon: UserCog,
+    shell: "border-teal-100 bg-teal-50/70",
+    icon: "bg-teal-700 text-white",
+    accent: "text-teal-800"
+  },
+  MANAGER: {
+    Icon: UserCog,
+    shell: "border-teal-100 bg-teal-50/70",
+    icon: "bg-teal-700 text-white",
+    accent: "text-teal-800"
+  },
+  WAITER: {
+    Icon: Users,
+    shell: "border-sky-100 bg-sky-50/70",
+    icon: "bg-sky-600 text-white",
+    accent: "text-sky-800"
+  },
+  KITCHEN: {
+    Icon: ChefHat,
+    shell: "border-amber-100 bg-amber-50/70",
+    icon: "bg-amber-600 text-white",
+    accent: "text-amber-800"
+  },
+  CASHIER: {
+    Icon: Receipt,
+    shell: "border-emerald-100 bg-emerald-50/70",
+    icon: "bg-emerald-600 text-white",
+    accent: "text-emerald-800"
+  }
 };
 const staffStatusRank = { WORKING: 0, OFF_SHIFT: 1, LOCKED: 2 };
 
@@ -149,6 +182,8 @@ export default async function AdminStaffPage({
     }));
   const safeError = sanitizeFeedbackMessage(searchParams?.error, "Không thể hoàn tất thao tác. Vui lòng thử lại.");
   const safeSuccess = safeError ? undefined : sanitizeFeedbackMessage(searchParams?.success, "Thao tác đã hoàn tất.");
+  const totalWorking = staffRows.filter((row) => row.status === "WORKING").length;
+  const totalActiveDevices = staffRows.reduce((total, row) => total + row.devices.filter((device) => device.isActive && !device.revokedAt).length, 0);
 
   return (
     <RestaurantAdminShell
@@ -224,12 +259,35 @@ export default async function AdminStaffPage({
       </details>
 
       <section className="mt-6 space-y-5">
-        <h2 className="text-base font-semibold">Danh sách nhân sự</h2>
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Nhân sự</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950">Quản lý đội ngũ</h2>
+        </div>
+
+        <section className="grid gap-3 md:grid-cols-3">
+          <StaffMetricCard icon={Users} label="Tổng nhân viên" value={staffRows.length} helper="Không bao gồm chủ quán" tone="teal" />
+          <StaffMetricCard icon={Clock3} label="Đang trong ca" value={totalWorking} helper="Có phiên làm việc hợp lệ" tone="blue" />
+          <StaffMetricCard icon={Smartphone} label="Thiết bị đang hoạt động" value={totalActiveDevices} helper="Thiết bị chưa bị khóa" tone="amber" />
+        </section>
+
+        <StaffDirectoryFilters />
+
         {staffRows.length ? groupedStaff.map((group) => (
-          <section key={group.role} className="space-y-3">
-            <div>
-              <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">{group.title}</h3>
-              <p className="text-xs text-slate-500">{restaurantRoleLabels[group.role]}</p>
+          <section key={group.role} className={`space-y-3 rounded-2xl border p-4 ${staffRoleStyles[group.role].shell}`} data-staff-group>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${staffRoleStyles[group.role].icon}`}>
+                  {(() => {
+                    const Icon = staffRoleStyles[group.role].Icon;
+                    return <Icon className="h-5 w-5" />;
+                  })()}
+                </span>
+                <div>
+                  <h3 className={`text-sm font-bold uppercase tracking-wide ${staffRoleStyles[group.role].accent}`}>{group.title}</h3>
+                  <p className="text-xs text-slate-500">{restaurantRoleLabels[group.role]}</p>
+                </div>
+              </div>
+              <span className="rounded-full border bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700">{group.rows.length} nhân viên</span>
             </div>
             {group.rows.length ? (
               <div className="space-y-3">
@@ -246,6 +304,7 @@ export default async function AdminStaffPage({
             ) : (
               <p className="rounded-lg border border-dashed bg-white p-4 text-sm text-slate-500">Chưa có nhân sự trong bộ phận này.</p>
             )}
+            <p data-staff-group-empty hidden className="rounded-lg border border-dashed bg-white p-4 text-sm text-slate-500">Không có nhân sự phù hợp bộ lọc.</p>
           </section>
         )) : (
           <section className="rounded-lg border bg-white p-8 text-center shadow-sm">
@@ -271,25 +330,34 @@ function StaffRow({
 }) {
   const canEditRole = !isSelf;
   const activeDevices = staff.devices.filter((device) => device.isActive && !device.revokedAt);
-  const workingDevices = activeDevices.filter((device) => device.onShift);
+  const roleStyle = staffRoleStyles[staff.role];
+  const RoleIcon = roleStyle.Icon;
 
   return (
-    <article className="rounded-lg border bg-white p-4 shadow-sm transition hover:border-slate-300">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.8fr)_auto] lg:items-start">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-2 lg:block">
-            <div className="min-w-0">
-              <h4 className="truncate text-base font-semibold">{staff.name}</h4>
-              <p className="text-sm font-medium text-slate-700">{restaurantRoleLabels[staff.role]}</p>
-            </div>
-            <StatusBadge status={staff.status} />
+    <article
+      className="rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-100 hover:shadow-md"
+      data-staff-card
+      data-staff-name={normalizeForFilter(staff.name)}
+      data-staff-username={normalizeForFilter(staff.username)}
+      data-staff-status={staff.status}
+    >
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${roleStyle.icon}`}>
+            <RoleIcon className="h-5 w-5" />
           </div>
-          <p className="mt-2 break-all text-sm text-slate-600">Tên đăng nhập: <span className="font-semibold">{staff.username}</span></p>
-        </div>
-
-        <div className="space-y-1 text-sm text-slate-600">
-          <p><span className="font-medium text-slate-800">Thiết bị:</span> {deviceSummary(staff, activeDevices, workingDevices)}</p>
-          <p><span className="font-medium text-slate-800">Hoạt động gần nhất:</span> {lastSeenSummary(staff.devices)}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="truncate text-base font-semibold text-slate-950">{staff.name}</h4>
+              <StatusBadge status={staff.status} />
+            </div>
+            <p className="mt-1 text-sm font-medium text-slate-700">{restaurantRoleLabels[staff.role]}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-600">
+              <span className="rounded-full bg-slate-100 px-2.5 py-1">@{staff.username}</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1">{activeDevices.length} thiết bị hoạt động</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1">Gần nhất: {lastSeenSummary(staff.devices)}</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -299,22 +367,14 @@ function StaffRow({
               <EditStaffForms staff={staff} slug={slug} assignableRoles={assignableRoles} canEditRole={canEditRole} isSelf={isSelf} />
             </div>
           </details>
-          {activeDevices.length === 1 ? (
-            <RevokeDeviceForm slug={slug} device={activeDevices[0]} staffName={staff.name} compact />
-          ) : activeDevices.length > 1 ? (
+          {staff.devices.length > 0 ? (
             <details data-staff-panel>
               <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem thiết bị</summary>
-              <DeviceList slug={slug} staffName={staff.name} devices={activeDevices} />
+              <DeviceList slug={slug} staffName={staff.name} devices={staff.devices} />
             </details>
           ) : null}
         </div>
       </div>
-
-      {staff.devices.length > 0 ? (
-        <div className="mt-3 border-t pt-3">
-          <DevicePreview slug={slug} staffName={staff.name} devices={staff.devices} />
-        </div>
-      ) : null}
     </article>
   );
 }
@@ -390,21 +450,13 @@ function EditStaffForms({
   );
 }
 
-function DevicePreview({ slug, staffName, devices }: { slug: string; staffName: string; devices: StaffDeviceViewModel[] }) {
-  const previewDevices = devices.slice(0, 2);
-  return (
-    <div className="grid gap-2 md:grid-cols-2">
-      {previewDevices.map((device) => (
-        <DeviceLine key={device.id} slug={slug} staffName={staffName} device={device} />
-      ))}
-      {devices.length > 2 ? <p className="text-sm text-slate-500">+ {devices.length - 2} thiết bị khác</p> : null}
-    </div>
-  );
-}
-
 function DeviceList({ slug, staffName, devices }: { slug: string; staffName: string; devices: StaffDeviceViewModel[] }) {
   return (
-    <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-sm lg:w-[420px]">
+    <div className="mt-2 max-h-[70vh] w-full overflow-y-auto rounded-2xl border bg-white p-3 shadow-sm lg:w-[460px]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="font-semibold text-slate-950">Thiết bị của {staffName}</p>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{devices.length} thiết bị</span>
+      </div>
       <div className="space-y-2">
         {devices.map((device) => (
           <DeviceLine key={device.id} slug={slug} staffName={staffName} device={device} forceAction />
@@ -427,7 +479,7 @@ function DeviceLine({
 }) {
   const canRevoke = device.isActive && !device.revokedAt;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-3 text-sm">
       <div className="min-w-0">
         <p className="truncate font-medium text-slate-900">{device.name}</p>
         <p className="text-xs text-slate-500">{deviceStatusLabel(device)} · {formatTime(device.lastSeenAt)}</p>
@@ -484,13 +536,39 @@ function deviceStatusLabel(device: StaffDeviceViewModel) {
   return device.onShift ? "Trong ca" : "Ngoài ca";
 }
 
-function deviceSummary(staff: StaffViewModel, activeDevices: StaffDeviceViewModel[], workingDevices: StaffDeviceViewModel[]) {
-  if (staff.status === "LOCKED") return "Tài khoản đã khóa";
-  if (workingDevices.length > 1) return `${workingDevices.length} thiết bị đang hoạt động`;
-  if (workingDevices.length === 1) return workingDevices[0].name;
-  if (activeDevices.length > 1) return `${activeDevices.length} thiết bị ngoài ca`;
-  if (activeDevices.length === 1) return `${activeDevices[0].name} · ngoài ca`;
-  return "Chưa có thiết bị đang trong ca";
+function StaffMetricCard({
+  icon: Icon,
+  label,
+  value,
+  helper,
+  tone
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: number;
+  helper: string;
+  tone: "teal" | "blue" | "amber";
+}) {
+  const styles = {
+    teal: "border-teal-100 bg-teal-50 text-teal-700",
+    blue: "border-sky-100 bg-sky-50 text-sky-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700"
+  }[tone];
+
+  return (
+    <article className="rounded-2xl border bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border ${styles}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-slate-600">{label}</p>
+          <p className="text-xs text-slate-500">{helper}</p>
+        </div>
+      </div>
+      <p className="mt-4 text-3xl font-semibold tracking-normal text-slate-950">{value}</p>
+    </article>
+  );
 }
 
 function lastSeenSummary(devices: StaffDeviceViewModel[]) {
@@ -509,4 +587,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <div className="mt-1">{children}</div>
     </label>
   );
+}
+
+function normalizeForFilter(value: string) {
+  return value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
