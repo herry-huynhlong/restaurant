@@ -990,7 +990,7 @@ export async function createStaffAction(slug: string, formData: FormData) {
     });
 
     revalidatePath(path);
-    redirectWithMessage(path, "success", `Đã tạo nhân viên ${staff.name}.`);
+    redirectWithMessage(path, "success", "Đã tạo tài khoản nhân viên thành công.");
   } catch (error) {
     rethrowNextNavigation(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
@@ -1027,6 +1027,9 @@ export async function updateStaffAction(slug: string, formData: FormData) {
     }
     ensureCanMutateStaff(access, membership, parsed.role, parsed.isActive);
 
+    const roleChanged = membership.role !== parsed.role;
+    const activeChanged = membership.isActive !== parsed.isActive;
+
     await prisma.$transaction([
       prisma.user.update({
         where: { id: membership.userId },
@@ -1056,7 +1059,11 @@ export async function updateStaffAction(slug: string, formData: FormData) {
     ]);
 
     revalidatePath(path);
-    redirectWithMessage(path, "success", "Đã lưu nhân viên.");
+    redirectWithMessage(
+      path,
+      "success",
+      roleChanged ? "Đã cập nhật vai trò nhân viên." : activeChanged && parsed.isActive ? "Đã kích hoạt lại tài khoản nhân viên." : activeChanged ? "Đã tạm khóa tài khoản nhân viên." : "Đã cập nhật thông tin nhân viên."
+    );
   } catch (error) {
     rethrowNextNavigation(error);
     console.error("UPDATE STAFF ERROR", error);
@@ -1101,7 +1108,7 @@ export async function resetStaffPasswordAction(slug: string, formData: FormData)
     ]);
 
     revalidatePath(path);
-    redirectWithMessage(path, "success", "Đã đổi mật khẩu nhân viên.");
+    redirectWithMessage(path, "success", "Đã đổi mật khẩu nhân viên thành công.");
   } catch (error) {
     rethrowNextNavigation(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));
@@ -1168,7 +1175,7 @@ export async function toggleStaffActiveAction(slug: string, formData: FormData) 
     ]);
 
     revalidatePath(path);
-    redirectWithMessage(path, "success", isActive ? "Đã kích hoạt nhân viên." : "Đã ngừng sử dụng nhân viên.");
+    redirectWithMessage(path, "success", isActive ? "Đã kích hoạt lại tài khoản nhân viên." : "Đã tạm khóa tài khoản nhân viên.");
   } catch (error) {
     rethrowNextNavigation(error);
     redirectWithMessage(path, "error", staffActionErrorMessage(error));

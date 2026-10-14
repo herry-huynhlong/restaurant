@@ -4,11 +4,13 @@ import Image from "next/image";
 import { headers } from "next/headers";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { CopyLoginLinkButton, StaffPageInteractions, StaffSubmitButton } from "@/components/admin/staff-page-interactions";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { departmentLoginRolesForPlan } from "@/lib/plan/features";
 import { assignableRestaurantRolesForPlan, restaurantRoleLabels } from "@/lib/restaurant-role-labels";
+import { sanitizeFeedbackMessage } from "@/lib/safe-user-message";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import {
   createStaffAction,
@@ -18,7 +20,8 @@ import {
   updateStaffAction
 } from "@/app/[rSlug]/admin/actions";
 
-const departmentLabels: Record<"WAITER" | "KITCHEN" | "CASHIER", { title: string; description: string }> = {
+const departmentLabels: Record<"MANAGER" | "WAITER" | "KITCHEN" | "CASHIER", { title: string; description: string }> = {
+  MANAGER: { title: "Quản lý", description: "Dành cho người điều hành cửa hàng." },
   WAITER: { title: "Phục vụ", description: "Dành cho nhân viên phục vụ bàn." },
   KITCHEN: { title: "Bếp", description: "Dành cho bộ phận bếp." },
   CASHIER: { title: "Thu ngân", description: "Dành cho quầy thu ngân." }
@@ -64,10 +67,14 @@ export default async function AdminStaffPage({
   searchParams?: { error?: string; success?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
-  const assignableRoles = assignableRestaurantRolesForPlan(access.restaurant.plan, access.restaurant.businessType);
-  const departmentAccess = departmentLoginRolesForPlan(access.restaurant.plan, access.restaurant.businessType, access.restaurant.planEntitlement).map((role) => ({
+  const assignableRoles = assignableRestaurantRolesForPlan(access.restaurant.plan, access.restaurant.businessType, access.restaurant.planEntitlement);
+  const departmentRoles = [
+    ...(assignableRoles.includes("MANAGER") ? ["MANAGER" as const] : []),
+    ...departmentLoginRolesForPlan(access.restaurant.plan, access.restaurant.businessType, access.restaurant.planEntitlement)
+  ];
+  const departmentAccess = departmentRoles.map((role) => ({
     role,
-    ...departmentLabels[role as "WAITER" | "KITCHEN" | "CASHIER"]
+    ...departmentLabels[role as "MANAGER" | "WAITER" | "KITCHEN" | "CASHIER"]
   }));
   const origin = getRequestOrigin();
   const loginAccessRows = await Promise.all(departmentAccess.map(async (item) => {
@@ -89,8 +96,6 @@ export default async function AdminStaffPage({
     }),
     getRecentNotifications(access.restaurant.id, access.user.id)
   ]);
-  const shouldCloseEditPanel = searchParams?.success === "Đã lưu nhân viên.";
-  const closeEditKey = shouldCloseEditPanel ? `${searchParams?.success}-${Date.now()}` : "";
   const staffUserIds = staffMemberships.map((membership) => membership.userId);
   const deviceSessions = staffUserIds.length
     ? await prisma.staffDeviceSession.findMany({
@@ -142,6 +147,8 @@ export default async function AdminStaffPage({
       title: staffGroupTitles[role],
       rows: staffRows.filter((row) => row.role === role)
     }));
+  const safeError = sanitizeFeedbackMessage(searchParams?.error, "Không thể hoàn tất thao tác. Vui lòng thử lại.");
+  const safeSuccess = safeError ? undefined : sanitizeFeedbackMessage(searchParams?.success, "Thao tác đã hoàn tất.");
 
   return (
     <RestaurantAdminShell
@@ -155,9 +162,10 @@ export default async function AdminStaffPage({
       planEntitlement={access.restaurant.planEntitlement}
       businessType={access.restaurant.businessType}
     >
-      <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
+      <FeedbackBanner error={safeError} success={safeSuccess} />
+      <StaffPageInteractions error={safeError} success={safeSuccess} />
 
-      <details className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
+      <details data-staff-panel className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
         <summary className="cursor-pointer list-none text-base font-semibold">
           <span className="inline-flex items-center gap-2">Mã đăng nhập theo bộ phận <span className="text-xs font-medium text-slate-500">(bấm để mở)</span></span>
         </summary>
@@ -172,8 +180,9 @@ export default async function AdminStaffPage({
                     <p className="text-sm text-slate-600">{item.description}</p>
                   </div>
                   <a className="rounded-md border px-3 py-2 text-sm font-semibold" href={item.url} target="_blank" rel="noreferrer">
-                    Mở link
+                    Mở liên kết
                   </a>
+                  <CopyLoginLinkButton url={item.url} />
                 </div>
                 <p className="mt-3 break-all rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-700">{item.url}</p>
               </div>
@@ -182,7 +191,7 @@ export default async function AdminStaffPage({
         </div>
       </details>
 
-      <details className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
+      <details data-staff-panel className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
         <summary className="cursor-pointer list-none text-base font-semibold">
           <span className="inline-flex items-center gap-2">+ Thêm nhân viên <span className="text-xs font-medium text-slate-500">(bấm để mở)</span></span>
         </summary>
@@ -208,9 +217,9 @@ export default async function AdminStaffPage({
               <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" minLength={8} name="password" required type="password" />
             </Field>
           </div>
-          <button className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+          <StaffSubmitButton className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" pendingLabel="Đang tạo...">
             Tạo nhân viên
-          </button>
+          </StaffSubmitButton>
         </form>
       </details>
 
@@ -231,7 +240,6 @@ export default async function AdminStaffPage({
                     slug={access.restaurant.slug}
                     assignableRoles={assignableRoles}
                     isSelf={staff.userId === access.user.id}
-                    closeEditKey={closeEditKey}
                   />
                 ))}
               </div>
@@ -255,13 +263,11 @@ function StaffRow({
   slug,
   assignableRoles,
   isSelf,
-  closeEditKey
 }: {
   staff: StaffViewModel;
   slug: string;
   assignableRoles: RestaurantRole[];
   isSelf: boolean;
-  closeEditKey: string;
 }) {
   const canEditRole = !isSelf;
   const activeDevices = staff.devices.filter((device) => device.isActive && !device.revokedAt);
@@ -287,16 +293,16 @@ function StaffRow({
         </div>
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
-          <details key={`${staff.id}-${closeEditKey}`} className="relative">
+          <details data-staff-panel>
             <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Chỉnh sửa</summary>
-            <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-lg lg:absolute lg:right-0 lg:z-10 lg:w-[520px]">
+            <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-sm lg:w-[520px]">
               <EditStaffForms staff={staff} slug={slug} assignableRoles={assignableRoles} canEditRole={canEditRole} isSelf={isSelf} />
             </div>
           </details>
           {activeDevices.length === 1 ? (
             <RevokeDeviceForm slug={slug} device={activeDevices[0]} staffName={staff.name} compact />
           ) : activeDevices.length > 1 ? (
-            <details className="relative">
+            <details data-staff-panel>
               <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem thiết bị</summary>
               <DeviceList slug={slug} staffName={staff.name} devices={activeDevices} />
             </details>
@@ -354,9 +360,9 @@ function EditStaffForms({
           Tài khoản đang hoạt động
         </label>
         {isSelf ? <input name="isActive" type="hidden" value="true" /> : null}
-        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+        <StaffSubmitButton className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">
           Lưu thay đổi
-        </button>
+        </StaffSubmitButton>
       </form>
 
       <form className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]" action={resetStaffPasswordAction.bind(null, slug)}>
@@ -364,7 +370,7 @@ function EditStaffForms({
         <Field label="Mật khẩu mới">
           <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" minLength={8} name="password" placeholder="Mật khẩu mới" required type="password" />
         </Field>
-        <button className="self-end rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đổi mật khẩu</button>
+        <StaffSubmitButton className="self-end rounded-md border px-3 py-2 text-sm font-semibold" pendingLabel="Đang đổi...">Đổi mật khẩu</StaffSubmitButton>
       </form>
 
       <div className="mt-4 border-t pt-3">
@@ -398,7 +404,7 @@ function DevicePreview({ slug, staffName, devices }: { slug: string; staffName: 
 
 function DeviceList({ slug, staffName, devices }: { slug: string; staffName: string; devices: StaffDeviceViewModel[] }) {
   return (
-    <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-lg lg:absolute lg:right-0 lg:z-10 lg:w-[420px]">
+    <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-sm lg:w-[420px]">
       <div className="space-y-2">
         {devices.map((device) => (
           <DeviceLine key={device.id} slug={slug} staffName={staffName} device={device} forceAction />
