@@ -1,7 +1,8 @@
 "use client";
 
 import { CheckCircle2, Crown, ShieldCheck, XCircle } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createRestaurantSubscriptionRequestAction } from "@/app/[rSlug]/admin/subscription/actions";
 import type { CommercialPlan, PlanFeature } from "@/lib/plan/features";
@@ -55,10 +56,17 @@ export function SubscriptionPricingClient({
   pendingRequests
 }: SubscriptionPricingClientProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const searchParams = useSearchParams();
   const [selectedTerm, setSelectedTerm] = useState<(typeof terms)[number]>(12);
   const [selectedPrice, setSelectedPrice] = useState<PlanPrice | null>(null);
   const [selectedRequestType, setSelectedRequestType] = useState<"RENEWAL" | "UPGRADE">("RENEWAL");
   const action = createRestaurantSubscriptionRequestAction.bind(null, slug);
+
+  useEffect(() => {
+    if (!searchParams.get("success")) return;
+    dialogRef.current?.close();
+    setSelectedPrice(null);
+  }, [searchParams]);
 
   const pricesByPlan = useMemo(() => {
     return new Map(prices.map((price) => [`${price.plan}:${price.termMonths}`, price]));
