@@ -3,8 +3,8 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SubscriptionPricingClient } from "@/components/admin/subscription-pricing-client";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRecentNotifications } from "@/server/services/notification-service";
-import { daysRemaining, getPublicPlanPrices, getRestaurantSubscriptionSummary, planPriceDescription } from "@/server/services/subscription-service";
-import { basicPlanFeatures, planFeatureLabels, proPlanFeatures, type CommercialPlan } from "@/lib/plan/features";
+import { daysRemaining, getPublicPlanPrices, getRestaurantSubscriptionSummary } from "@/server/services/subscription-service";
+import { basicPlanFeatures, planFeatureLabels, planFeatureOrder, proPlanFeatures, type CommercialPlan } from "@/lib/plan/features";
 
 const planFeatures: Record<CommercialPlan, typeof basicPlanFeatures> = {
   BASIC: basicPlanFeatures,
@@ -29,14 +29,15 @@ export default async function AdminSubscriptionPage({
   const remainingDays = daysRemaining(restaurant.subscriptionEnd);
   const currentExpired = remainingDays != null && remainingDays <= 0;
   const currentPlan = restaurant.plan === "PRO" ? "PRO" : "BASIC";
-  const featureItems = {
-    BASIC: planFeatures.BASIC.map((feature) => ({ key: feature, title: planFeatureLabels[feature].title })),
-    PRO: planFeatures.PRO.map((feature) => ({ key: feature, title: planFeatureLabels[feature].title }))
-  };
-  const descriptions = {
-    BASIC: planPriceDescription("BASIC", prices.find((price) => price.plan === "BASIC")?.description),
-    PRO: planPriceDescription("PRO", prices.find((price) => price.plan === "PRO")?.description)
-  };
+  const featureItems = planFeatureOrder.map((feature) => ({
+    key: feature,
+    title: planFeatureLabels[feature].title,
+    BASIC: planFeatures.BASIC.includes(feature),
+    PRO: planFeatures.PRO.includes(feature)
+  }));
+  const currentTerm = summary.currentRequest && [3, 6, 12].includes(summary.currentRequest.termMonths)
+    ? summary.currentRequest.termMonths
+    : null;
 
   return (
     <RestaurantAdminShell
@@ -90,7 +91,7 @@ export default async function AdminSubscriptionPage({
           <div className="mt-3 space-y-2">
             {summary.pendingRequests.map((request) => (
               <div key={request.id} className="rounded-xl border border-amber-200 bg-white/70 p-3 text-sm">
-                <p className="font-semibold">{request.plan} · {request.termMonths} tháng · {formatVnd(request.priceVnd)}</p>
+                <p className="font-semibold">{requestTypeLabel(request.requestType)} · {request.plan} · {request.termMonths} tháng · {formatVnd(request.priceVnd)}</p>
                 <p className="mt-1">Đã gửi lúc {formatDateTime(request.createdAt)}. Gói chỉ được kích hoạt sau khi QuánPilot Admin xác nhận thanh toán.</p>
               </div>
             ))}
@@ -102,6 +103,9 @@ export default async function AdminSubscriptionPage({
         slug={access.restaurant.slug}
         currentPlan={currentPlan}
         currentExpired={currentExpired}
+        subscriptionStart={restaurant.subscriptionStart?.toISOString() ?? null}
+        subscriptionEnd={restaurant.subscriptionEnd?.toISOString() ?? null}
+        currentTerm={currentTerm}
         prices={prices.map((price) => ({
           id: price.id,
           plan: price.plan === "PRO" ? "PRO" : "BASIC",
@@ -112,14 +116,19 @@ export default async function AdminSubscriptionPage({
           description: price.description
         }))}
         features={featureItems}
-        descriptions={descriptions}
         pendingRequests={summary.pendingRequests.map((request) => ({
           plan: request.plan === "PRO" ? "PRO" : "BASIC",
-          termMonths: request.termMonths
+          termMonths: request.termMonths,
+          requestType: request.requestType === "UPGRADE" ? "UPGRADE" : "RENEWAL"
         }))}
       />
     </RestaurantAdminShell>
   );
+}
+
+function requestTypeLabel(type: string) {
+  if (type === "UPGRADE") return "Nâng cấp";
+  return "Gia hạn";
 }
 
 function subscriptionStatusText(status: string, remainingDays: number | null) {

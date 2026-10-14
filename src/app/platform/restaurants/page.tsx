@@ -77,7 +77,13 @@ export default async function PlatformRestaurantsPage({
                       <div className="mt-2 space-y-2">
                         {restaurant.subscriptionRequests.map((request) => (
                           <div key={request.id} className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                            <p className="font-semibold">Chờ xác nhận: {request.plan} · {request.termMonths} tháng · {formatVnd(request.priceVnd)}</p>
+                            <p className="font-semibold">Chờ xác nhận: {requestTypeLabel(request.requestType)} · {request.plan} · {formatVnd(request.priceVnd)}</p>
+                            <p className="mt-1">Kỳ tham chiếu: {request.termMonths} tháng</p>
+                            {request.requestType === "UPGRADE" ? (
+                              <p className="mt-1">Giữ hạn đến: {formatDate(request.currentSubscriptionEnd)}</p>
+                            ) : (
+                              <p className="mt-1">Hạn hiện tại: {formatDate(restaurant.subscriptionEnd)}</p>
+                            )}
                             <div className="mt-2 flex flex-wrap gap-2">
                               <form action={confirmSubscriptionRequestAction}>
                                 <input name="requestId" type="hidden" value={request.id} />
@@ -131,4 +137,9 @@ function formatDate(date: Date | null) {
 
 function formatVnd(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
+}
+
+function requestTypeLabel(type: string) {
+  if (type === "UPGRADE") return "Nâng cấp";
+  return "Gia hạn";
 }

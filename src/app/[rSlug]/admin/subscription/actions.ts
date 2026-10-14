@@ -9,14 +9,16 @@ import { createSubscriptionRequest, subscriptionTerms } from "@/server/services/
 
 const requestSchema = z.object({
   plan: z.enum(["BASIC", "PRO"]),
-  termMonths: z.coerce.number().refine((value) => subscriptionTerms.includes(value as never), "Thời hạn đăng ký không hợp lệ.")
+  termMonths: z.coerce.number().refine((value) => subscriptionTerms.includes(value as never), "Thời hạn đăng ký không hợp lệ."),
+  requestType: z.enum(["RENEWAL", "UPGRADE"]).optional()
 });
 
 export async function createRestaurantSubscriptionRequestAction(slug: string, formData: FormData) {
   const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER"]);
   const parsed = requestSchema.safeParse({
     plan: String(formData.get("plan") ?? ""),
-    termMonths: String(formData.get("termMonths") ?? "")
+    termMonths: String(formData.get("termMonths") ?? ""),
+    requestType: String(formData.get("requestType") ?? "RENEWAL")
   });
 
   if (!parsed.success) {
@@ -28,14 +30,15 @@ export async function createRestaurantSubscriptionRequestAction(slug: string, fo
       restaurantId: access.restaurant.id,
       requestedByUserId: access.user.id,
       plan: parsed.data.plan,
-      termMonths: parsed.data.termMonths as 3 | 6 | 12
+      termMonths: parsed.data.termMonths as 3 | 6 | 12,
+      requestType: parsed.data.requestType
     });
   } catch (error) {
     redirectWithError(slug, error instanceof Error ? error.message : "Chưa thể gửi yêu cầu đăng ký.");
   }
 
   revalidatePath(restaurantRoutes.adminSubscription(slug));
-  redirect(`${restaurantRoutes.adminSubscription(slug)}?success=${encodeURIComponent("Đã gửi yêu cầu đăng ký. QuánPilot Admin sẽ xác nhận sau khi kiểm tra thanh toán.")}`);
+  redirect(`${restaurantRoutes.adminSubscription(slug)}?success=${encodeURIComponent("Đã gửi yêu cầu thành công. Chúng tôi sẽ xác nhận sau khi kiểm tra thanh toán.")}`);
 }
 
 function validationMessage(error: z.ZodError) {

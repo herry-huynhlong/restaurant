@@ -717,6 +717,8 @@ model RestaurantSubscriptionRequest {
   id                String         @id @default(cuid())
   restaurantId      String
   requestedByUserId String
+  requestType       String         @default("RENEWAL")
+  currentPlan       String?
   plan              RestaurantPlan
   termMonths        Int
   priceVnd          Int
@@ -730,11 +732,16 @@ model RestaurantSubscriptionRequest {
   rejectedAt        DateTime?
   activatedStart    DateTime?
   activatedEnd      DateTime?
+  currentSubscriptionStart DateTime?
+  currentSubscriptionEnd   DateTime?
+  quoteExpiresAt    DateTime?
+  pricingSnapshotJson Json?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
   @@index([restaurantId, status])
   @@index([status, createdAt])
+  @@index([requestType, status])
   @@index([requestedByUserId])
 }
 
