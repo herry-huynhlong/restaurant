@@ -1,4 +1,4 @@
-import { AlertTriangle, Archive, CalendarClock, CheckCircle2, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Archive, CalendarClock, CheckCircle2, HardDrive, RefreshCw } from "lucide-react";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { BackupHistoryCard } from "@/components/platform/backup-history-card";
@@ -32,7 +32,7 @@ export default async function PlatformStoragePage({
           icon={<Archive className="h-5 w-5" />}
           label="Bản sao lưu"
           value={formatBytes(dashboard.totals.backupBytes)}
-          helper={`Giữ tối đa ${dashboard.policy.backupRetentionCount} bản thành công`}
+          helper="Dung lượng bản sao hiện có"
         />
         <StatCard
           icon={<CheckCircle2 className="h-5 w-5" />}
@@ -48,15 +48,30 @@ export default async function PlatformStoragePage({
         />
       </section>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
+      {(dashboard.latestFailedBackup || !dashboard.backupWorker.ready) ? (
+        <div className="mt-5 grid gap-3 lg:grid-cols-2">
+          {dashboard.latestFailedBackup ? (
+            <WarningCard
+              title="Có lần sao lưu chưa thành công"
+              message="Hãy kiểm tra lần sao lưu gần nhất và thử lại sau khi xử lý nguyên nhân."
+            />
+          ) : null}
+
+          {!dashboard.backupWorker.ready ? (
+            <WarningCard
+              title="Dịch vụ sao lưu chưa sẵn sàng"
+              message={dashboard.backupWorker.message}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-5">
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Dung lượng ước tính</p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Theo từng nhà hàng</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Số liệu được ước tính từ dữ liệu thuộc từng nhà hàng và các ảnh đang được liên kết trong hệ thống.
-              </p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">Dung lượng từng cửa hàng</h2>
             </div>
             <form action={refreshStorageUsageAction}>
               <button className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="submit">
@@ -67,15 +82,15 @@ export default async function PlatformStoragePage({
           </div>
 
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
+            <table className="w-full min-w-[680px] border-collapse text-sm">
               <thead>
                 <tr className="border-b bg-slate-50 text-left text-slate-600">
-                  <th className="px-4 py-3 font-semibold">Nhà hàng</th>
-                  <th className="px-4 py-3 font-semibold">Gói</th>
-                  <th className="px-4 py-3 text-right font-semibold">Dữ liệu vận hành</th>
-                  <th className="px-4 py-3 text-right font-semibold">Ảnh tải lên</th>
-                  <th className="px-4 py-3 text-right font-semibold">Tổng ước tính</th>
-                  <th className="px-4 py-3 font-semibold">Cập nhật</th>
+                  <th className="w-[28%] px-4 py-3 font-semibold">Cửa hàng</th>
+                  <th className="w-[10%] px-4 py-3 font-semibold">Gói</th>
+                  <th className="w-[16%] px-4 py-3 text-right font-semibold">Dữ liệu</th>
+                  <th className="w-[16%] px-4 py-3 text-right font-semibold">Ảnh tải lên</th>
+                  <th className="w-[16%] px-4 py-3 text-right font-semibold">Tổng ước tính</th>
+                  <th className="w-[14%] px-4 py-3 font-semibold">Cập nhật</th>
                 </tr>
               </thead>
               <tbody>
@@ -100,44 +115,6 @@ export default async function PlatformStoragePage({
             </table>
           </div>
         </section>
-
-        <aside className="space-y-4">
-          {dashboard.policy.backupStorageKind === "LOCAL" ? (
-            <WarningCard
-              title="Nên có bản sao độc lập"
-              message="Bản sao hiện đang lưu cùng nơi với hệ thống chính. Nên lưu thêm ở một nơi độc lập để giảm rủi ro."
-            />
-          ) : null}
-
-          {dashboard.latestFailedBackup ? (
-            <WarningCard
-              title="Có lần sao lưu chưa thành công"
-              message="Hãy kiểm tra lần sao lưu gần nhất và thử lại sau khi xử lý nguyên nhân."
-            />
-          ) : null}
-
-          {!dashboard.backupWorker.ready ? (
-            <WarningCard
-              title="Dịch vụ sao lưu chưa sẵn sàng"
-              message={dashboard.backupWorker.message}
-            />
-          ) : null}
-
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-1 h-5 w-5 text-teal-700" />
-              <div>
-                <h2 className="text-lg font-semibold">Chính sách lưu trữ</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Hệ thống giữ {dashboard.policy.backupRetentionCount} bản sao lưu gần nhất đã kiểm tra thành công. Thông báo đã đọc được dọn sau {dashboard.policy.notificationRetentionDays} ngày. Dữ liệu tạm được dọn sau {dashboard.policy.temporaryDataRetentionDays} ngày.
-                </p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Đơn hàng, thanh toán và chứng từ vẫn được giữ để tra cứu, đối soát và báo cáo.
-                </p>
-              </div>
-            </div>
-          </section>
-        </aside>
       </div>
 
       <section className="mt-5 rounded-2xl border bg-white shadow-sm">
@@ -172,7 +149,6 @@ export default async function PlatformStoragePage({
             <select className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupStorageKind} name="backupStorageKind">
               <option value="LOCAL">Nơi lưu hiện tại</option>
             </select>
-            <p className="mt-2 text-xs leading-5 text-slate-500">Nên bổ sung nơi lưu độc lập để tăng an toàn dữ liệu.</p>
           </Field>
 
           <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">
