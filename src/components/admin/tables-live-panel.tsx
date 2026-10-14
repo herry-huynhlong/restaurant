@@ -282,9 +282,9 @@ function TableSummaryCard({
 
   return (
     <article className={`flex min-h-44 flex-col rounded-xl border p-4 transition hover:-translate-y-0.5 hover:shadow-sm ${cardClass} ${selected ? "ring-2 ring-teal-400" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 break-words text-lg font-semibold leading-tight">Bàn {table.name}</h3>
-        <span className={`shrink-0 rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
+      <div className="flex flex-wrap items-start gap-2">
+        <h3 className="min-w-0 max-w-full truncate text-lg font-semibold leading-tight">Bàn {table.name}</h3>
+        <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
       </div>
       <div className="mt-3 space-y-1 text-sm">
         <p className={table.activeSession ? "font-semibold text-slate-800" : "text-slate-500"}>{summary}</p>

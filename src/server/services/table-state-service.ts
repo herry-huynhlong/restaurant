@@ -96,7 +96,7 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
           status: table.status,
           isActive: table.isActive,
           qrUrl,
-          qrDataUrl: await QRCode.toDataURL(qrUrl, { margin: 1, width: 220 }),
+          qrDataUrl: await QRCode.toDataURL(qrUrl, { margin: 2, width: 720 }),
           activeSession: activeSession ? {
             id: activeSession.id,
             status: activeSession.status,
