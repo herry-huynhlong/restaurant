@@ -13,7 +13,7 @@ import {
   type CommercialPlan,
   type PlanFeature
 } from "@/lib/plan/features";
-import { ensureDefaultPlanPrices, ensureSubscriptionPolicy } from "@/server/services/subscription-service";
+import { ensureDefaultPlanPrices } from "@/server/services/subscription-service";
 
 const planFeatureMap: Record<CommercialPlan, PlanFeature[]> = {
   BASIC: basicPlanFeatures,
@@ -133,47 +133,6 @@ export async function updatePlanPriceAction(formData: FormData) {
 
   revalidatePath(platformRoutes.plans);
   redirect(`${platformRoutes.plans}?success=${encodeURIComponent("Đã lưu bảng giá dịch vụ.")}`);
-}
-
-const subscriptionPolicySchema = z.object({
-  trialEnabled: z.boolean(),
-  trialDays: z.coerce.number().int().min(0, "Số ngày dùng thử không hợp lệ.").max(365, "Số ngày dùng thử quá lớn."),
-  trialRestaurantLimit: z.coerce.number().int().min(0, "Giới hạn cửa hàng không hợp lệ.").max(100000, "Giới hạn cửa hàng quá lớn."),
-  gracePeriodDays: z.coerce.number().int().min(0, "Số ngày gia hạn không hợp lệ.").max(30, "Thời gian gia hạn quá dài.")
-});
-
-export async function updateSubscriptionPolicyAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
-  const parsed = subscriptionPolicySchema.safeParse({
-    trialEnabled: formData.get("trialEnabled") === "on",
-    trialDays: String(formData.get("trialDays") ?? ""),
-    trialRestaurantLimit: String(formData.get("trialRestaurantLimit") ?? ""),
-    gracePeriodDays: String(formData.get("gracePeriodDays") ?? "")
-  });
-
-  if (!parsed.success) {
-    redirect(`${platformRoutes.plans}?error=${encodeURIComponent(validationMessage(parsed.error))}`);
-  }
-
-  const policy = await ensureSubscriptionPolicy();
-  await prisma.$transaction([
-    prisma.platformSubscriptionPolicy.update({
-      where: { id: policy.id },
-      data: parsed.data
-    }),
-    prisma.auditLog.create({
-      data: {
-        userId: actor.id,
-        action: "SUBSCRIPTION_POLICY_UPDATED",
-        entityType: "PlatformSubscriptionPolicy",
-        entityId: policy.id,
-        metadataJson: parsed.data
-      }
-    })
-  ]);
-
-  revalidatePath(platformRoutes.plans);
-  redirect(`${platformRoutes.plans}?success=${encodeURIComponent("Đã lưu chính sách đăng ký.")}`);
 }
 
 function readSubmittedMatrix(formData: FormData) {

@@ -1,11 +1,10 @@
-import { CheckCircle2, Crown, ShieldCheck } from "lucide-react";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { SubscriptionPricingClient } from "@/components/admin/subscription-pricing-client";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { daysRemaining, getPublicPlanPrices, getRestaurantSubscriptionSummary, planPriceDescription } from "@/server/services/subscription-service";
 import { basicPlanFeatures, planFeatureLabels, proPlanFeatures, type CommercialPlan } from "@/lib/plan/features";
-import { createRestaurantSubscriptionRequestAction } from "./actions";
 
 const planFeatures: Record<CommercialPlan, typeof basicPlanFeatures> = {
   BASIC: basicPlanFeatures,
@@ -28,6 +27,16 @@ export default async function AdminSubscriptionPage({
   const restaurant = summary.restaurant;
   if (!restaurant) return null;
   const remainingDays = daysRemaining(restaurant.subscriptionEnd);
+  const currentExpired = remainingDays != null && remainingDays <= 0;
+  const currentPlan = restaurant.plan === "PRO" ? "PRO" : "BASIC";
+  const featureItems = {
+    BASIC: planFeatures.BASIC.map((feature) => ({ key: feature, title: planFeatureLabels[feature].title })),
+    PRO: planFeatures.PRO.map((feature) => ({ key: feature, title: planFeatureLabels[feature].title }))
+  };
+  const descriptions = {
+    BASIC: planPriceDescription("BASIC", prices.find((price) => price.plan === "BASIC")?.description),
+    PRO: planPriceDescription("PRO", prices.find((price) => price.plan === "PRO")?.description)
+  };
 
   return (
     <RestaurantAdminShell
@@ -42,28 +51,38 @@ export default async function AdminSubscriptionPage({
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
 
-      <section className="rounded-2xl border bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <section className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Gói đang sử dụng</p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">{restaurant.plan === "PRO" ? "PRO" : "BASIC"}</h2>
-            <p className="mt-2 text-sm text-slate-600">{subscriptionStatusText(restaurant.subscriptionStatus, remainingDays)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Gói đang sử dụng</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-semibold text-slate-950">Gói hiện tại: {currentPlan}</h2>
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${currentPlan === "PRO" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-teal-200 bg-teal-50 text-teal-700"}`}>
+                {subscriptionStatusText(restaurant.subscriptionStatus, remainingDays)}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Hết hạn: <span className="font-semibold text-slate-900">{formatDate(restaurant.subscriptionEnd)}</span>
+              <span className="mx-2 text-slate-300">•</span>
+              Còn lại: <span className="font-semibold text-slate-900">{remainingDays == null ? "Chưa cập nhật" : remainingDays > 0 ? `${remainingDays} ngày` : "Đã hết hạn"}</span>
+            </p>
           </div>
-          <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${restaurant.plan === "PRO" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-            {restaurant.plan === "PRO" ? "PRO" : "BASIC"}
-          </span>
-        </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-4">
-          <InfoTile label="Ngày bắt đầu" value={formatDate(restaurant.subscriptionStart)} />
-          <InfoTile label="Ngày hết hạn" value={formatDate(restaurant.subscriptionEnd)} />
-          <InfoTile label="Số ngày còn lại" value={remainingDays == null ? "Chưa có" : remainingDays > 0 ? `${remainingDays} ngày` : "Đã hết hạn"} />
-          <InfoTile label="Yêu cầu đang chờ" value={`${summary.pendingRequests.length}`} />
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <InfoTile label="Kỳ thanh toán đã xác nhận" value={summary.currentRequest ? `${summary.currentRequest.termMonths} tháng` : "Chưa có"} />
-          <InfoTile label="Giá đã xác nhận" value={summary.currentRequest ? formatVnd(summary.currentRequest.priceVnd) : "Chưa có"} />
+          <details className="rounded-xl border bg-slate-50 px-3 py-2 text-sm md:min-w-72">
+            <summary className="cursor-pointer font-semibold text-slate-800">Chi tiết gói hiện tại</summary>
+            <div className="mt-3 grid gap-2 text-slate-600">
+              <p>Ngày kích hoạt: <span className="font-medium text-slate-900">{formatDate(restaurant.subscriptionStart)}</span></p>
+              <p>Kỳ thanh toán đã xác nhận: <span className="font-medium text-slate-900">{summary.currentRequest ? `${summary.currentRequest.termMonths} tháng` : "Chưa có"}</span></p>
+              <p>Giá đã xác nhận: <span className="font-medium text-slate-900">{summary.currentRequest ? formatVnd(summary.currentRequest.priceVnd) : "Chưa có"}</span></p>
+            </div>
+          </details>
         </div>
       </section>
+
+      {remainingDays != null && remainingDays > 0 && remainingDays <= 14 ? (
+        <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Gói dịch vụ còn {remainingDays} ngày. Bạn có thể chọn kỳ phù hợp bên dưới và gửi yêu cầu gia hạn ngay.
+        </section>
+      ) : null}
 
       {summary.pendingRequests.length > 0 ? (
         <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
@@ -79,62 +98,27 @@ export default async function AdminSubscriptionPage({
         </section>
       ) : null}
 
-      <section className="mt-5 grid gap-4 lg:grid-cols-2">
-        {(["BASIC", "PRO"] as CommercialPlan[]).map((plan) => {
-          const planPrices = prices.filter((price) => price.plan === plan);
-          return (
-            <article key={plan} className={`rounded-2xl border bg-white p-5 shadow-sm ${plan === "PRO" ? "border-amber-200" : ""}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold ${plan === "PRO" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
-                    {plan === "PRO" ? <Crown className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
-                    {plan}
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{planPriceDescription(plan, planPrices[0]?.description)}</p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-2">
-                {planFeatures[plan].slice(0, 8).map((feature) => (
-                  <div key={feature} className="flex gap-2 text-sm text-slate-700">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" />
-                    <span>{planFeatureLabels[feature].title}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 space-y-3">
-                {planPrices.map((price) => {
-                  const currentPlan = restaurant.plan === plan;
-                  return (
-                    <form key={price.id} action={createRestaurantSubscriptionRequestAction.bind(null, access.restaurant.slug)} className="rounded-xl border bg-slate-50 p-3">
-                      <input name="plan" type="hidden" value={plan} />
-                      <input name="termMonths" type="hidden" value={price.termMonths} />
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold">{price.termMonths} tháng {price.isRecommended ? <span className="ml-2 rounded-full bg-teal-100 px-2 py-0.5 text-xs text-teal-800">Đề xuất</span> : null}</p>
-                          <p className="mt-1 text-sm text-slate-600">{formatVnd(price.monthlyPriceVnd)}/tháng · Tổng {formatVnd(price.priceVnd)}</p>
-                        </div>
-                        <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
-                          {currentPlan ? "Gia hạn" : "Đăng ký"}
-                        </button>
-                      </div>
-                    </form>
-                  );
-                })}
-              </div>
-            </article>
-          );
-        })}
-      </section>
+      <SubscriptionPricingClient
+        slug={access.restaurant.slug}
+        currentPlan={currentPlan}
+        currentExpired={currentExpired}
+        prices={prices.map((price) => ({
+          id: price.id,
+          plan: price.plan === "PRO" ? "PRO" : "BASIC",
+          termMonths: price.termMonths,
+          priceVnd: price.priceVnd,
+          monthlyPriceVnd: price.monthlyPriceVnd,
+          isRecommended: price.isRecommended,
+          description: price.description
+        }))}
+        features={featureItems}
+        descriptions={descriptions}
+        pendingRequests={summary.pendingRequests.map((request) => ({
+          plan: request.plan === "PRO" ? "PRO" : "BASIC",
+          termMonths: request.termMonths
+        }))}
+      />
     </RestaurantAdminShell>
-  );
-}
-
-function InfoTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border bg-slate-50 p-3">
-      <p className="text-xs font-medium uppercase text-slate-500">{label}</p>
-      <p className="mt-2 font-semibold text-slate-950">{value}</p>
-    </div>
   );
 }
 

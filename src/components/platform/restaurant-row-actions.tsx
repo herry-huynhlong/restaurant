@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from "react";
 import {
-  changePlanAction,
+  activateRestaurantSubscriptionAction,
   permanentlyDeleteRestaurantAction,
   resetOwnerPasswordAction,
   restoreRestaurantAction,
@@ -18,11 +18,21 @@ type RestaurantActionProps = {
   plan: string;
   businessType?: string | null;
   returnTo: string;
+  priceOptions?: SubscriptionPriceOption[];
   compact?: boolean;
   showStatusAction?: boolean;
   showPlanAction?: boolean;
   showResetPasswordAction?: boolean;
   showDeleteAction?: boolean;
+};
+
+type SubscriptionPriceOption = {
+  id: string;
+  plan: "BASIC" | "PRO";
+  termMonths: number;
+  priceVnd: number;
+  monthlyPriceVnd: number;
+  isRecommended: boolean;
 };
 
 export function PlatformRestaurantActions({
@@ -33,6 +43,7 @@ export function PlatformRestaurantActions({
   plan,
   businessType,
   returnTo,
+  priceOptions = [],
   compact = false,
   showStatusAction = true,
   showPlanAction = true,
@@ -40,6 +51,7 @@ export function PlatformRestaurantActions({
   showDeleteAction = true
 }: RestaurantActionProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const subscriptionDialogRef = useRef<HTMLDialogElement>(null);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const restoreDialogRef = useRef<HTMLDialogElement>(null);
   const permanentDeleteDialogRef = useRef<HTMLDialogElement>(null);
@@ -49,6 +61,9 @@ export function PlatformRestaurantActions({
   const restoreSlugId = useId();
   const permanentDeleteSlugId = useId();
   const [password, setPassword] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<"BASIC" | "PRO">(plan === "PRO" ? "PRO" : "BASIC");
+  const [selectedTerm, setSelectedTerm] = useState("12");
+  const [grantType, setGrantType] = useState<"PAID" | "PROMOTION">("PAID");
   const [deleteSlug, setDeleteSlug] = useState("");
   const [restoreSlug, setRestoreSlug] = useState("");
   const [permanentDeleteSlug, setPermanentDeleteSlug] = useState("");
@@ -57,6 +72,8 @@ export function PlatformRestaurantActions({
   const nextStatus = isLocked ? "ACTIVE" : "SUSPENDED";
   const statusLabel = isLocked ? "Mở" : "Khóa";
   const isDrinkShop = businessType === "DRINK_SHOP";
+  const availablePlans = isDrinkShop ? (["BASIC"] as const) : (["BASIC", "PRO"] as const);
+  const currentPrice = priceOptions.find((price) => price.plan === selectedPlan && String(price.termMonths) === selectedTerm);
   const confirmMessage = isLocked
     ? `Mở lại nhà hàng ${restaurantName}?`
     : `Khóa nhà hàng ${restaurantName}?\n\nTất cả tài khoản thuộc nhà hàng này sẽ không thể đăng nhập hoặc sử dụng hệ thống cho đến khi được mở lại.`;
@@ -83,16 +100,9 @@ export function PlatformRestaurantActions({
       ) : null}
 
       {!isDeleted && showPlanAction ? (
-        <form className="flex gap-1" action={changePlanAction}>
-          <input name="restaurantId" type="hidden" value={restaurantId} />
-          <input name="returnTo" type="hidden" value={returnTo} />
-          <select className="rounded-md border px-1 py-1 text-sm disabled:bg-slate-100" name="plan" defaultValue={isDrinkShop ? "BASIC" : plan === "PRO" ? "PRO" : "BASIC"} disabled={isDrinkShop} aria-label="Gói dịch vụ">
-            <option value="BASIC">BASIC</option>
-            {!isDrinkShop ? <option value="PRO">PRO</option> : null}
-          </select>
-          {isDrinkShop ? <input name="plan" type="hidden" value="BASIC" /> : null}
-          <button className="rounded-md border px-2 py-1 text-sm" type="submit">Đổi gói</button>
-        </form>
+        <button className="rounded-md border px-2 py-1 text-sm font-semibold hover:bg-slate-50" type="button" onClick={() => subscriptionDialogRef.current?.showModal()}>
+          Kích hoạt/Gia hạn
+        </button>
       ) : null}
 
       {!isDeleted && showResetPasswordAction ? <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => dialogRef.current?.showModal()}>
@@ -158,6 +168,86 @@ export function PlatformRestaurantActions({
             </button>
             <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" type="submit">
               Xác nhận
+            </button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog ref={subscriptionDialogRef} className="w-full max-w-xl rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
+        <form className="space-y-4 p-5" action={activateRestaurantSubscriptionAction}>
+          <input name="restaurantId" type="hidden" value={restaurantId} />
+          <input name="returnTo" type="hidden" value={returnTo} />
+          <div>
+            <h2 className="text-lg font-semibold">Kích hoạt hoặc gia hạn gói</h2>
+            <p className="mt-1 text-sm text-slate-600">Nhà hàng: {restaurantName}</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-medium">
+              Gói dịch vụ
+              <select
+                className="mt-1 h-10 w-full rounded-md border px-3"
+                name="plan"
+                value={selectedPlan}
+                onChange={(event) => setSelectedPlan(event.currentTarget.value === "PRO" ? "PRO" : "BASIC")}
+              >
+                {availablePlans.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-medium">
+              Thời hạn
+              <select className="mt-1 h-10 w-full rounded-md border px-3" name="termMonths" value={selectedTerm} onChange={(event) => setSelectedTerm(event.currentTarget.value)}>
+                <option value="3">3 tháng</option>
+                <option value="6">6 tháng</option>
+                <option value="12">12 tháng</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium">
+              Ngày bắt đầu
+              <input className="mt-1 h-10 w-full rounded-md border px-3" name="subscriptionStart" type="date" />
+            </label>
+            <label className="block text-sm font-medium">
+              Ngày hết hạn
+              <input className="mt-1 h-10 w-full rounded-md border px-3" name="subscriptionEnd" type="date" />
+            </label>
+          </div>
+          <div className="rounded-xl border bg-slate-50 p-3 text-sm">
+            <p className="font-semibold">Giá theo bảng hiện tại</p>
+            <p className="mt-1 text-slate-600">
+              {currentPrice ? `${formatVnd(currentPrice.priceVnd)} · ${formatVnd(currentPrice.monthlyPriceVnd)}/tháng` : "Kỳ giá này chưa mở bán."}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">Nếu nhập ngày hết hạn thủ công, hệ thống sẽ dùng ngày đó và vẫn lưu lịch sử thao tác.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-medium">
+              Loại kích hoạt
+              <select className="mt-1 h-10 w-full rounded-md border px-3" name="grantType" value={grantType} onChange={(event) => setGrantType(event.currentTarget.value === "PROMOTION" ? "PROMOTION" : "PAID")}>
+                <option value="PAID">Hợp đồng trả phí</option>
+                <option value="PROMOTION">Ưu đãi quản trị</option>
+              </select>
+            </label>
+            <label className="block text-sm font-medium">
+              Ghi chú
+              <input className="mt-1 h-10 w-full rounded-md border px-3" name="note" placeholder="Ví dụ: đã đối soát chuyển khoản" />
+            </label>
+          </div>
+          {grantType === "PAID" ? (
+            <label className="flex items-start gap-2 rounded-xl border bg-white p-3 text-sm">
+              <input className="mt-1" name="paymentConfirmed" type="checkbox" />
+              <span>Đã kiểm tra thanh toán cho hợp đồng này.</span>
+            </label>
+          ) : null}
+          <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <input className="mt-1" name="confirmApply" type="checkbox" required />
+            <span>Tôi xác nhận thao tác này sẽ cập nhật gói và thời hạn sử dụng của nhà hàng.</span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => subscriptionDialogRef.current?.close()}>
+              Hủy
+            </button>
+            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" disabled={grantType === "PAID" && !currentPrice}>
+              Lưu thay đổi
             </button>
           </div>
         </form>
@@ -310,4 +400,8 @@ function DialogActions({
 
 function escapePattern(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function formatVnd(value: number) {
+  return `${value.toLocaleString("vi-VN")}đ`;
 }

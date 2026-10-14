@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db/prisma";
 import { platformRoutes } from "@/lib/routes";
 import { enforceBusinessPlan } from "@/lib/business-type";
 import { allowedUploadImageTypes, MAX_UPLOAD_IMAGE_SIZE, saveOptimizedUploadImage } from "@/server/services/image-upload-service";
-import { confirmSubscriptionRequest, ensureSubscriptionPolicy, rejectSubscriptionRequest } from "@/server/services/subscription-service";
+import { addCalendarMonths, confirmSubscriptionRequest, rejectSubscriptionRequest } from "@/server/services/subscription-service";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 const restaurantDeleteSchema = z.object({
@@ -38,6 +38,17 @@ const updateOwnerNameSchema = z.object({
 const subscriptionRequestActionSchema = z.object({
   requestId: z.string().min(1),
   adminNote: z.string().trim().max(500).optional()
+});
+const manualSubscriptionSchema = z.object({
+  restaurantId: z.string().min(1),
+  plan: planSchema,
+  termMonths: z.coerce.number().int().refine((value) => [3, 6, 12].includes(value), "Thời hạn sử dụng không hợp lệ."),
+  subscriptionStart: z.string().trim().optional(),
+  subscriptionEnd: z.string().trim().optional(),
+  grantType: z.enum(["PAID", "PROMOTION"]),
+  paymentConfirmed: z.boolean(),
+  note: z.string().trim().max(500, "Ghi chú quá dài.").optional(),
+  confirmApply: z.boolean()
 });
 function slugify(input: string) {
   return input
@@ -162,12 +173,6 @@ function validateSubscriptionDates(start: Date | null, end: Date | null) {
   return null;
 }
 
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
 function prismaCreateRestaurantMessage(error: unknown) {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) {
     return "Không thể tạo nhà hàng. Vui lòng kiểm tra dữ liệu.";
@@ -256,11 +261,8 @@ export async function createRestaurantAction(formData: FormData) {
     status: parsed.data.status
   });
 
-  const policy = await ensureSubscriptionPolicy();
-  const trialUsedCount = await prisma.restaurant.count({ where: { subscriptionStart: { not: null } } });
-  const canApplyTrial = policy.trialEnabled && policy.trialDays > 0 && (policy.trialRestaurantLimit === 0 || trialUsedCount < policy.trialRestaurantLimit);
-  const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart")) ?? (canApplyTrial ? new Date() : null);
-  const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd")) ?? (subscriptionStart && canApplyTrial ? addDays(subscriptionStart, policy.trialDays) : null);
+  const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart"));
+  const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.newRestaurant, dateError);
 
@@ -764,6 +766,138 @@ export async function extendSubscriptionAction(formData: FormData) {
   ]);
 
   revalidatePath(platformRoutes.restaurantDetail(restaurantId));
+}
+
+export async function activateRestaurantSubscriptionAction(formData: FormData) {
+  const actor = await requirePlatformAdmin();
+  const returnTo = readPlatformReturnPath(formData);
+  const parsed = manualSubscriptionSchema.safeParse({
+    restaurantId: readString(formData, "restaurantId"),
+    plan: readString(formData, "plan"),
+    termMonths: readString(formData, "termMonths"),
+    subscriptionStart: readString(formData, "subscriptionStart"),
+    subscriptionEnd: readString(formData, "subscriptionEnd"),
+    grantType: readString(formData, "grantType") || "PAID",
+    paymentConfirmed: formData.get("paymentConfirmed") === "on",
+    note: optionalString(formData, "note"),
+    confirmApply: formData.get("confirmApply") === "on"
+  });
+
+  if (!parsed.success) {
+    redirectWithError(returnTo, validationMessage(parsed.error));
+  }
+  if (!parsed.data.confirmApply) {
+    redirectWithError(returnTo, "Vui lòng xác nhận trước khi lưu thay đổi gói.");
+  }
+  if (parsed.data.grantType === "PAID" && !parsed.data.paymentConfirmed) {
+    redirectWithError(returnTo, "Vui lòng xác nhận đã kiểm tra thanh toán trước khi kích hoạt hợp đồng trả phí.");
+  }
+
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: parsed.data.restaurantId },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      businessType: true,
+      plan: true,
+      subscriptionStatus: true,
+      subscriptionStart: true,
+      subscriptionEnd: true
+    }
+  });
+  if (!restaurant || restaurant.status === "DELETED") {
+    redirectWithError(returnTo, "Nhà hàng không hợp lệ.");
+  }
+
+  const plan = planSchema.parse(enforceBusinessPlan(restaurant.businessType, parsed.data.plan));
+  const startAt = parseOptionalDate(parsed.data.subscriptionStart ?? null) ?? new Date();
+  const customEndAt = parseOptionalDate(parsed.data.subscriptionEnd ?? null);
+  const endAt = customEndAt ?? addCalendarMonths(startAt, parsed.data.termMonths);
+  const dateError = validateSubscriptionDates(startAt, endAt);
+  if (dateError) redirectWithError(returnTo, dateError);
+
+  const price = await prisma.platformPlanPrice.findUnique({
+    where: {
+      plan_termMonths: {
+        plan,
+        termMonths: parsed.data.termMonths
+      }
+    }
+  });
+  if (!price?.isActive && parsed.data.grantType === "PAID") {
+    redirectWithError(returnTo, "Kỳ giá này hiện chưa mở bán.");
+  }
+
+  const unchanged = restaurant.plan === plan
+    && restaurant.subscriptionStatus === "ACTIVE"
+    && restaurant.subscriptionStart?.getTime() === startAt.getTime()
+    && restaurant.subscriptionEnd?.getTime() === endAt.getTime();
+  if (unchanged) {
+    redirectWithError(returnTo, "Gói dịch vụ hiện tại đã trùng với thông tin vừa nhập.");
+  }
+
+  const action = restaurant.plan === plan ? "SUBSCRIPTION_MANUAL_RENEWED" : "SUBSCRIPTION_MANUAL_ACTIVATED";
+  const priceVnd = parsed.data.grantType === "PAID" ? price?.priceVnd ?? null : null;
+
+  await prisma.$transaction([
+    prisma.restaurant.update({
+      where: { id: restaurant.id },
+      data: {
+        plan,
+        subscriptionStatus: "ACTIVE",
+        subscriptionStart: startAt,
+        subscriptionEnd: endAt
+      }
+    }),
+    prisma.restaurantSubscriptionEvent.create({
+      data: {
+        restaurantId: restaurant.id,
+        actorUserId: actor.id,
+        action,
+        plan,
+        termMonths: parsed.data.termMonths,
+        priceVnd,
+        startAt,
+        endAt,
+        metadataJson: {
+          grantType: parsed.data.grantType,
+          note: parsed.data.note || null,
+          previousPlan: restaurant.plan,
+          previousSubscriptionStatus: restaurant.subscriptionStatus,
+          previousSubscriptionStart: restaurant.subscriptionStart?.toISOString() ?? null,
+          previousSubscriptionEnd: restaurant.subscriptionEnd?.toISOString() ?? null,
+          priceSnapshot: price ? {
+            priceId: price.id,
+            priceVnd: price.priceVnd,
+            monthlyPriceVnd: price.monthlyPriceVnd
+          } : null
+        }
+      }
+    }),
+    prisma.auditLog.create({
+      data: {
+        restaurantId: restaurant.id,
+        userId: actor.id,
+        action,
+        entityType: "Restaurant",
+        entityId: restaurant.id,
+        metadataJson: {
+          plan,
+          termMonths: parsed.data.termMonths,
+          startAt: startAt.toISOString(),
+          endAt: endAt.toISOString(),
+          grantType: parsed.data.grantType,
+          priceVnd,
+          note: parsed.data.note || null
+        }
+      }
+    })
+  ]);
+
+  revalidatePath(platformRoutes.restaurants);
+  revalidatePath(platformRoutes.restaurantDetail(restaurant.id));
+  redirectWithSuccess(returnTo, parsed.data.grantType === "PAID" ? "Đã kích hoạt gói dịch vụ." : "Đã cấp ưu đãi sử dụng.");
 }
 
 export async function changePlanAction(formData: FormData) {

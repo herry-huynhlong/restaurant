@@ -12,7 +12,7 @@ import {
   type CommercialPlan,
   type PlanFeature
 } from "@/lib/plan/features";
-import { confirmPlanPermissionsAction, updatePlanPriceAction, updateSubscriptionPolicyAction } from "@/app/platform/plans/actions";
+import { confirmPlanPermissionsAction, updatePlanPriceAction } from "@/app/platform/plans/actions";
 import { getPlanPricingDashboard, planPriceDescription } from "@/server/services/subscription-service";
 
 const planFeatures: Record<CommercialPlan, PlanFeature[]> = {
@@ -144,35 +144,6 @@ export default async function PlatformPlansPage({
           )}
         </div>
       </section>
-
-      <form action={updateSubscriptionPolicyAction} className="mt-5 rounded-2xl border bg-white p-5 shadow-sm">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Chính sách đăng ký</p>
-          <h2 className="mt-2 text-xl font-semibold text-slate-950">Dùng thử và gia hạn</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Áp dụng cho cửa hàng tạo mới hoặc các lần kiểm tra hạn gói sau này. Không thay đổi ngày hết hạn hiện tại của cửa hàng đã có.</p>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <label className="flex items-center gap-2 rounded-xl border bg-slate-50 px-3 py-2 text-sm font-medium">
-            <input name="trialEnabled" type="checkbox" defaultChecked={pricing.policy.trialEnabled} />
-            Bật dùng thử
-          </label>
-          <label className="block text-sm font-medium">
-            Số ngày dùng thử
-            <input className="mt-1 h-10 w-full rounded-md border px-3" name="trialDays" type="number" min={0} max={365} defaultValue={pricing.policy.trialDays} />
-          </label>
-          <label className="block text-sm font-medium">
-            Giới hạn cửa hàng dùng thử
-            <input className="mt-1 h-10 w-full rounded-md border px-3" name="trialRestaurantLimit" type="number" min={0} defaultValue={pricing.policy.trialRestaurantLimit} />
-          </label>
-          <label className="block text-sm font-medium">
-            Số ngày gia hạn ưu đãi
-            <input className="mt-1 h-10 w-full rounded-md border px-3" name="gracePeriodDays" type="number" min={0} max={30} defaultValue={pricing.policy.gracePeriodDays} />
-          </label>
-        </div>
-        <button className="mt-4 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
-          Lưu chính sách
-        </button>
-      </form>
 
       <section className="mt-5 rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">

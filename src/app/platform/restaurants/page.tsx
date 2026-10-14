@@ -7,6 +7,7 @@ import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
 import { getPlatformRestaurants } from "@/server/services/platform-service";
+import { getPublicPlanPrices } from "@/server/services/subscription-service";
 import { confirmSubscriptionRequestAction, rejectSubscriptionRequestAction } from "./actions";
 
 export default async function PlatformRestaurantsPage({
@@ -16,7 +17,18 @@ export default async function PlatformRestaurantsPage({
 }) {
   await requirePlatformAdmin();
   const showDeleted = searchParams?.view === "deleted";
-  const restaurants = await getPlatformRestaurants({ includeDeleted: showDeleted });
+  const [restaurants, planPrices] = await Promise.all([
+    getPlatformRestaurants({ includeDeleted: showDeleted }),
+    getPublicPlanPrices()
+  ]);
+  const priceOptions = planPrices.map((price) => ({
+    id: price.id,
+    plan: price.plan === "PRO" ? "PRO" as const : "BASIC" as const,
+    termMonths: price.termMonths,
+    priceVnd: price.priceVnd,
+    monthlyPriceVnd: price.monthlyPriceVnd,
+    isRecommended: price.isRecommended
+  }));
 
   return (
     <PlatformShell
@@ -98,6 +110,7 @@ export default async function PlatformRestaurantsPage({
                         plan={restaurant.plan}
                         businessType={restaurant.businessType}
                         returnTo={platformRoutes.restaurants}
+                        priceOptions={priceOptions}
                         compact
                       />
                     </div>
