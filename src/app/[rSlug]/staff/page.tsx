@@ -182,7 +182,7 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
             slug={access.restaurant.slug}
             restaurantName={access.restaurant.name}
             cashierName={access.user.name}
-            canUsePayment={hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType) && ["OWNER", "MANAGER", "CASHIER"].includes(access.membership.role)}
+            canUsePayment={hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType, access.restaurant.planEntitlement) && ["OWNER", "MANAGER", "CASHIER"].includes(access.membership.role)}
             showQrTools={false}
             products={products}
             initialState={tableState}

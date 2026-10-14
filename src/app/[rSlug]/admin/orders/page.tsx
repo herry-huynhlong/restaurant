@@ -26,6 +26,7 @@ export default async function AdminOrdersPage({
       userName={access.user.name}
       notifications={notifications}
       plan={access.restaurant.plan}
+      planEntitlement={access.restaurant.planEntitlement}
       businessType={access.restaurant.businessType}
     >
       <OrdersByTableBoard slug={access.restaurant.slug} restaurantName={access.restaurant.name} initialTables={tables} initialExpandedSessionId={searchParams?.session} />

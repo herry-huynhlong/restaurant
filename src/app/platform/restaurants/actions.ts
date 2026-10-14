@@ -19,6 +19,8 @@ const restaurantDeleteSchema = z.object({
   confirmSlug: z.string().trim().min(1)
 });
 const planSchema = z.enum(["BASIC", "PRO"]);
+const restaurantPlanSchema = z.enum(["BASIC", "PRO", "TRAIN"]);
+const planEntitlementSchema = z.enum(["BASIC", "PRO"]);
 const businessTypeSchema = z.enum(["RESTAURANT", "DRINK_SHOP"]);
 const subscriptionStatusSchema = z.enum(["ACTIVE", "EXPIRED", "SUSPENDED"]);
 const languageSchema = z.enum(["vi", "en"]);
@@ -42,8 +44,9 @@ const subscriptionRequestActionSchema = z.object({
 });
 const manualSubscriptionSchema = z.object({
   restaurantId: z.string().min(1),
-  plan: planSchema,
-  termMonths: z.coerce.number().int().refine((value) => [3, 6, 12].includes(value), "Thời hạn sử dụng không hợp lệ."),
+  plan: restaurantPlanSchema,
+  planEntitlement: planEntitlementSchema,
+  termMonths: z.coerce.number().int().optional(),
   subscriptionStart: z.string().trim().optional(),
   subscriptionEnd: z.string().trim().optional(),
   grantType: z.enum(["PAID", "PROMOTION"]),
@@ -68,6 +71,20 @@ function parseOptionalDate(value: FormDataEntryValue | null) {
 
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseVietnamDateInput(value: FormDataEntryValue | string | null | undefined, boundary: "start" | "end") {
+  const text = String(value ?? "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) return parseOptionalDate(text);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const utcHour = boundary === "start" ? -7 : 16;
+  const utcMinute = boundary === "start" ? 0 : 59;
+  const utcSecond = boundary === "start" ? 0 : 59;
+  const utcMs = boundary === "start" ? 0 : 999;
+  return new Date(Date.UTC(year, month - 1, day, utcHour, utcMinute, utcSecond, utcMs));
 }
 
 function readString(formData: FormData, key: string) {
@@ -133,7 +150,8 @@ const createRestaurantSchema = z.object({
   ownerPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự."),
   ownerPhone: z.string().optional(),
   businessType: businessTypeSchema,
-  plan: planSchema,
+  plan: restaurantPlanSchema,
+  planEntitlement: planEntitlementSchema,
   subscriptionStatus: subscriptionStatusSchema,
   status: statusSchema
 });
@@ -234,6 +252,7 @@ export async function createRestaurantAction(formData: FormData) {
     ownerPhone: optionalString(formData, "ownerPhone"),
     businessType: readString(formData, "businessType") || "RESTAURANT",
     plan: enforceBusinessPlan(readString(formData, "businessType") || "RESTAURANT", readString(formData, "plan") || "BASIC"),
+    planEntitlement: readString(formData, "planEntitlement") || (readString(formData, "plan") === "PRO" ? "PRO" : "BASIC"),
     subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
     status: readString(formData, "status") || "INACTIVE"
   });
@@ -258,14 +277,18 @@ export async function createRestaurantAction(formData: FormData) {
     ownerPhone: parsed.data.ownerPhone,
     businessType: parsed.data.businessType,
     plan: parsed.data.plan,
+    planEntitlement: parsed.data.planEntitlement,
     subscriptionStatus: parsed.data.subscriptionStatus,
     status: parsed.data.status
   });
 
-  const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart"));
-  const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
+  const subscriptionStart = parseVietnamDateInput(formData.get("subscriptionStart"), "start");
+  const subscriptionEnd = parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.newRestaurant, dateError);
+  if (parsed.data.plan === "TRAIN" && !subscriptionEnd) {
+    redirectWithError(platformRoutes.newRestaurant, "TRAIN cần có ngày hết hạn do QuánPilot Admin chọn.");
+  }
 
   const existingRestaurant = await prisma.restaurant.findUnique({
     where: { slug: parsed.data.slug },
@@ -310,6 +333,7 @@ export async function createRestaurantAction(formData: FormData) {
           status: parsed.data.status,
           businessType: parsed.data.businessType,
           plan: parsed.data.plan,
+          planEntitlement: parsed.data.plan === "TRAIN" ? parsed.data.planEntitlement : parsed.data.plan === "PRO" ? "PRO" : "BASIC",
           subscriptionStatus: parsed.data.subscriptionStatus,
           subscriptionStart,
           subscriptionEnd
@@ -367,7 +391,7 @@ export async function createRestaurantAction(formData: FormData) {
             action: "RESTAURANT_CREATED",
             entityType: "Restaurant",
             entityId: createdRestaurant.id,
-            metadataJson: { slug: createdRestaurant.slug, plan: createdRestaurant.plan, businessType: createdRestaurant.businessType }
+            metadataJson: { slug: createdRestaurant.slug, plan: createdRestaurant.plan, planEntitlement: createdRestaurant.planEntitlement, businessType: createdRestaurant.businessType }
           },
           {
             restaurantId: createdRestaurant.id,
@@ -426,6 +450,7 @@ export async function updateRestaurantAction(formData: FormData) {
     currency: readString(formData, "currency") || "VND",
     businessType: readString(formData, "businessType") || "RESTAURANT",
     plan: enforceBusinessPlan(readString(formData, "businessType") || "RESTAURANT", readString(formData, "plan") || "BASIC"),
+    planEntitlement: readString(formData, "planEntitlement") || (readString(formData, "plan") === "PRO" ? "PRO" : "BASIC"),
     subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
     status: readString(formData, "status") || "INACTIVE"
   });
@@ -434,10 +459,13 @@ export async function updateRestaurantAction(formData: FormData) {
     redirectWithError(platformRoutes.restaurantEdit(restaurantId), validationMessage(parsed.error));
   }
 
-  const subscriptionStart = parseOptionalDate(formData.get("subscriptionStart"));
-  const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
+  const subscriptionStart = parseVietnamDateInput(formData.get("subscriptionStart"), "start");
+  const subscriptionEnd = parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.restaurantEdit(restaurantId), dateError);
+  if (parsed.data.plan === "TRAIN" && !subscriptionEnd) {
+    redirectWithError(platformRoutes.restaurantEdit(restaurantId), "TRAIN cần có ngày hết hạn do QuánPilot Admin chọn.");
+  }
   const currentRestaurant = await prisma.restaurant.findUnique({
     where: { id: parsed.data.restaurantId },
     select: { status: true }
@@ -457,6 +485,7 @@ export async function updateRestaurantAction(formData: FormData) {
           status: parsed.data.status,
           businessType: parsed.data.businessType,
           plan: parsed.data.plan,
+          planEntitlement: parsed.data.plan === "TRAIN" ? parsed.data.planEntitlement : parsed.data.plan === "PRO" ? "PRO" : "BASIC",
           subscriptionStatus: parsed.data.subscriptionStatus,
           subscriptionStart,
           subscriptionEnd
@@ -738,18 +767,20 @@ export async function permanentlyDeleteRestaurantAction(formData: FormData) {
 export async function extendSubscriptionAction(formData: FormData) {
   const actor = await requirePlatformAdmin();
   const restaurantId = readString(formData, "restaurantId");
-  const subscriptionEnd = parseOptionalDate(formData.get("subscriptionEnd"));
+  const subscriptionEnd = parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
     select: { businessType: true }
   });
   const plan = planSchema.parse(enforceBusinessPlan(restaurant?.businessType, readString(formData, "plan")));
+  const planEntitlement = plan === "PRO" ? "PRO" : "BASIC";
 
   await prisma.$transaction([
     prisma.restaurant.update({
       where: { id: restaurantId },
       data: {
         plan,
+        planEntitlement: plan === "PRO" ? "PRO" : "BASIC",
         subscriptionEnd,
         subscriptionStatus: "ACTIVE"
       }
@@ -775,7 +806,8 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
   const parsed = manualSubscriptionSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),
     plan: readString(formData, "plan"),
-    termMonths: readString(formData, "termMonths"),
+    planEntitlement: readString(formData, "planEntitlement") || (readString(formData, "plan") === "PRO" ? "PRO" : "BASIC"),
+    termMonths: readString(formData, "termMonths") || undefined,
     subscriptionStart: readString(formData, "subscriptionStart"),
     subscriptionEnd: readString(formData, "subscriptionEnd"),
     grantType: readString(formData, "grantType") || "PAID",
@@ -802,6 +834,7 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
       status: true,
       businessType: true,
       plan: true,
+      planEntitlement: true,
       subscriptionStatus: true,
       subscriptionStart: true,
       subscriptionEnd: true
@@ -811,26 +844,30 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
     redirectWithError(returnTo, "Nhà hàng không hợp lệ.");
   }
 
-  const plan = planSchema.parse(enforceBusinessPlan(restaurant.businessType, parsed.data.plan));
-  const startAt = parseOptionalDate(parsed.data.subscriptionStart ?? null) ?? new Date();
-  const customEndAt = parseOptionalDate(parsed.data.subscriptionEnd ?? null);
-  const endAt = customEndAt ?? addCalendarMonths(startAt, parsed.data.termMonths);
+  const plan = restaurantPlanSchema.parse(enforceBusinessPlan(restaurant.businessType, parsed.data.plan));
+  const planEntitlement = plan === "TRAIN" ? parsed.data.planEntitlement : plan === "PRO" ? "PRO" : "BASIC";
+  const startAt = parseVietnamDateInput(parsed.data.subscriptionStart, "start") ?? new Date();
+  const customEndAt = parseVietnamDateInput(parsed.data.subscriptionEnd, "end");
+  if (plan === "TRAIN" && !customEndAt) {
+    redirectWithError(returnTo, "TRAIN cần có ngày hết hạn do QuánPilot Admin chọn.");
+  }
+  const termMonths = parsed.data.termMonths && [3, 6, 12].includes(parsed.data.termMonths) ? parsed.data.termMonths : 12;
+  const endAt = customEndAt ?? addCalendarMonths(startAt, termMonths);
   const dateError = validateSubscriptionDates(startAt, endAt);
   if (dateError) redirectWithError(returnTo, dateError);
 
-  const price = await prisma.platformPlanPrice.findUnique({
-    where: {
-      plan_termMonths: {
-        plan,
-        termMonths: parsed.data.termMonths
-      }
-    }
+  const price = plan === "TRAIN" ? null : await prisma.platformPlanPrice.findUnique({
+    where: { plan_termMonths: { plan: planSchema.parse(plan), termMonths } }
   });
-  if (!price?.isActive && parsed.data.grantType === "PAID") {
+  if (plan !== "TRAIN" && !price?.isActive && parsed.data.grantType === "PAID") {
     redirectWithError(returnTo, "Kỳ giá này hiện chưa mở bán.");
+  }
+  if (plan === "TRAIN" && parsed.data.grantType !== "PROMOTION") {
+    redirectWithError(returnTo, "TRAIN là gói miễn phí, vui lòng chọn loại kích hoạt ưu đãi quản trị.");
   }
 
   const unchanged = restaurant.plan === plan
+    && restaurant.planEntitlement === planEntitlement
     && restaurant.subscriptionStatus === "ACTIVE"
     && restaurant.subscriptionStart?.getTime() === startAt.getTime()
     && restaurant.subscriptionEnd?.getTime() === endAt.getTime();
@@ -838,7 +875,9 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
     redirectWithError(returnTo, "Gói dịch vụ hiện tại đã trùng với thông tin vừa nhập.");
   }
 
-  const action = restaurant.plan === plan ? "SUBSCRIPTION_MANUAL_RENEWED" : "SUBSCRIPTION_MANUAL_ACTIVATED";
+  const action = plan === "TRAIN"
+    ? "TRAIN_MANUAL_UPDATED"
+    : restaurant.plan === plan ? "SUBSCRIPTION_MANUAL_RENEWED" : "SUBSCRIPTION_MANUAL_ACTIVATED";
   const priceVnd = parsed.data.grantType === "PAID" ? price?.priceVnd ?? null : null;
 
   await prisma.$transaction([
@@ -846,6 +885,7 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
       where: { id: restaurant.id },
       data: {
         plan,
+        planEntitlement,
         subscriptionStatus: "ACTIVE",
         subscriptionStart: startAt,
         subscriptionEnd: endAt
@@ -857,7 +897,7 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
         actorUserId: actor.id,
         action,
         plan,
-        termMonths: parsed.data.termMonths,
+        termMonths: plan === "TRAIN" ? null : termMonths,
         priceVnd,
         startAt,
         endAt,
@@ -865,6 +905,7 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
           grantType: parsed.data.grantType,
           note: parsed.data.note || null,
           previousPlan: restaurant.plan,
+          previousPlanEntitlement: restaurant.planEntitlement,
           previousSubscriptionStatus: restaurant.subscriptionStatus,
           previousSubscriptionStart: restaurant.subscriptionStart?.toISOString() ?? null,
           previousSubscriptionEnd: restaurant.subscriptionEnd?.toISOString() ?? null,
@@ -885,7 +926,8 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
         entityId: restaurant.id,
         metadataJson: {
           plan,
-          termMonths: parsed.data.termMonths,
+          planEntitlement,
+          termMonths: plan === "TRAIN" ? null : termMonths,
           startAt: startAt.toISOString(),
           endAt: endAt.toISOString(),
           grantType: parsed.data.grantType,
@@ -898,7 +940,7 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
 
   revalidatePath(platformRoutes.restaurants);
   revalidatePath(platformRoutes.restaurantDetail(restaurant.id));
-  redirectWithSuccess(returnTo, parsed.data.grantType === "PAID" ? "Đã kích hoạt gói dịch vụ." : "Đã cấp ưu đãi sử dụng.");
+  redirectWithSuccess(returnTo, plan === "TRAIN" ? "Đã cập nhật TRAIN cho nhà hàng." : parsed.data.grantType === "PAID" ? "Đã kích hoạt gói dịch vụ." : "Đã cấp ưu đãi sử dụng.");
 }
 
 export async function changePlanAction(formData: FormData) {
@@ -909,10 +951,11 @@ export async function changePlanAction(formData: FormData) {
     select: { businessType: true }
   });
   const plan = planSchema.parse(enforceBusinessPlan(restaurant?.businessType, readString(formData, "plan")));
+  const planEntitlement = plan === "PRO" ? "PRO" : "BASIC";
   const returnTo = readPlatformReturnPath(formData);
 
   await prisma.$transaction([
-    prisma.restaurant.update({ where: { id: restaurantId }, data: { plan } }),
+    prisma.restaurant.update({ where: { id: restaurantId }, data: { plan, planEntitlement } }),
     prisma.auditLog.create({
       data: {
         restaurantId,
@@ -920,7 +963,7 @@ export async function changePlanAction(formData: FormData) {
         action: "PLAN_CHANGED",
         entityType: "Restaurant",
         entityId: restaurantId,
-        metadataJson: { plan }
+        metadataJson: { plan, planEntitlement }
       }
     })
   ]);

@@ -19,7 +19,7 @@ export default async function SelectRestaurantPage() {
         <h1 className="text-xl font-semibold">Chọn nhà hàng</h1>
         <div className="mt-4 space-y-2">
           {memberships.map((membership) => {
-            const href = !canRoleAccessPlan(membership.restaurant.plan, membership.role, membership.restaurant.businessType)
+            const href = !canRoleAccessPlan(membership.restaurant.plan, membership.role, membership.restaurant.businessType, membership.restaurant.planEntitlement)
               ? "/unauthorized"
               : membership.role === "WAITER"
                 ? restaurantRoutes.staff(membership.restaurant.slug)

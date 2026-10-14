@@ -5,10 +5,11 @@ import { DashboardLiveOverview } from "@/components/admin/dashboard-live-overvie
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { formatInTimeZone } from "@/lib/period";
-import { hasPlanFeature } from "@/lib/plan/features";
+import { hasPlanFeature, planDisplayLabel } from "@/lib/plan/features";
 import { restaurantStatusLabel } from "@/lib/platform/restaurant-status";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getRestaurantAdminOverview } from "@/server/services/restaurant-service";
+import { daysRemaining } from "@/server/services/subscription-service";
 
 export default async function RestaurantAdminPage({ params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
@@ -16,13 +17,14 @@ export default async function RestaurantAdminPage({ params }: { params: { rSlug:
   const logoUrl = servedUploadUrl(overview.restaurant?.logoUrl ?? null);
   const timeZone = overview.restaurant?.timeZone ?? "Asia/Ho_Chi_Minh";
   const todayLabel = formatInTimeZone(new Date(), timeZone, { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
+  const trainRemainingDays = access.restaurant.plan === "TRAIN" ? daysRemaining(access.restaurant.subscriptionEnd) : null;
   const quickActions = [
     { label: "Thêm món mới", description: "Cập nhật menu bán hàng", href: restaurantRoutes.adminMenu(access.restaurant.slug), Icon: MenuIcon },
     { label: "Tạo bàn", description: "Quản lý khu vực và QR bàn", href: restaurantRoutes.adminTables(access.restaurant.slug), Icon: Grid3X3 },
     { label: "Xem đơn hàng", description: "Theo dõi order theo bàn", href: restaurantRoutes.adminOrders(access.restaurant.slug), Icon: ListOrdered },
     { label: "Quản lý nhân viên", description: "Tài khoản, ca làm và thiết bị", href: restaurantRoutes.adminStaff(access.restaurant.slug), Icon: Users },
     { label: "Top món", description: "Món bán chạy và doanh thu", href: restaurantRoutes.adminTopItems(access.restaurant.slug), Icon: Trophy },
-    ...(hasPlanFeature(access.restaurant.plan, "REPORTS", access.restaurant.businessType)
+    ...(hasPlanFeature(access.restaurant.plan, "REPORTS", access.restaurant.businessType, access.restaurant.planEntitlement)
       ? [{ label: "Xem báo cáo", description: "Doanh thu và giao dịch", href: restaurantRoutes.adminReports(access.restaurant.slug), Icon: BarChart3 }]
       : [])
   ];
@@ -35,6 +37,7 @@ export default async function RestaurantAdminPage({ params }: { params: { rSlug:
       title="Tổng quan kinh doanh"
       userName={access.user.name}
       plan={access.restaurant.plan}
+      planEntitlement={access.restaurant.planEntitlement}
       businessType={access.restaurant.businessType}
       logoUrl={logoUrl}
     >
@@ -50,8 +53,8 @@ export default async function RestaurantAdminPage({ params }: { params: { rSlug:
                   <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                     {restaurantStatusLabel(access.restaurant.status)}
                   </span>
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${access.restaurant.plan === "PRO" ? "border-amber-200 bg-[#fff8e7] text-amber-900" : "border-white/20 bg-white/10 text-white"}`}>
-                    {access.restaurant.plan === "PRO" ? "PRO" : "BASIC"}
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${access.restaurant.plan === "PRO" || access.restaurant.plan === "TRAIN" && access.restaurant.planEntitlement === "PRO" ? "border-amber-200 bg-[#fff8e7] text-amber-900" : "border-white/20 bg-white/10 text-white"}`}>
+                    {planDisplayLabel(access.restaurant.plan, access.restaurant.planEntitlement)}
                   </span>
                 </div>
                 <p className="text-sm font-medium text-teal-50">{todayLabel}</p>
@@ -63,6 +66,19 @@ export default async function RestaurantAdminPage({ params }: { params: { rSlug:
       </section>
 
       <DashboardLiveOverview slug={access.restaurant.slug} initialOverview={overview} />
+
+      {access.restaurant.plan === "TRAIN" && trainRemainingDays != null && trainRemainingDays <= 10 ? (
+        <section className={`mt-5 rounded-2xl border p-4 text-sm ${trainRemainingDays > 0 ? "border-amber-200 bg-amber-50 text-amber-900" : "border-red-200 bg-red-50 text-red-800"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-semibold">
+              {trainRemainingDays > 0 ? `Gói trải nghiệm của bạn còn ${trainRemainingDays} ngày.` : "Gói trải nghiệm đã hết hạn."}
+            </p>
+            <Link className="rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" href={restaurantRoutes.adminSubscription(access.restaurant.slug)}>
+              {trainRemainingDays > 0 ? "Xem gói dịch vụ" : "Đăng ký gói dịch vụ"}
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-5 rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">

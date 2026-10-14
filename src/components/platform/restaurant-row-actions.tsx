@@ -16,6 +16,7 @@ type RestaurantActionProps = {
   restaurantSlug: string;
   status: string;
   plan: string;
+  planEntitlement?: string | null;
   businessType?: string | null;
   returnTo: string;
   priceOptions?: SubscriptionPriceOption[];
@@ -41,6 +42,7 @@ export function PlatformRestaurantActions({
   restaurantSlug,
   status,
   plan,
+  planEntitlement,
   businessType,
   returnTo,
   priceOptions = [],
@@ -61,7 +63,8 @@ export function PlatformRestaurantActions({
   const restoreSlugId = useId();
   const permanentDeleteSlugId = useId();
   const [password, setPassword] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState<"BASIC" | "PRO">(plan === "PRO" ? "PRO" : "BASIC");
+  const [selectedPlan, setSelectedPlan] = useState<"TRAIN" | "BASIC" | "PRO">(plan === "TRAIN" ? "TRAIN" : plan === "PRO" ? "PRO" : "BASIC");
+  const [selectedEntitlement, setSelectedEntitlement] = useState<"BASIC" | "PRO">(planEntitlement === "PRO" || plan === "PRO" ? "PRO" : "BASIC");
   const [selectedTerm, setSelectedTerm] = useState("12");
   const [grantType, setGrantType] = useState<"PAID" | "PROMOTION">("PAID");
   const [deleteSlug, setDeleteSlug] = useState("");
@@ -72,8 +75,8 @@ export function PlatformRestaurantActions({
   const nextStatus = isLocked ? "ACTIVE" : "SUSPENDED";
   const statusLabel = isLocked ? "Mở" : "Khóa";
   const isDrinkShop = businessType === "DRINK_SHOP";
-  const availablePlans = isDrinkShop ? (["BASIC"] as const) : (["BASIC", "PRO"] as const);
-  const currentPrice = priceOptions.find((price) => price.plan === selectedPlan && String(price.termMonths) === selectedTerm);
+  const availablePlans = isDrinkShop ? (["TRAIN", "BASIC"] as const) : (["TRAIN", "BASIC", "PRO"] as const);
+  const currentPrice = selectedPlan === "TRAIN" ? null : priceOptions.find((price) => price.plan === selectedPlan && String(price.termMonths) === selectedTerm);
   const confirmMessage = isLocked
     ? `Mở lại nhà hàng ${restaurantName}?`
     : `Khóa nhà hàng ${restaurantName}?\n\nTất cả tài khoản thuộc nhà hàng này sẽ không thể đăng nhập hoặc sử dụng hệ thống cho đến khi được mở lại.`;
@@ -188,20 +191,41 @@ export function PlatformRestaurantActions({
                 className="mt-1 h-10 w-full rounded-md border px-3"
                 name="plan"
                 value={selectedPlan}
-                onChange={(event) => setSelectedPlan(event.currentTarget.value === "PRO" ? "PRO" : "BASIC")}
+                onChange={(event) => {
+                  const nextPlan = event.currentTarget.value === "TRAIN" ? "TRAIN" : event.currentTarget.value === "PRO" ? "PRO" : "BASIC";
+                  setSelectedPlan(nextPlan);
+                  if (nextPlan !== "TRAIN") {
+                    setSelectedEntitlement(nextPlan === "PRO" ? "PRO" : "BASIC");
+                    setGrantType("PAID");
+                  } else {
+                    setGrantType("PROMOTION");
+                  }
+                }}
               >
                 {availablePlans.map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </label>
+            {selectedPlan === "TRAIN" ? (
+              <label className="block text-sm font-medium">
+                Quyền sử dụng
+                <select className="mt-1 h-10 w-full rounded-md border px-3" name="planEntitlement" value={selectedEntitlement} onChange={(event) => setSelectedEntitlement(event.currentTarget.value === "PRO" ? "PRO" : "BASIC")}>
+                  <option value="BASIC">Quyền BASIC</option>
+                  <option value="PRO">Quyền PRO</option>
+                </select>
+              </label>
+            ) : (
+              <input name="planEntitlement" type="hidden" value={selectedPlan === "PRO" ? "PRO" : "BASIC"} />
+            )}
             <label className="block text-sm font-medium">
               Thời hạn
-              <select className="mt-1 h-10 w-full rounded-md border px-3" name="termMonths" value={selectedTerm} onChange={(event) => setSelectedTerm(event.currentTarget.value)}>
+              <select className="mt-1 h-10 w-full rounded-md border px-3 disabled:bg-slate-100" name="termMonths" value={selectedTerm} onChange={(event) => setSelectedTerm(event.currentTarget.value)} disabled={selectedPlan === "TRAIN"}>
                 <option value="3">3 tháng</option>
                 <option value="6">6 tháng</option>
                 <option value="12">12 tháng</option>
               </select>
+              {selectedPlan === "TRAIN" ? <span className="mt-1 block text-xs text-slate-500">TRAIN dùng ngày bắt đầu và ngày hết hạn do Admin nhập.</span> : null}
             </label>
             <label className="block text-sm font-medium">
               Ngày bắt đầu
@@ -209,30 +233,31 @@ export function PlatformRestaurantActions({
             </label>
             <label className="block text-sm font-medium">
               Ngày hết hạn
-              <input className="mt-1 h-10 w-full rounded-md border px-3" name="subscriptionEnd" type="date" />
+              <input className="mt-1 h-10 w-full rounded-md border px-3" name="subscriptionEnd" type="date" required={selectedPlan === "TRAIN"} />
             </label>
           </div>
           <div className="rounded-xl border bg-slate-50 p-3 text-sm">
             <p className="font-semibold">Giá theo bảng hiện tại</p>
             <p className="mt-1 text-slate-600">
-              {currentPrice ? `${formatVnd(currentPrice.priceVnd)} · ${formatVnd(currentPrice.monthlyPriceVnd)}/tháng` : "Kỳ giá này chưa mở bán."}
+              {selectedPlan === "TRAIN" ? "Miễn phí · Không phát sinh doanh thu" : currentPrice ? `${formatVnd(currentPrice.priceVnd)} · ${formatVnd(currentPrice.monthlyPriceVnd)}/tháng` : "Kỳ giá này chưa mở bán."}
             </p>
-            <p className="mt-2 text-xs text-slate-500">Nếu nhập ngày hết hạn thủ công, hệ thống sẽ dùng ngày đó và vẫn lưu lịch sử thao tác.</p>
+            <p className="mt-2 text-xs text-slate-500">{selectedPlan === "TRAIN" ? "Ngày hết hạn là bắt buộc khi cấp TRAIN." : "Nếu nhập ngày hết hạn thủ công, hệ thống sẽ dùng ngày đó và vẫn lưu lịch sử thao tác."}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm font-medium">
               Loại kích hoạt
-              <select className="mt-1 h-10 w-full rounded-md border px-3" name="grantType" value={grantType} onChange={(event) => setGrantType(event.currentTarget.value === "PROMOTION" ? "PROMOTION" : "PAID")}>
+              <select className="mt-1 h-10 w-full rounded-md border px-3 disabled:bg-slate-100" name="grantType" value={selectedPlan === "TRAIN" ? "PROMOTION" : grantType} disabled={selectedPlan === "TRAIN"} onChange={(event) => setGrantType(event.currentTarget.value === "PROMOTION" ? "PROMOTION" : "PAID")}>
                 <option value="PAID">Hợp đồng trả phí</option>
                 <option value="PROMOTION">Ưu đãi quản trị</option>
               </select>
+              {selectedPlan === "TRAIN" ? <input name="grantType" type="hidden" value="PROMOTION" /> : null}
             </label>
             <label className="block text-sm font-medium">
               Ghi chú
               <input className="mt-1 h-10 w-full rounded-md border px-3" name="note" placeholder="Ví dụ: đã đối soát chuyển khoản" />
             </label>
           </div>
-          {grantType === "PAID" ? (
+          {selectedPlan !== "TRAIN" && grantType === "PAID" ? (
             <label className="flex items-start gap-2 rounded-xl border bg-white p-3 text-sm">
               <input className="mt-1" name="paymentConfirmed" type="checkbox" />
               <span>Đã kiểm tra thanh toán cho hợp đồng này.</span>
@@ -246,7 +271,7 @@ export function PlatformRestaurantActions({
             <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => subscriptionDialogRef.current?.close()}>
               Hủy
             </button>
-            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" disabled={grantType === "PAID" && !currentPrice}>
+            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" disabled={selectedPlan !== "TRAIN" && grantType === "PAID" && !currentPrice}>
               Lưu thay đổi
             </button>
           </div>

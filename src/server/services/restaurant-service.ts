@@ -10,6 +10,7 @@ export async function getRestaurantAdminOverview(restaurantId: string) {
       logoUrl: true,
       status: true,
       plan: true,
+      planEntitlement: true,
       businessType: true,
       settings: {
         select: {
@@ -108,6 +109,7 @@ export async function getRestaurantAdminOverview(restaurantId: string) {
       logoUrl: restaurant.settings?.logoUrl ?? restaurant.logoUrl,
       status: restaurant.status,
       plan: restaurant.plan,
+      planEntitlement: restaurant.planEntitlement,
       businessType: restaurant.businessType,
       timeZone
     } : null,

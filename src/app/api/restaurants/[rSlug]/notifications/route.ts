@@ -17,7 +17,7 @@ function notificationPayload(notification: {
   type: string;
   title: string;
   message: string;
-  tableId: string;
+  tableId: string | null;
   orderId: string | null;
   serviceRequestId: string | null;
   isRead: boolean;

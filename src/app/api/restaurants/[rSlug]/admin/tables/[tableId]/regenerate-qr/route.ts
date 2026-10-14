@@ -14,6 +14,8 @@ type AccessResult =
         slug: string;
         status: string;
         plan: string;
+        planEntitlement: string;
+        businessType: string;
       };
       role: RestaurantRole;
     }
@@ -31,8 +33,9 @@ async function requireQrAccess(slug: string): Promise<AccessResult> {
       id: true,
       slug: true,
       status: true,
-        plan: true,
-        businessType: true
+      plan: true,
+      planEntitlement: true,
+      businessType: true
     }
   });
 
@@ -57,7 +60,7 @@ async function requireQrAccess(slug: string): Promise<AccessResult> {
     }
   });
 
-  if (!membership?.isActive || !["OWNER", "MANAGER"].includes(membership.role) || !canRoleAccessPlan(restaurant.plan, membership.role, restaurant.businessType)) {
+  if (!membership?.isActive || !["OWNER", "MANAGER"].includes(membership.role) || !canRoleAccessPlan(restaurant.plan, membership.role, restaurant.businessType, restaurant.planEntitlement)) {
     return { error: NextResponse.json({ success: false, message: "Bạn không có quyền đổi mã QR bàn." }, { status: 403 }) };
   }
 

@@ -65,7 +65,7 @@ export default async function AdminStaffPage({
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
   const assignableRoles = assignableRestaurantRolesForPlan(access.restaurant.plan, access.restaurant.businessType);
-  const departmentAccess = departmentLoginRolesForPlan(access.restaurant.plan, access.restaurant.businessType).map((role) => ({
+  const departmentAccess = departmentLoginRolesForPlan(access.restaurant.plan, access.restaurant.businessType, access.restaurant.planEntitlement).map((role) => ({
     role,
     ...departmentLabels[role as "WAITER" | "KITCHEN" | "CASHIER"]
   }));
@@ -152,6 +152,7 @@ export default async function AdminStaffPage({
       userName={access.user.name}
       notifications={notifications}
       plan={access.restaurant.plan}
+      planEntitlement={access.restaurant.planEntitlement}
       businessType={access.restaurant.businessType}
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />

@@ -8,6 +8,7 @@ export function CustomerShell({
   tableName,
   customerName,
   plan,
+  planEntitlement,
   businessType,
   children
 }: {
@@ -16,10 +17,11 @@ export function CustomerShell({
   tableName?: string;
   customerName?: string;
   plan?: string | null;
+  planEntitlement?: string | null;
   businessType?: string | null;
   children: React.ReactNode;
 }) {
-  const canUsePayment = hasPlanFeature(plan, "PAYMENT_REQUEST", businessType);
+  const canUsePayment = hasPlanFeature(plan, "PAYMENT_REQUEST", businessType, planEntitlement);
   const navColumns = canUsePayment ? "grid-cols-3" : "grid-cols-2";
 
   return (

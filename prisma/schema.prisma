@@ -29,6 +29,12 @@ enum RestaurantStatus {
 
 enum RestaurantPlan {
   FREE
+  TRAIN
+  BASIC
+  PRO
+}
+
+enum PlanEntitlement {
   BASIC
   PRO
 }
@@ -111,6 +117,7 @@ enum NotificationType {
   SERVICE_REQUEST_CREATED
   PAYMENT_REQUESTED
   ORDER_READY
+  SUBSCRIPTION_EXPIRING
 }
 
 model User {
@@ -139,6 +146,7 @@ model Restaurant {
   logoUrl            String?
   status             RestaurantStatus   @default(ACTIVE)
   plan               RestaurantPlan     @default(FREE)
+  planEntitlement    PlanEntitlement    @default(BASIC)
   businessType       BusinessType       @default(RESTAURANT)
   subscriptionStatus SubscriptionStatus @default(ACTIVE)
   subscriptionStart  DateTime?
@@ -168,6 +176,7 @@ model Restaurant {
   @@index([status])
   @@index([deletedAt])
   @@index([plan])
+  @@index([planEntitlement])
   @@index([businessType])
   @@index([createdAt])
 }
@@ -549,13 +558,13 @@ model Notification {
   type             NotificationType
   title            String
   message          String
-  tableId          String
+  tableId          String?
   orderId          String?
   serviceRequestId String?
   isRead           Boolean             @default(false)
   createdAt        DateTime            @default(now())
   restaurant       Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  table            RestaurantTable     @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  table            RestaurantTable?    @relation(fields: [tableId], references: [id], onDelete: Restrict)
   order            Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
   serviceRequest   ServiceRequest?     @relation(fields: [serviceRequestId], references: [id], onDelete: SetNull)
 

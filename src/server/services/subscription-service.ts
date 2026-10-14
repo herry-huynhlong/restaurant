@@ -78,6 +78,8 @@ export async function getRestaurantSubscriptionSummary(restaurantId: string) {
         name: true,
         slug: true,
         plan: true,
+        planEntitlement: true,
+        businessType: true,
         subscriptionStatus: true,
         subscriptionStart: true,
         subscriptionEnd: true

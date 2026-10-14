@@ -11,5 +11,6 @@ export function getBusinessTypeLabel(type: BusinessType | string | null | undefi
 }
 
 export function enforceBusinessPlan(type: BusinessType | string | null | undefined, plan: string | null | undefined) {
+  if (plan === "TRAIN") return "TRAIN";
   return type === "DRINK_SHOP" ? "BASIC" : plan === "PRO" ? "PRO" : "BASIC";
 }

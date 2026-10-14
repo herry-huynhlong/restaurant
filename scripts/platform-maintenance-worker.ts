@@ -445,7 +445,10 @@ async function processSubscriptionLifecycle() {
     },
     select: {
       id: true,
+      name: true,
+      slug: true,
       plan: true,
+      planEntitlement: true,
       subscriptionEnd: true,
       subscriptionStatus: true
     }
@@ -454,7 +457,9 @@ async function processSubscriptionLifecycle() {
   for (const restaurant of restaurants) {
     if (!restaurant.subscriptionEnd) continue;
     const remainingDays = Math.ceil((restaurant.subscriptionEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
-    const alertMilestone = [14, 7, 3, 1].includes(remainingDays) ? remainingDays : remainingDays <= 0 ? 0 : null;
+    const trainMilestones = [10, 7, 3, 1];
+    const standardMilestones = [14, 7, 3, 1];
+    const alertMilestone = (restaurant.plan === "TRAIN" ? trainMilestones : standardMilestones).includes(remainingDays) ? remainingDays : remainingDays <= 0 ? 0 : null;
 
     if (remainingDays < -subscriptionPolicy.gracePeriodDays && restaurant.subscriptionStatus !== "EXPIRED") {
       await prisma.restaurant.update({
@@ -482,11 +487,83 @@ async function processSubscriptionLifecycle() {
         plan: restaurant.plan,
         endAt: restaurant.subscriptionEnd,
         metadataJson: {
-          remainingDays: alertMilestone
+          remainingDays: alertMilestone,
+          planEntitlement: restaurant.planEntitlement
         }
       }
     });
+    if (restaurant.plan === "TRAIN") {
+      await createTrainExpiryNotifications({
+        restaurantId: restaurant.id,
+        restaurantName: restaurant.name,
+        restaurantSlug: restaurant.slug,
+        entitlement: restaurant.planEntitlement,
+        endAt: restaurant.subscriptionEnd,
+        remainingDays: alertMilestone
+      });
+    }
   }
+}
+
+async function createTrainExpiryNotifications({
+  restaurantId,
+  restaurantName,
+  restaurantSlug,
+  entitlement,
+  endAt,
+  remainingDays
+}: {
+  restaurantId: string;
+  restaurantName: string;
+  restaurantSlug: string;
+  entitlement: string;
+  endAt: Date;
+  remainingDays: number;
+}) {
+  const owners = await prisma.restaurantUser.findMany({
+    where: {
+      restaurantId,
+      role: "OWNER",
+      isActive: true,
+      user: { isActive: true }
+    },
+    select: { userId: true }
+  });
+  if (!owners.length) return;
+
+  const endLabel = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }).format(endAt);
+  const title = remainingDays <= 0 ? "Gói TRAIN đã hết hạn" : `Gói TRAIN còn ${remainingDays} ngày`;
+  const message = remainingDays <= 0
+    ? `Gói TRAIN · Quyền ${entitlement} của ${restaurantName} đã hết hạn ngày ${endLabel}. Vào trang gói dịch vụ để đăng ký gói trả phí.`
+    : `Gói TRAIN · Quyền ${entitlement} của ${restaurantName} sẽ hết hạn ngày ${endLabel}. Vào trang gói dịch vụ để xem chi tiết.`;
+
+  await prisma.notification.createMany({
+    data: owners.map((owner) => ({
+      restaurantId,
+      recipientUserId: owner.userId,
+      type: "SUBSCRIPTION_EXPIRING",
+      title,
+      message,
+      tableId: null
+    })),
+    skipDuplicates: false
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      restaurantId,
+      action: remainingDays <= 0 ? "TRAIN_EXPIRED_NOTIFICATION_SENT" : `TRAIN_EXPIRING_${remainingDays}_DAYS_NOTIFICATION_SENT`,
+      entityType: "Restaurant",
+      entityId: restaurantId,
+      metadataJson: {
+        slug: restaurantSlug,
+        plan: "TRAIN",
+        planEntitlement: entitlement,
+        subscriptionEnd: endAt.toISOString(),
+        remainingDays
+      }
+    }
+  });
 }
 
 function postgresEnv(databaseUrl: string) {

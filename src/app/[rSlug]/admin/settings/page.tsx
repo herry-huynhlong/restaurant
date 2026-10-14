@@ -9,6 +9,7 @@ import { servedUploadUrl } from "@/lib/upload-url";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { restaurantRoutes } from "@/lib/routes";
 import { daysRemaining } from "@/server/services/subscription-service";
+import { planDisplayLabel } from "@/lib/plan/features";
 import { changeOwnerPasswordAction, updateRestaurantSettingsAction } from "@/app/[rSlug]/admin/actions";
 
 export default async function SettingsPage({
@@ -37,7 +38,7 @@ export default async function SettingsPage({
   const remainingDays = daysRemaining(restaurant.subscriptionEnd);
 
   return (
-    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Cài đặt" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan} businessType={access.restaurant.businessType}>
+    <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Cài đặt" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan} planEntitlement={access.restaurant.planEntitlement} businessType={access.restaurant.businessType}>
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
       <form className="space-y-6" action={updateRestaurantSettingsAction.bind(null, access.restaurant.slug)} encType="multipart/form-data">
         <SettingsSection title="Thông tin quán">
@@ -138,7 +139,7 @@ export default async function SettingsPage({
           <div>
             <h2 className="text-base font-semibold">Gói dịch vụ hiện tại</h2>
             <p className="mt-1 text-sm text-slate-600">
-              {restaurant.plan === "PRO" ? "PRO" : "BASIC"} · {remainingDays == null ? "Chưa có ngày hết hạn" : remainingDays > 0 ? `Còn ${remainingDays} ngày` : "Đã hết hạn"}
+              {planDisplayLabel(restaurant.plan, restaurant.planEntitlement)} · {remainingDays == null ? "Chưa có ngày hết hạn" : remainingDays > 0 ? `Còn ${remainingDays} ngày` : "Đã hết hạn"}
             </p>
           </div>
           <Link className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" href={restaurantRoutes.adminSubscription(access.restaurant.slug)}>

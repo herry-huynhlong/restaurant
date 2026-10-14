@@ -8,7 +8,7 @@ import { NotificationAudioUnlocker } from "@/components/app-shell/notification-a
 import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
 import { SignOutButton } from "@/components/app-shell/sign-out-button";
 import { AdminMobileMenu, type AdminMobileNavIcon } from "@/components/app-shell/admin-mobile-menu";
-import { hasPlanFeature } from "@/lib/plan/features";
+import { hasPlanFeature, planDisplayLabel } from "@/lib/plan/features";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { restaurantRoutes } from "@/lib/routes";
 
@@ -28,6 +28,7 @@ export function RestaurantAdminShell({
   userName,
   notifications = [],
   plan = "BASIC",
+  planEntitlement = "BASIC",
   businessType = "RESTAURANT",
   logoUrl
 }: {
@@ -39,16 +40,18 @@ export function RestaurantAdminShell({
   userName?: string | null;
   notifications?: Notification[];
   plan?: string | null;
+  planEntitlement?: string | null;
   businessType?: string | null;
   logoUrl?: string | null;
 }) {
   const roleLabel = getRoleLabel(role);
-  const planLabel = plan === "PRO" ? "PRO" : "BASIC";
-  const planBadgeClass = planLabel === "PRO"
+  const planLabel = planDisplayLabel(plan, planEntitlement);
+  const effectivePlanTone = plan === "PRO" || plan === "TRAIN" && planEntitlement === "PRO" ? "PRO" : "BASIC";
+  const planBadgeClass = effectivePlanTone === "PRO"
     ? "border-amber-200 bg-[#fff8e7] text-amber-900"
     : "border-slate-200 bg-slate-50 text-slate-700";
   const displayUserName = userName?.trim() || roleLabel;
-  const reportNavItems: AdminNavItem[] = hasPlanFeature(plan, "REPORTS", businessType)
+  const reportNavItems: AdminNavItem[] = hasPlanFeature(plan, "REPORTS", businessType, planEntitlement)
     ? [{ label: "Báo cáo", href: restaurantRoutes.adminReports(slug), Icon: BarChart3, icon: "reports" }]
     : [];
   const navItems: AdminNavItem[] = [

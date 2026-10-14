@@ -104,9 +104,9 @@ export async function sendPushToRestaurantRoles({
 }) {
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
-    select: { slug: true, plan: true, businessType: true }
+    select: { slug: true, plan: true, planEntitlement: true, businessType: true }
   });
-  const allowedRoles = new Set<RestaurantRole>(["OWNER", ...allowedStaffRolesForPlan(restaurant?.plan, restaurant?.businessType)]);
+  const allowedRoles = new Set<RestaurantRole>(["OWNER", ...allowedStaffRolesForPlan(restaurant?.plan, restaurant?.businessType, restaurant?.planEntitlement)]);
   const effectiveRoles = roles.filter((role) => allowedRoles.has(role));
   const iconUrl = restaurant?.slug ? `/${restaurant.slug}/icons/icon-192.png` : "/icons/icon-192.png";
   const payloadWithRestaurantIcon: PushPayload = {

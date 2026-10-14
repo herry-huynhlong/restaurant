@@ -11,7 +11,7 @@ import { publishNotificationRefresh } from "@/server/services/notification-event
 export async function POST(request: Request, { params }: { params: { rSlug: string } }) {
   try {
     const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "CASHIER"]);
-    if (!hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType)) {
+    if (!hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType, access.restaurant.planEntitlement)) {
       return NextResponse.json({ ok: false, error: "plan_locked", message: "Gói hiện tại chưa hỗ trợ xác nhận thanh toán." }, { status: 403 });
     }
     await assertActiveStaffDeviceForAction({

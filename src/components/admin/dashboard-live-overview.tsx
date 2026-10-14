@@ -49,6 +49,7 @@ type DashboardOverview = {
     logoUrl: string | null;
     status: string;
     plan: string;
+    planEntitlement: string;
     businessType: string;
     timeZone: string;
   } | null;

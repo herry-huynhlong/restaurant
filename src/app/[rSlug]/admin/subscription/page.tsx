@@ -4,7 +4,7 @@ import { SubscriptionPricingClient } from "@/components/admin/subscription-prici
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { daysRemaining, getPublicPlanPrices, getRestaurantSubscriptionSummary } from "@/server/services/subscription-service";
-import { basicPlanFeatures, planFeatureLabels, planFeatureOrder, proPlanFeatures, type CommercialPlan } from "@/lib/plan/features";
+import { basicPlanFeatures, effectiveCommercialPlan, planDisplayLabel, planFeatureLabels, planFeatureOrder, proPlanFeatures, type CommercialPlan } from "@/lib/plan/features";
 
 const planFeatures: Record<CommercialPlan, typeof basicPlanFeatures> = {
   BASIC: basicPlanFeatures,
@@ -28,7 +28,8 @@ export default async function AdminSubscriptionPage({
   if (!restaurant) return null;
   const remainingDays = daysRemaining(restaurant.subscriptionEnd);
   const currentExpired = remainingDays != null && remainingDays <= 0;
-  const currentPlan = restaurant.plan === "PRO" ? "PRO" : "BASIC";
+  const currentPlan = effectiveCommercialPlan(restaurant.plan, restaurant.businessType, restaurant.planEntitlement);
+  const displayPlan = planDisplayLabel(restaurant.plan, restaurant.planEntitlement);
   const featureItems = planFeatureOrder.map((feature) => ({
     key: feature,
     title: planFeatureLabels[feature].title,
@@ -48,6 +49,7 @@ export default async function AdminSubscriptionPage({
       userName={access.user.name}
       notifications={notifications}
       plan={access.restaurant.plan}
+      planEntitlement={access.restaurant.planEntitlement}
       businessType={access.restaurant.businessType}
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
@@ -57,7 +59,7 @@ export default async function AdminSubscriptionPage({
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Gói đang sử dụng</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold text-slate-950">Gói hiện tại: {currentPlan}</h2>
+              <h2 className="text-xl font-semibold text-slate-950">Gói hiện tại: {displayPlan}</h2>
               <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${currentPlan === "PRO" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-teal-200 bg-teal-50 text-teal-700"}`}>
                 {subscriptionStatusText(restaurant.subscriptionStatus, remainingDays)}
               </span>
@@ -81,7 +83,13 @@ export default async function AdminSubscriptionPage({
 
       {remainingDays != null && remainingDays > 0 && remainingDays <= 14 ? (
         <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Gói dịch vụ còn {remainingDays} ngày. Bạn có thể chọn kỳ phù hợp bên dưới và gửi yêu cầu gia hạn ngay.
+          {restaurant.plan === "TRAIN" ? `Gói trải nghiệm của bạn còn ${remainingDays} ngày. Hết hạn ngày ${formatDate(restaurant.subscriptionEnd)}.` : `Gói dịch vụ còn ${remainingDays} ngày. Bạn có thể chọn kỳ phù hợp bên dưới và gửi yêu cầu gia hạn ngay.`}
+        </section>
+      ) : null}
+
+      {restaurant.plan === "TRAIN" && remainingDays != null && remainingDays <= 0 ? (
+        <section className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Gói trải nghiệm đã hết hạn. Bạn có thể chọn BASIC hoặc PRO bên dưới để gửi yêu cầu đăng ký gói dịch vụ.
         </section>
       ) : null}
 

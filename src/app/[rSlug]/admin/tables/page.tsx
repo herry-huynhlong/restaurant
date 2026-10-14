@@ -52,6 +52,7 @@ export default async function TablesPage({
       userName={access.user.name}
       notifications={notifications}
       plan={access.restaurant.plan}
+      planEntitlement={access.restaurant.planEntitlement}
       businessType={access.restaurant.businessType}
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
@@ -81,7 +82,7 @@ export default async function TablesPage({
         slug={access.restaurant.slug}
         restaurantName={access.restaurant.name}
         cashierName={access.user.name}
-        canUsePayment={hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType)}
+        canUsePayment={hasPlanFeature(access.restaurant.plan, "PAYMENT_CONFIRM", access.restaurant.businessType, access.restaurant.planEntitlement)}
         products={products}
         initialState={tableState}
         initialSelectedTableId={searchParams?.table}

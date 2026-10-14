@@ -1,17 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { Bell, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Notification, NotificationType } from "@prisma/client";
 import { getStaffDeviceId, isDeviceOnShift } from "@/lib/staff-device";
 import { playNotificationSound } from "@/lib/client-notification-sound";
+import { restaurantRoutes } from "@/lib/routes";
 
 type NotificationItem = {
   id: string;
   type: NotificationType;
   title: string;
   message: string;
-  tableId: string;
+  tableId: string | null;
   orderId: string | null;
   serviceRequestId: string | null;
   isRead: boolean;
@@ -301,6 +303,11 @@ export function NotificationBell({
                 <div key={notification.id} className={`rounded-md p-3 [overflow-wrap:anywhere] ${notification.isRead ? "bg-slate-50" : "bg-teal-50"}`}>
                   <p className="whitespace-normal text-sm font-medium leading-snug">{notification.title}</p>
                   <p className="mt-1 whitespace-normal text-xs leading-relaxed text-slate-600">{notification.message}</p>
+                  {notification.type === "SUBSCRIPTION_EXPIRING" ? (
+                    <Link className="mt-2 inline-flex rounded-md border bg-white px-2.5 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50" href={restaurantRoutes.adminSubscription(slug)} onClick={() => setOpen(false)}>
+                      Xem gói dịch vụ
+                    </Link>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-slate-500">{formatCreatedAt(notification.createdAt)}</span>
                     {!notification.isRead ? (
@@ -324,6 +331,11 @@ export function NotificationBell({
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Thông báo mới</p>
               <p className="mt-1 break-words text-base font-semibold text-slate-950">{foregroundPopup.title}</p>
               <p className="mt-1 break-words text-sm text-slate-600">{foregroundPopup.message}</p>
+              {foregroundPopup.type === "SUBSCRIPTION_EXPIRING" ? (
+                <Link className="mt-3 inline-flex rounded-md border bg-white px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50" href={restaurantRoutes.adminSubscription(slug)} onClick={() => setForegroundPopup(null)}>
+                  Xem gói dịch vụ
+                </Link>
+              ) : null}
             </div>
             <button
               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-slate-600 hover:bg-slate-50"

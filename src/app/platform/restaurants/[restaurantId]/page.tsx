@@ -30,6 +30,7 @@ import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
+import { planDisplayLabel } from "@/lib/plan/features";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getPlatformRestaurantDetail } from "@/server/services/platform-service";
@@ -56,6 +57,7 @@ export default async function RestaurantDetailPage({
   const isExpiringSoon = typeof daysRemaining === "number" && daysRemaining >= 0 && daysRemaining <= 14;
   const isExpired = typeof daysRemaining === "number" && daysRemaining < 0;
   const isDeleted = restaurant.status === "DELETED";
+  const planLabel = planDisplayLabel(restaurant.plan, restaurant.planEntitlement);
 
   return (
     <PlatformShell title="Chi tiết nhà hàng">
@@ -77,7 +79,7 @@ export default async function RestaurantDetailPage({
               <div className="min-w-0">
                 <div className="mb-3 flex flex-wrap gap-2">
                   <Badge className={statusBadgeClass(restaurant.status)}>{restaurantStatusLabel(restaurant.status)}</Badge>
-                  <Badge className={planBadgeClass(restaurant.plan)}>{restaurant.plan}</Badge>
+                  <Badge className={planBadgeClass(restaurant.plan)}>{planLabel}</Badge>
                   <Badge className="border-white/20 bg-white/10 text-white">{getBusinessTypeLabel(restaurant.businessType)}</Badge>
                 </div>
                 <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">{restaurant.name}</h1>
@@ -118,7 +120,7 @@ export default async function RestaurantDetailPage({
 
       <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard icon={BadgeCheck} label="Trạng thái nhà hàng" value={restaurantStatusLabel(restaurant.status)} tone={restaurant.status === "ACTIVE" ? "green" : restaurant.status === "DELETED" ? "red" : "amber"} />
-        <MetricCard icon={ReceiptText} label="Gói dịch vụ" value={restaurant.plan} tone={restaurant.plan === "PRO" ? "champagne" : "neutral"} />
+        <MetricCard icon={ReceiptText} label="Gói dịch vụ" value={planLabel} tone={restaurant.plan === "PRO" || restaurant.plan === "TRAIN" && restaurant.planEntitlement === "PRO" ? "champagne" : "neutral"} />
         <MetricCard icon={CalendarClock} label="Ngày hết hạn" value={formatDate(restaurant.subscriptionEnd)} tone={isExpired ? "red" : isExpiringSoon ? "amber" : "neutral"} />
         <MetricCard icon={Timer} label="Số ngày còn lại" value={formatDaysRemaining(daysRemaining)} tone={isExpired ? "red" : isExpiringSoon ? "amber" : "green"} />
         <MetricCard icon={Utensils} label="Tổng bàn" value={restaurant._count.tables} tone="neutral" />
@@ -132,7 +134,7 @@ export default async function RestaurantDetailPage({
               <h2 className="text-lg font-semibold">Gói dịch vụ & Gia hạn</h2>
               <p className="mt-1 text-sm text-slate-500">Quản lý gói dịch vụ, hạn sử dụng và trạng thái sử dụng.</p>
             </div>
-            <Badge className={planBadgeClass(restaurant.plan)}>{restaurant.plan}</Badge>
+            <Badge className={planBadgeClass(restaurant.plan)}>{planLabel}</Badge>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -278,6 +280,7 @@ export default async function RestaurantDetailPage({
             restaurantSlug={restaurant.slug}
             status={restaurant.status}
             plan={restaurant.plan}
+            planEntitlement={restaurant.planEntitlement}
             businessType={restaurant.businessType}
             returnTo={platformRoutes.restaurantDetail(restaurant.id)}
             showPlanAction={false}
@@ -299,6 +302,7 @@ export default async function RestaurantDetailPage({
             restaurantSlug={restaurant.slug}
             status={restaurant.status}
             plan={restaurant.plan}
+            planEntitlement={restaurant.planEntitlement}
             businessType={restaurant.businessType}
             returnTo={platformRoutes.restaurantDetail(restaurant.id)}
             showStatusAction={false}

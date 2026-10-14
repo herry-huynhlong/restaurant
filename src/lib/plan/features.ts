@@ -1,4 +1,4 @@
-import type { BusinessType, RestaurantPlan, RestaurantRole } from "@prisma/client";
+import type { BusinessType, PlanEntitlement, RestaurantPlan, RestaurantRole } from "@prisma/client";
 
 export type CommercialPlan = "BASIC" | "PRO";
 
@@ -114,7 +114,12 @@ const proFeatures = new Set<PlanFeature>(proPlanFeatures);
 
 export const commercialPlans: CommercialPlan[] = ["BASIC", "PRO"];
 
-export function effectiveCommercialPlan(plan: RestaurantPlan | string | null | undefined, businessType?: BusinessType | string | null): CommercialPlan {
+export function effectiveCommercialPlan(
+  plan: RestaurantPlan | string | null | undefined,
+  businessType?: BusinessType | string | null,
+  entitlement?: PlanEntitlement | CommercialPlan | string | null
+): CommercialPlan {
+  if (plan === "TRAIN") return normalizeEntitlement(entitlement);
   if (businessType === "DRINK_SHOP") return "BASIC";
   return normalizeCommercialPlan(plan);
 }
@@ -123,23 +128,49 @@ export function normalizeCommercialPlan(plan: RestaurantPlan | string | null | u
   return plan === "PRO" ? "PRO" : "BASIC";
 }
 
-export function hasPlanFeature(plan: RestaurantPlan | string | null | undefined, feature: PlanFeature, businessType?: BusinessType | string | null) {
-  return (effectiveCommercialPlan(plan, businessType) === "PRO" ? proFeatures : basicFeatures).has(feature);
+export function normalizeEntitlement(entitlement: PlanEntitlement | CommercialPlan | string | null | undefined): CommercialPlan {
+  return entitlement === "PRO" ? "PRO" : "BASIC";
 }
 
-export function allowedStaffRolesForPlan(plan: RestaurantPlan | string | null | undefined, businessType?: BusinessType | string | null): RestaurantRole[] {
-  return effectiveCommercialPlan(plan, businessType) === "PRO"
+export function planDisplayLabel(plan: RestaurantPlan | string | null | undefined, entitlement?: PlanEntitlement | CommercialPlan | string | null) {
+  return plan === "TRAIN" ? `TRAIN · Quyền ${normalizeEntitlement(entitlement)}` : normalizeCommercialPlan(plan);
+}
+
+export function hasPlanFeature(
+  plan: RestaurantPlan | string | null | undefined,
+  feature: PlanFeature,
+  businessType?: BusinessType | string | null,
+  entitlement?: PlanEntitlement | CommercialPlan | string | null
+) {
+  return (effectiveCommercialPlan(plan, businessType, entitlement) === "PRO" ? proFeatures : basicFeatures).has(feature);
+}
+
+export function allowedStaffRolesForPlan(
+  plan: RestaurantPlan | string | null | undefined,
+  businessType?: BusinessType | string | null,
+  entitlement?: PlanEntitlement | CommercialPlan | string | null
+): RestaurantRole[] {
+  return effectiveCommercialPlan(plan, businessType, entitlement) === "PRO"
     ? ["MANAGER", "WAITER", "KITCHEN", "CASHIER"]
     : ["WAITER"];
 }
 
-export function canRoleAccessPlan(plan: RestaurantPlan | string | null | undefined, role: RestaurantRole, businessType?: BusinessType | string | null) {
+export function canRoleAccessPlan(
+  plan: RestaurantPlan | string | null | undefined,
+  role: RestaurantRole,
+  businessType?: BusinessType | string | null,
+  entitlement?: PlanEntitlement | CommercialPlan | string | null
+) {
   if (role === "OWNER") return true;
-  return allowedStaffRolesForPlan(plan, businessType).includes(role);
+  return allowedStaffRolesForPlan(plan, businessType, entitlement).includes(role);
 }
 
-export function departmentLoginRolesForPlan(plan: RestaurantPlan | string | null | undefined, businessType?: BusinessType | string | null): RestaurantRole[] {
-  return effectiveCommercialPlan(plan, businessType) === "PRO"
+export function departmentLoginRolesForPlan(
+  plan: RestaurantPlan | string | null | undefined,
+  businessType?: BusinessType | string | null,
+  entitlement?: PlanEntitlement | CommercialPlan | string | null
+): RestaurantRole[] {
+  return effectiveCommercialPlan(plan, businessType, entitlement) === "PRO"
     ? ["WAITER", "KITCHEN", "CASHIER"]
     : ["WAITER"];
 }

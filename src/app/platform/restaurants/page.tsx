@@ -7,6 +7,7 @@ import { requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
+import { planDisplayLabel } from "@/lib/plan/features";
 import { getPlatformRestaurants } from "@/server/services/platform-service";
 import { getPublicPlanPrices } from "@/server/services/subscription-service";
 
@@ -80,7 +81,7 @@ export default async function PlatformRestaurantsPage({
                   </td>
                   <td className="px-3 py-3">
                     <p className="font-semibold">
-                      {restaurant.plan}
+                      {planDisplayLabel(restaurant.plan, restaurant.planEntitlement)}
                       {restaurant.subscriptionRequests.length > 0 ? ` — ${restaurant.subscriptionRequests.length} yêu cầu chờ` : ""}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">Hết hạn: {formatDate(restaurant.subscriptionEnd)}</p>
@@ -114,6 +115,7 @@ export default async function PlatformRestaurantsPage({
                         restaurantSlug={restaurant.slug}
                         status={restaurant.status}
                         plan={restaurant.plan}
+                        planEntitlement={restaurant.planEntitlement}
                         businessType={restaurant.businessType}
                         returnTo={returnTo}
                         priceOptions={priceOptions}
