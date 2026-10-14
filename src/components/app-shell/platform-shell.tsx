@@ -3,17 +3,27 @@ import { SignOutButton } from "@/components/app-shell/sign-out-button";
 import { PlatformMobileMenu } from "@/components/app-shell/platform-mobile-menu";
 import { PendingSubscriptionBadge } from "@/components/platform/pending-subscription-badge";
 import { productBrand } from "@/lib/brand";
+import { requirePlatformAdmin, isPlatformOwnerRole } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { getPendingSubscriptionRequestCount } from "@/server/services/platform-service";
 
-const navItems = [
+const ownerNavItems = [
   ["Tổng quan", platformRoutes.dashboard],
   ["Nhà hàng", platformRoutes.restaurants],
   ["Gói dịch vụ", platformRoutes.plans],
   ["Tài khoản chủ quán", platformRoutes.owners],
   ["Tài nguyên & Sao lưu", platformRoutes.storage],
   ["Hoạt động hệ thống", platformRoutes.activity],
+  ["Quản trị viên", platformRoutes.admins],
   ["Cài đặt nền tảng", platformRoutes.settings]
+] as const;
+
+const subAdminNavItems = [
+  ["Tổng quan", platformRoutes.dashboard],
+  ["Nhà hàng", platformRoutes.restaurants],
+  ["Tài khoản chủ quán", platformRoutes.owners],
+  ["Tài nguyên & Sao lưu", platformRoutes.storage],
+  ["Hoạt động hệ thống", platformRoutes.activity]
 ] as const;
 
 export async function PlatformShell({
@@ -27,7 +37,10 @@ export async function PlatformShell({
   action?: React.ReactNode;
   subtitle?: string;
 }) {
-  const pendingSubscriptionRequestCount = await getPendingSubscriptionRequestCount();
+  const user = await requirePlatformAdmin();
+  const isOwner = isPlatformOwnerRole(user.platformRole);
+  const pendingSubscriptionRequestCount = isOwner ? await getPendingSubscriptionRequestCount() : 0;
+  const navItems = isOwner ? ownerNavItems : subAdminNavItems;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -46,7 +59,7 @@ export async function PlatformShell({
         <section className="min-w-0 flex-1">
           <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
-              <PlatformMobileMenu pendingSubscriptionRequestCount={pendingSubscriptionRequestCount} />
+              <PlatformMobileMenu pendingSubscriptionRequestCount={pendingSubscriptionRequestCount} items={navItems.map(([label, href]) => ({ label, href }))} />
               <div className="min-w-0">
                 <h1 className="text-2xl font-semibold">{title}</h1>
                 <p className="mt-1 text-sm text-slate-600">{subtitle}</p>

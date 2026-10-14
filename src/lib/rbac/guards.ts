@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { notFound, redirect } from "next/navigation";
-import type { RestaurantRole } from "@prisma/client";
+import type { PlatformRole, RestaurantRole } from "@prisma/client";
 import { authOptions } from "@/lib/auth/options";
 import { prisma } from "@/lib/db/prisma";
 import { canRoleAccessPlan, hasPlanFeature, type PlanFeature } from "@/lib/plan/features";
@@ -20,11 +20,33 @@ export async function requireAuthenticatedUser() {
 export async function requirePlatformAdmin() {
   const user = await requireAuthenticatedUser();
 
-  if (user.platformRole !== "PLATFORM_ADMIN") {
+  if (!isPlatformAdminRole(user.platformRole)) {
     redirect("/unauthorized");
   }
 
   return user;
+}
+
+export async function requirePlatformOwner() {
+  const user = await requireAuthenticatedUser();
+
+  if (!isPlatformOwnerRole(user.platformRole)) {
+    redirect("/unauthorized");
+  }
+
+  return user;
+}
+
+export function isPlatformOwnerRole(role: PlatformRole | string | null | undefined) {
+  return role === "PLATFORM_OWNER" || role === "PLATFORM_ADMIN";
+}
+
+export function isPlatformSubAdminRole(role: PlatformRole | string | null | undefined) {
+  return role === "PLATFORM_SUB_ADMIN";
+}
+
+export function isPlatformAdminRole(role: PlatformRole | string | null | undefined) {
+  return isPlatformOwnerRole(role) || isPlatformSubAdminRole(role);
 }
 
 export async function requireRestaurantAccess(rSlug: string, allowedRoles?: RestaurantRole[]) {

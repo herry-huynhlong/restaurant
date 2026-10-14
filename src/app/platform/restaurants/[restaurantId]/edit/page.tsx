@@ -4,7 +4,7 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { BusinessPlanFields } from "@/components/platform/business-plan-fields";
 import { LogoUploadInput } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { getPlatformRestaurantDetail } from "@/server/services/platform-service";
 import { updateRestaurantAction } from "@/app/platform/restaurants/actions";
@@ -16,7 +16,7 @@ export default async function EditRestaurantPage({
   params: { restaurantId: string };
   searchParams?: { error?: string };
 }) {
-  await requirePlatformAdmin();
+  const user = await requirePlatformAdmin();
   const restaurant = await getPlatformRestaurantDetail(params.restaurantId);
 
   if (!restaurant) {
@@ -32,6 +32,7 @@ export default async function EditRestaurantPage({
       </PlatformShell>
     );
   }
+  const canManageSensitive = isPlatformOwnerRole(user.platformRole);
 
   return (
     <PlatformShell title={`Chỉnh sửa ${restaurant.name}`}>
@@ -52,16 +53,18 @@ export default async function EditRestaurantPage({
             <TextField label="Đơn vị tiền tệ" name="currency" defaultValue={restaurant.settings?.currency ?? "VND"} required />
           </div>
         </section>
-        <section>
-          <h2 className="text-base font-semibold">Gói dịch vụ</h2>
-          <div className="mt-3 grid gap-4 md:grid-cols-2">
-            <BusinessPlanFields defaultBusinessType={restaurant.businessType} defaultPlan={restaurant.plan} defaultPlanEntitlement={restaurant.planEntitlement} />
-            <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" defaultValue={toDateInput(restaurant.subscriptionStart)} />
-            <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" defaultValue={toDateInput(restaurant.subscriptionEnd)} />
-            <SelectField label="Trạng thái gói dịch vụ" name="subscriptionStatus" defaultValue={restaurant.subscriptionStatus} options={[["ACTIVE", "Đang hoạt động"], ["EXPIRED", "Đã hết hạn"], ["SUSPENDED", "Tạm ngưng"]]} />
-            <SelectField label="Trạng thái nhà hàng" name="status" defaultValue={restaurant.status} options={[["ACTIVE", "Đang hoạt động"], ["SUSPENDED", "Đã khóa"], ["INACTIVE", "Chưa hoạt động"]]} />
-          </div>
-        </section>
+        {canManageSensitive ? (
+          <section>
+            <h2 className="text-base font-semibold">Gói dịch vụ</h2>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <BusinessPlanFields defaultBusinessType={restaurant.businessType} defaultPlan={restaurant.plan} defaultPlanEntitlement={restaurant.planEntitlement} />
+              <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" defaultValue={toDateInput(restaurant.subscriptionStart)} />
+              <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" defaultValue={toDateInput(restaurant.subscriptionEnd)} />
+              <SelectField label="Trạng thái gói dịch vụ" name="subscriptionStatus" defaultValue={restaurant.subscriptionStatus} options={[["ACTIVE", "Đang hoạt động"], ["EXPIRED", "Đã hết hạn"], ["SUSPENDED", "Tạm ngưng"]]} />
+              <SelectField label="Trạng thái nhà hàng" name="status" defaultValue={restaurant.status} options={[["ACTIVE", "Đang hoạt động"], ["SUSPENDED", "Đã khóa"], ["INACTIVE", "Chưa hoạt động"]]} />
+            </div>
+          </section>
+        ) : null}
         <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Lưu thay đổi</button>
       </form>
     </PlatformShell>

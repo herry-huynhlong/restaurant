@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { ensurePlatformDataPolicy, refreshRestaurantStorageUsage } from "@/server/services/platform-storage-service";
 
@@ -18,7 +18,7 @@ const storagePolicySchema = z.object({
 });
 
 export async function updateStoragePolicyAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const parsed = storagePolicySchema.safeParse({
     backupEnabled: formData.get("backupEnabled") === "on",
     backupTime: readString(formData, "backupTime"),
@@ -61,7 +61,7 @@ export async function updateStoragePolicyAction(formData: FormData) {
 }
 
 export async function refreshStorageUsageAction() {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   await refreshRestaurantStorageUsage();
   await prisma.auditLog.create({
     data: {
@@ -76,7 +76,7 @@ export async function refreshStorageUsageAction() {
 }
 
 export async function queueManualBackupAction() {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const policy = await ensurePlatformDataPolicy();
   const run = await prisma.platformBackupRun.create({
     data: {
@@ -102,7 +102,7 @@ export async function queueManualBackupAction() {
 }
 
 export async function queueCleanupAction() {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const run = await prisma.platformMaintenanceRun.create({
     data: {
       taskType: "CLEANUP_TEMPORARY_DATA",

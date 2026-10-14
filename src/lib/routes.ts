@@ -6,6 +6,7 @@ export const platformRoutes = {
   restaurantEdit: (restaurantId: string) => `/platform/restaurants/${restaurantId}/edit`,
   plans: "/platform/plans",
   owners: "/platform/owners",
+  admins: "/platform/admins",
   storage: "/platform/storage",
   activity: "/platform/activity",
   settings: "/platform/settings"

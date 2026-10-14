@@ -3,7 +3,7 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { BusinessPlanFields } from "@/components/platform/business-plan-fields";
 import { CreateRestaurantSubmitButton, LogoUploadInput, RestaurantSlugField } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { createRestaurantAction } from "@/app/platform/restaurants/actions";
 
 export default async function NewRestaurantPage({
@@ -11,7 +11,8 @@ export default async function NewRestaurantPage({
 }: {
   searchParams?: { error?: string };
 }) {
-  await requirePlatformAdmin();
+  const user = await requirePlatformAdmin();
+  const canManageSensitive = isPlatformOwnerRole(user.platformRole);
 
   return (
     <PlatformShell title="Thêm nhà hàng">
@@ -35,13 +36,19 @@ export default async function NewRestaurantPage({
           <TextField label="Số điện thoại chủ quán" name="ownerPhone" />
         </FormSection>
 
-        <FormSection title="Gói dịch vụ và trạng thái">
-          <BusinessPlanFields defaultBusinessType="RESTAURANT" defaultPlan="BASIC" />
-          <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" />
-          <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" />
-          <SelectField label="Trạng thái gói dịch vụ" name="subscriptionStatus" options={[["ACTIVE", "Đang hoạt động"], ["EXPIRED", "Hết hạn"], ["SUSPENDED", "Tạm ngừng"]]} />
-          <SelectField label="Trạng thái nhà hàng" name="status" options={[["ACTIVE", "Đang hoạt động"], ["SUSPENDED", "Đã khóa"], ["INACTIVE", "Chưa hoạt động"]]} />
-        </FormSection>
+        {canManageSensitive ? (
+          <FormSection title="Gói dịch vụ và trạng thái">
+            <BusinessPlanFields defaultBusinessType="RESTAURANT" defaultPlan="BASIC" />
+            <TextField label="Ngày bắt đầu" name="subscriptionStart" type="date" />
+            <TextField label="Ngày hết hạn" name="subscriptionEnd" type="date" />
+            <SelectField label="Trạng thái gói dịch vụ" name="subscriptionStatus" options={[["ACTIVE", "Đang hoạt động"], ["EXPIRED", "Hết hạn"], ["SUSPENDED", "Tạm ngừng"]]} />
+            <SelectField label="Trạng thái nhà hàng" name="status" options={[["ACTIVE", "Đang hoạt động"], ["SUSPENDED", "Đã khóa"], ["INACTIVE", "Chưa hoạt động"]]} />
+          </FormSection>
+        ) : (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Nhà hàng do quản trị phụ tạo sẽ mặc định ở trạng thái Chưa hoạt động và gói BASIC. Chủ quản trị nền tảng sẽ kiểm tra trước khi mở sử dụng.
+          </section>
+        )}
 
         <CreateRestaurantSubmitButton />
       </form>

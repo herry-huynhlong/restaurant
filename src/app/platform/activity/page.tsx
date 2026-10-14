@@ -39,6 +39,9 @@ function activityLabel(action: string) {
     OWNER_NAME_UPDATED: "Cập nhật họ tên chủ quán",
     ADMIN_PASSWORD_RESET: "Đặt lại mật khẩu chủ quán",
     PLATFORM_ADMIN_PASSWORD_CHANGED: "Đổi mật khẩu quản trị nền tảng",
+    PLATFORM_SUB_ADMIN_CREATED: "Tạo quản trị phụ",
+    PLATFORM_SUB_ADMIN_UPDATED: "Cập nhật quản trị phụ",
+    PLATFORM_SUB_ADMIN_PASSWORD_RESET: "Đặt lại mật khẩu quản trị phụ",
     PLAN_PERMISSION_MATRIX_CONFIRMED: "Xác nhận quyền lợi gói dịch vụ"
   };
 

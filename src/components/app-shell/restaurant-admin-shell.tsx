@@ -54,6 +54,9 @@ export function RestaurantAdminShell({
   const reportNavItems: AdminNavItem[] = hasPlanFeature(plan, "REPORTS", businessType, planEntitlement)
     ? [{ label: "Báo cáo", href: restaurantRoutes.adminReports(slug), Icon: BarChart3, icon: "reports" }]
     : [];
+  const subscriptionNavItems: AdminNavItem[] = role === "OWNER"
+    ? [{ label: "Đăng ký gói", href: restaurantRoutes.adminSubscription(slug), Icon: CreditCard, icon: "settings" }]
+    : [];
   const navItems: AdminNavItem[] = [
     { label: "Tổng quan", href: restaurantRoutes.admin(slug), Icon: Home, icon: "home" },
     { label: "Menu", href: restaurantRoutes.adminMenu(slug), Icon: MenuIcon, icon: "menu" },
@@ -62,7 +65,7 @@ export function RestaurantAdminShell({
     { label: "Nhân viên", href: restaurantRoutes.adminStaff(slug), Icon: Users, icon: "staff" },
     { label: "Top món", href: restaurantRoutes.adminTopItems(slug), Icon: Trophy, icon: "top-items" },
     ...reportNavItems,
-    { label: "Đăng ký gói", href: restaurantRoutes.adminSubscription(slug), Icon: CreditCard, icon: "settings" },
+    ...subscriptionNavItems,
     { label: "Cài đặt", href: restaurantRoutes.adminSettings(slug), Icon: Settings, icon: "settings" }
   ];
   const mobileNavItems = navItems.map(({ label, href, icon }) => ({ label, href, icon }));

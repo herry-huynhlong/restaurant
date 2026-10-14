@@ -26,7 +26,7 @@ import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformRestaurantActions } from "@/components/platform/restaurant-row-actions";
 import { productBrand } from "@/lib/brand";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
@@ -43,7 +43,7 @@ export default async function RestaurantDetailPage({
   params: { restaurantId: string };
   searchParams?: { error?: string; success?: string };
 }) {
-  await requirePlatformAdmin();
+  const user = await requirePlatformAdmin();
   const restaurant = await getPlatformRestaurantDetail(params.restaurantId);
 
   if (!restaurant) {
@@ -58,6 +58,7 @@ export default async function RestaurantDetailPage({
   const isExpired = typeof daysRemaining === "number" && daysRemaining < 0;
   const isDeleted = restaurant.status === "DELETED";
   const planLabel = planDisplayLabel(restaurant.plan, restaurant.planEntitlement);
+  const canManageSensitive = isPlatformOwnerRole(user.platformRole);
 
   return (
     <PlatformShell title="Chi tiết nhà hàng">
@@ -128,6 +129,7 @@ export default async function RestaurantDetailPage({
       </section>
 
       <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+        {canManageSensitive ? (
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -173,6 +175,22 @@ export default async function RestaurantDetailPage({
             </form>
           </div>
         </section>
+        ) : (
+        <section className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Gói dịch vụ & Gia hạn</h2>
+              <p className="mt-1 text-sm text-slate-500">Thông tin gói hiện tại của nhà hàng.</p>
+            </div>
+            <Badge className={planBadgeClass(restaurant.plan)}>{planLabel}</Badge>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <MiniInfo label="Ngày bắt đầu" value={formatDate(restaurant.subscriptionStart)} />
+            <MiniInfo label="Ngày hết hạn" value={formatDate(restaurant.subscriptionEnd)} />
+            <MiniInfo label="Còn lại" value={formatDaysRemaining(daysRemaining)} />
+          </div>
+        </section>
+        )}
 
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Thông tin nhà hàng</h2>
@@ -263,6 +281,7 @@ export default async function RestaurantDetailPage({
         </div>
       </section>
 
+      {canManageSensitive ? (
       <section className="mt-5 rounded-2xl border border-red-200 bg-red-50/60 p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-2xl">
@@ -288,6 +307,7 @@ export default async function RestaurantDetailPage({
           />
         </div>
       </section>
+      ) : null}
 
       <section className="mt-5 rounded-2xl border bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Thao tác thông thường</h2>
@@ -420,6 +440,9 @@ function activityLabel(action: string) {
     OWNER_NAME_UPDATED: "Cập nhật họ tên chủ quán",
     ADMIN_PASSWORD_RESET: "Đặt lại mật khẩu chủ quán",
     PLATFORM_ADMIN_PASSWORD_CHANGED: "Đổi mật khẩu quản trị nền tảng",
+    PLATFORM_SUB_ADMIN_CREATED: "Tạo quản trị phụ",
+    PLATFORM_SUB_ADMIN_UPDATED: "Cập nhật quản trị phụ",
+    PLATFORM_SUB_ADMIN_PASSWORD_RESET: "Đặt lại mật khẩu quản trị phụ",
     PLAN_PERMISSION_MATRIX_CONFIRMED: "Xác nhận quyền lợi gói dịch vụ"
   };
 

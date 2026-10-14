@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { isPlatformOwnerRole, isPlatformSubAdminRole, requirePlatformAdmin, requirePlatformOwner } from "@/lib/rbac/guards";
 import { prisma } from "@/lib/db/prisma";
 import { platformRoutes } from "@/lib/routes";
 import { safeErrorMessage } from "@/lib/safe-user-message";
@@ -237,6 +237,9 @@ export async function createRestaurantAction(formData: FormData) {
     redirectWithError(platformRoutes.newRestaurant, "Logo chỉ hỗ trợ JPG, PNG, WEBP. Ảnh tối đa 5MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
+  const submittedPlan = isPlatformSubAdminRole(actor.platformRole) ? "BASIC" : readString(formData, "plan") || "BASIC";
+  const submittedStatus = isPlatformSubAdminRole(actor.platformRole) ? "INACTIVE" : readString(formData, "status") || "INACTIVE";
+  const submittedSubscriptionStatus = isPlatformSubAdminRole(actor.platformRole) ? "ACTIVE" : readString(formData, "subscriptionStatus") || "ACTIVE";
   const parsed = createRestaurantSchema.safeParse({
     name: readString(formData, "name"),
     slug: normalizedSlug,
@@ -251,10 +254,10 @@ export async function createRestaurantAction(formData: FormData) {
     ownerPassword: readString(formData, "ownerPassword"),
     ownerPhone: optionalString(formData, "ownerPhone"),
     businessType: readString(formData, "businessType") || "RESTAURANT",
-    plan: enforceBusinessPlan(readString(formData, "businessType") || "RESTAURANT", readString(formData, "plan") || "BASIC"),
-    planEntitlement: readString(formData, "planEntitlement") || (readString(formData, "plan") === "PRO" ? "PRO" : "BASIC"),
-    subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
-    status: readString(formData, "status") || "INACTIVE"
+    plan: enforceBusinessPlan(readString(formData, "businessType") || "RESTAURANT", submittedPlan),
+    planEntitlement: isPlatformSubAdminRole(actor.platformRole) ? "BASIC" : readString(formData, "planEntitlement") || (submittedPlan === "PRO" ? "PRO" : "BASIC"),
+    subscriptionStatus: submittedSubscriptionStatus,
+    status: submittedStatus
   });
 
   if (!parsed.success) {
@@ -282,8 +285,8 @@ export async function createRestaurantAction(formData: FormData) {
     status: parsed.data.status
   });
 
-  const subscriptionStart = parseVietnamDateInput(formData.get("subscriptionStart"), "start");
-  const subscriptionEnd = parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
+  const subscriptionStart = isPlatformSubAdminRole(actor.platformRole) ? null : parseVietnamDateInput(formData.get("subscriptionStart"), "start");
+  const subscriptionEnd = isPlatformSubAdminRole(actor.platformRole) ? null : parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.newRestaurant, dateError);
   if (parsed.data.plan === "TRAIN" && !subscriptionEnd) {
@@ -306,7 +309,7 @@ export async function createRestaurantAction(formData: FormData) {
     where: { email: parsed.data.ownerEmail },
     select: { id: true, platformRole: true, memberships: { select: { restaurantId: true, role: true, isActive: true } } }
   });
-  if (existingOwner?.platformRole === "PLATFORM_ADMIN") {
+  if (isPlatformOwnerRole(existingOwner?.platformRole)) {
     console.warn("CREATE RESTAURANT OWNER_EMAIL_IS_PLATFORM_ADMIN", {
       ownerEmail: parsed.data.ownerEmail,
       userId: existingOwner.id
@@ -438,6 +441,24 @@ export async function updateRestaurantAction(formData: FormData) {
     redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Logo chỉ hỗ trợ JPG, PNG, WEBP. Ảnh tối đa 5MB.");
   }
   const logoUrl = uploadedLogoUrl ?? optionalString(formData, "existingLogoUrl");
+  const currentRestaurant = await prisma.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: {
+      status: true,
+      businessType: true,
+      plan: true,
+      planEntitlement: true,
+      subscriptionStatus: true,
+      subscriptionStart: true,
+      subscriptionEnd: true
+    }
+  });
+  const submittedBusinessType = isPlatformSubAdminRole(actor.platformRole)
+    ? currentRestaurant?.businessType ?? "RESTAURANT"
+    : readString(formData, "businessType") || "RESTAURANT";
+  const submittedPlan = isPlatformSubAdminRole(actor.platformRole)
+    ? currentRestaurant?.plan ?? "BASIC"
+    : enforceBusinessPlan(submittedBusinessType, readString(formData, "plan") || "BASIC");
   const parsed = updateRestaurantSchema.safeParse({
     restaurantId,
     name: readString(formData, "name"),
@@ -448,28 +469,24 @@ export async function updateRestaurantAction(formData: FormData) {
     timezone: readString(formData, "timezone") || "Asia/Ho_Chi_Minh",
     primaryLanguage: readString(formData, "primaryLanguage") || "vi",
     currency: readString(formData, "currency") || "VND",
-    businessType: readString(formData, "businessType") || "RESTAURANT",
-    plan: enforceBusinessPlan(readString(formData, "businessType") || "RESTAURANT", readString(formData, "plan") || "BASIC"),
-    planEntitlement: readString(formData, "planEntitlement") || (readString(formData, "plan") === "PRO" ? "PRO" : "BASIC"),
-    subscriptionStatus: readString(formData, "subscriptionStatus") || "ACTIVE",
-    status: readString(formData, "status") || "INACTIVE"
+    businessType: submittedBusinessType,
+    plan: submittedPlan,
+    planEntitlement: isPlatformSubAdminRole(actor.platformRole) ? currentRestaurant?.planEntitlement ?? "BASIC" : readString(formData, "planEntitlement") || (submittedPlan === "PRO" ? "PRO" : "BASIC"),
+    subscriptionStatus: isPlatformSubAdminRole(actor.platformRole) ? currentRestaurant?.subscriptionStatus ?? "ACTIVE" : readString(formData, "subscriptionStatus") || "ACTIVE",
+    status: isPlatformSubAdminRole(actor.platformRole) ? currentRestaurant?.status ?? "INACTIVE" : readString(formData, "status") || "INACTIVE"
   });
 
   if (!parsed.success) {
     redirectWithError(platformRoutes.restaurantEdit(restaurantId), validationMessage(parsed.error));
   }
 
-  const subscriptionStart = parseVietnamDateInput(formData.get("subscriptionStart"), "start");
-  const subscriptionEnd = parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
+  const subscriptionStart = isPlatformSubAdminRole(actor.platformRole) ? currentRestaurant?.subscriptionStart ?? null : parseVietnamDateInput(formData.get("subscriptionStart"), "start");
+  const subscriptionEnd = isPlatformSubAdminRole(actor.platformRole) ? currentRestaurant?.subscriptionEnd ?? null : parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
   const dateError = validateSubscriptionDates(subscriptionStart, subscriptionEnd);
   if (dateError) redirectWithError(platformRoutes.restaurantEdit(restaurantId), dateError);
   if (parsed.data.plan === "TRAIN" && !subscriptionEnd) {
     redirectWithError(platformRoutes.restaurantEdit(restaurantId), "TRAIN cần có ngày hết hạn do QuánPilot Admin chọn.");
   }
-  const currentRestaurant = await prisma.restaurant.findUnique({
-    where: { id: parsed.data.restaurantId },
-    select: { status: true }
-  });
   if (currentRestaurant?.status === "DELETED") {
     redirectWithError(platformRoutes.restaurantEdit(restaurantId), "Nhà hàng đã xóa. Hãy khôi phục trước khi chỉnh sửa.");
   }
@@ -539,7 +556,7 @@ export async function updateRestaurantAction(formData: FormData) {
 }
 
 export async function setRestaurantStatusAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const restaurantId = readString(formData, "restaurantId");
   const status = statusSchema.parse(readString(formData, "status"));
   const action = status === "ACTIVE" ? "RESTAURANT_ACTIVATED" : "RESTAURANT_SUSPENDED";
@@ -573,7 +590,7 @@ export async function setRestaurantStatusAction(formData: FormData) {
 }
 
 export async function softDeleteRestaurantAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = restaurantDeleteSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),
@@ -638,7 +655,7 @@ export async function softDeleteRestaurantAction(formData: FormData) {
 }
 
 export async function restoreRestaurantAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = restaurantDeleteSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),
@@ -695,7 +712,7 @@ export async function restoreRestaurantAction(formData: FormData) {
 }
 
 export async function permanentlyDeleteRestaurantAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = restaurantDeleteSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),
@@ -765,7 +782,7 @@ export async function permanentlyDeleteRestaurantAction(formData: FormData) {
 }
 
 export async function extendSubscriptionAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const restaurantId = readString(formData, "restaurantId");
   const subscriptionEnd = parseVietnamDateInput(formData.get("subscriptionEnd"), "end");
   const restaurant = await prisma.restaurant.findUnique({
@@ -801,7 +818,7 @@ export async function extendSubscriptionAction(formData: FormData) {
 }
 
 export async function activateRestaurantSubscriptionAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = manualSubscriptionSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),
@@ -944,7 +961,7 @@ export async function activateRestaurantSubscriptionAction(formData: FormData) {
 }
 
 export async function changePlanAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const restaurantId = readString(formData, "restaurantId");
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId },
@@ -1025,7 +1042,7 @@ export async function resetOwnerPasswordAction(formData: FormData) {
 }
 
 export async function updateOwnerNameAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = updateOwnerNameSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),
@@ -1074,7 +1091,7 @@ export async function updateOwnerNameAction(formData: FormData) {
 }
 
 export async function confirmSubscriptionRequestAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = subscriptionRequestActionSchema.safeParse({
     requestId: readString(formData, "requestId")
@@ -1095,7 +1112,7 @@ export async function confirmSubscriptionRequestAction(formData: FormData) {
 }
 
 export async function rejectSubscriptionRequestAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = subscriptionRequestActionSchema.safeParse({
     requestId: readString(formData, "requestId"),

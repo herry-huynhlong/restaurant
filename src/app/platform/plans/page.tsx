@@ -2,7 +2,7 @@ import { CheckCircle2, Crown, ShieldCheck } from "lucide-react";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { productBrand } from "@/lib/brand";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { requirePlatformOwner } from "@/lib/rbac/guards";
 import {
   basicPlanFeatures,
   commercialPlans,
@@ -43,7 +43,7 @@ export default async function PlatformPlansPage({
 }: {
   searchParams: { success?: string; error?: string };
 }) {
-  await requirePlatformAdmin();
+  await requirePlatformOwner();
   const groups = groupFeaturesByLabel();
   const pricing = await getPlanPricingDashboard();
 

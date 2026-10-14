@@ -15,7 +15,7 @@ const requestSchema = z.object({
 });
 
 export async function createRestaurantSubscriptionRequestAction(slug: string, formData: FormData) {
-  const access = await requireRestaurantAccess(slug, ["OWNER", "MANAGER"]);
+  const access = await requireRestaurantAccess(slug, ["OWNER"]);
   const parsed = requestSchema.safeParse({
     plan: String(formData.get("plan") ?? ""),
     termMonths: String(formData.get("termMonths") ?? ""),

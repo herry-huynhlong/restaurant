@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import {
   basicPlanFeatures,
@@ -21,7 +21,7 @@ const planFeatureMap: Record<CommercialPlan, PlanFeature[]> = {
 };
 
 export async function confirmPlanPermissionsAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const submitted = readSubmittedMatrix(formData);
   const current = {
     BASIC: [...basicPlanFeatures],
@@ -53,7 +53,7 @@ const planPriceSchema = z.object({
 });
 
 export async function updatePlanPriceAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   await ensureDefaultPlanPrices();
   const parsed = planPriceSchema.safeParse({
     priceId: String(formData.get("priceId") ?? ""),

@@ -2,12 +2,23 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Activity, Building2, CreditCard, HardDrive, Home, Menu, Settings, UserRoundCog, X } from "lucide-react";
+import { Activity, Building2, CreditCard, HardDrive, Home, Menu, Settings, ShieldCheck, UserRoundCog, X, type LucideIcon } from "lucide-react";
 import { PendingSubscriptionBadge } from "@/components/platform/pending-subscription-badge";
 import { productBrand } from "@/lib/brand";
 import { platformRoutes } from "@/lib/routes";
 
-const navItems = [
+const iconByHref: Record<string, LucideIcon> = {
+  [platformRoutes.dashboard]: Home,
+  [platformRoutes.restaurants]: Building2,
+  [platformRoutes.plans]: CreditCard,
+  [platformRoutes.owners]: UserRoundCog,
+  [platformRoutes.storage]: HardDrive,
+  [platformRoutes.activity]: Activity,
+  [platformRoutes.admins]: ShieldCheck,
+  [platformRoutes.settings]: Settings
+};
+
+const defaultNavItems = [
   { label: "Tổng quan", href: platformRoutes.dashboard, Icon: Home },
   { label: "Nhà hàng", href: platformRoutes.restaurants, Icon: Building2 },
   { label: "Gói dịch vụ", href: platformRoutes.plans, Icon: CreditCard },
@@ -17,8 +28,15 @@ const navItems = [
   { label: "Cài đặt nền tảng", href: platformRoutes.settings, Icon: Settings }
 ];
 
-export function PlatformMobileMenu({ pendingSubscriptionRequestCount }: { pendingSubscriptionRequestCount: number }) {
+export function PlatformMobileMenu({
+  pendingSubscriptionRequestCount,
+  items
+}: {
+  pendingSubscriptionRequestCount: number;
+  items?: ReadonlyArray<{ label: string; href: string }>;
+}) {
   const [open, setOpen] = useState(false);
+  const navItems = items?.map((item) => ({ ...item, Icon: iconByHref[item.href] ?? Settings })) ?? defaultNavItems;
 
   useEffect(() => {
     if (!open) return;

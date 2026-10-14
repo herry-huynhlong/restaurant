@@ -1,7 +1,7 @@
 import { KeyRound, ShieldCheck, UserCog } from "lucide-react";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { changePlatformAdminPasswordAction } from "@/app/platform/settings/actions";
 
 export default async function PlatformSettingsPage({
@@ -9,7 +9,7 @@ export default async function PlatformSettingsPage({
 }: {
   searchParams: { success?: string; error?: string };
 }) {
-  const user = await requirePlatformAdmin();
+  const user = await requirePlatformOwner();
 
   return (
     <PlatformShell title="Cài đặt nền tảng">
@@ -44,7 +44,7 @@ export default async function PlatformSettingsPage({
                 <UserCog className="h-4 w-4 text-teal-700" />
                 Quyền hiện tại
               </div>
-              <p className="mt-1 text-slate-500">PLATFORM_ADMIN</p>
+              <p className="mt-1 text-slate-500">Chủ quản trị nền tảng</p>
             </div>
           </div>
 

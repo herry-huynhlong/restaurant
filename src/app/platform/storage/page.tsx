@@ -3,7 +3,7 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { BackupHistoryCard } from "@/components/platform/backup-history-card";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
 import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
 
@@ -12,8 +12,9 @@ export default async function PlatformStoragePage({
 }: {
   searchParams?: { success?: string; error?: string };
 }) {
-  await requirePlatformAdmin();
+  const user = await requirePlatformAdmin();
   const dashboard = await getPlatformStorageDashboard();
+  const canManageStorage = isPlatformOwnerRole(user.platformRole);
 
   return (
     <PlatformShell title="Tài nguyên & Sao lưu" subtitle="Quản lý dung lượng lưu trữ và bảo vệ dữ liệu cửa hàng.">
@@ -73,12 +74,14 @@ export default async function PlatformStoragePage({
               <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Dung lượng ước tính</p>
               <h2 className="mt-1 text-xl font-semibold text-slate-950">Dung lượng từng cửa hàng</h2>
             </div>
-            <form action={refreshStorageUsageAction}>
-              <button className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="submit">
-                <RefreshCw className="h-4 w-4" />
-                Cập nhật dung lượng
-              </button>
-            </form>
+            {canManageStorage ? (
+              <form action={refreshStorageUsageAction}>
+                <button className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="submit">
+                  <RefreshCw className="h-4 w-4" />
+                  Cập nhật dung lượng
+                </button>
+              </form>
+            ) : null}
           </div>
 
           <div className="mt-5 overflow-x-auto">
@@ -117,60 +120,62 @@ export default async function PlatformStoragePage({
         </section>
       </div>
 
-      <section className="mt-5 rounded-2xl border bg-white shadow-sm">
-        <div className="border-b px-5 py-4">
-          <h2 className="text-lg font-semibold">Cấu hình sao lưu và dọn dữ liệu</h2>
-          <p className="mt-1 text-sm text-slate-500">Các yêu cầu sao lưu và dọn dữ liệu sẽ được tiếp nhận, xử lý an toàn ở nền.</p>
-        </div>
-
-        <form action={updateStoragePolicyAction} className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
-          <label className="flex items-center gap-3 rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium">
-            <input className="h-4 w-4 rounded border-slate-300 text-teal-700" defaultChecked={dashboard.policy.backupEnabled} name="backupEnabled" type="checkbox" />
-            Bật sao lưu tự động hằng ngày
-          </label>
-
-          <Field label="Giờ sao lưu">
-            <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupTime} name="backupTime" type="time" />
-          </Field>
-
-          <Field label="Số bản sao lưu giữ lại">
-            <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupRetentionCount} min={1} max={14} name="backupRetentionCount" type="number" />
-          </Field>
-
-          <Field label="Ngày giữ thông báo đã đọc">
-            <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.notificationRetentionDays} min={1} max={90} name="notificationRetentionDays" type="number" />
-          </Field>
-
-          <Field label="Ngày giữ dữ liệu tạm">
-            <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.temporaryDataRetentionDays} min={7} max={365} name="temporaryDataRetentionDays" type="number" />
-          </Field>
-
-          <Field label="Nơi lưu bản sao">
-            <select className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupStorageKind} name="backupStorageKind">
-              <option value="LOCAL">Nơi lưu hiện tại</option>
-            </select>
-          </Field>
-
-          <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">
-            <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
-              Lưu chính sách
-            </button>
+      {canManageStorage ? (
+        <section className="mt-5 rounded-2xl border bg-white shadow-sm">
+          <div className="border-b px-5 py-4">
+            <h2 className="text-lg font-semibold">Cấu hình sao lưu và dọn dữ liệu</h2>
+            <p className="mt-1 text-sm text-slate-500">Các yêu cầu sao lưu và dọn dữ liệu sẽ được tiếp nhận, xử lý an toàn ở nền.</p>
           </div>
-        </form>
 
-        <div className="flex flex-wrap gap-3 border-t bg-slate-50 px-5 py-4">
-          <form action={queueManualBackupAction}>
-            <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
-              Sao lưu ngay
-            </button>
+          <form action={updateStoragePolicyAction} className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+            <label className="flex items-center gap-3 rounded-xl border bg-slate-50 px-4 py-3 text-sm font-medium">
+              <input className="h-4 w-4 rounded border-slate-300 text-teal-700" defaultChecked={dashboard.policy.backupEnabled} name="backupEnabled" type="checkbox" />
+              Bật sao lưu tự động hằng ngày
+            </label>
+
+            <Field label="Giờ sao lưu">
+              <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupTime} name="backupTime" type="time" />
+            </Field>
+
+            <Field label="Số bản sao lưu giữ lại">
+              <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupRetentionCount} min={1} max={14} name="backupRetentionCount" type="number" />
+            </Field>
+
+            <Field label="Ngày giữ thông báo đã đọc">
+              <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.notificationRetentionDays} min={1} max={90} name="notificationRetentionDays" type="number" />
+            </Field>
+
+            <Field label="Ngày giữ dữ liệu tạm">
+              <input className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.temporaryDataRetentionDays} min={7} max={365} name="temporaryDataRetentionDays" type="number" />
+            </Field>
+
+            <Field label="Nơi lưu bản sao">
+              <select className="w-full rounded-md border px-3 py-2" defaultValue={dashboard.policy.backupStorageKind} name="backupStorageKind">
+                <option value="LOCAL">Nơi lưu hiện tại</option>
+              </select>
+            </Field>
+
+            <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">
+              <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+                Lưu chính sách
+              </button>
+            </div>
           </form>
-          <form action={queueCleanupAction}>
-            <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
-              Dọn dữ liệu tạm
-            </button>
-          </form>
-        </div>
-      </section>
+
+          <div className="flex flex-wrap gap-3 border-t bg-slate-50 px-5 py-4">
+            <form action={queueManualBackupAction}>
+              <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
+                Sao lưu ngay
+              </button>
+            </form>
+            <form action={queueCleanupAction}>
+              <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
+                Dọn dữ liệu tạm
+              </button>
+            </form>
+          </div>
+        </section>
+      ) : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <BackupHistoryCard

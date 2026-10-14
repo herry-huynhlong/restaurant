@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/db/prisma";
 import { canRoleAccessPlan } from "@/lib/plan/features";
+import { isPlatformAdminRole } from "@/lib/rbac/guards";
 import { platformRoutes, restaurantRoutes } from "@/lib/routes";
 
 export async function getPostLoginPath(userId: string, platformRole: string) {
-  if (platformRole === "PLATFORM_ADMIN") {
+  if (isPlatformAdminRole(platformRole)) {
     return platformRoutes.dashboard;
   }
 

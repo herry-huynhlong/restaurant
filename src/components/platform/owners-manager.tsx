@@ -16,7 +16,15 @@ type OwnerRow = {
   isActive: boolean;
 };
 
-export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]; returnTo: string }) {
+export function PlatformOwnersManager({
+  owners,
+  returnTo,
+  canEditOwnerName = true
+}: {
+  owners: OwnerRow[];
+  returnTo: string;
+  canEditOwnerName?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim().toLowerCase();
   const filteredOwners = useMemo(() => {
@@ -66,7 +74,7 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
                 </td>
                 <td className="px-3 py-3">{owner.isActive ? "Đang hoạt động" : "Ngừng sử dụng"}</td>
                 <td className="px-3 py-3">
-                  <OwnerActions owner={owner} returnTo={returnTo} />
+                  <OwnerActions owner={owner} returnTo={returnTo} canEditOwnerName={canEditOwnerName} />
                 </td>
               </tr>
             ))}
@@ -86,7 +94,7 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
               {owner.restaurantStatus !== "ACTIVE" ? <Info label="Nhà hàng" value="Đã khóa" /> : null}
             </div>
             <div className="mt-4">
-              <OwnerActions owner={owner} returnTo={returnTo} />
+              <OwnerActions owner={owner} returnTo={returnTo} canEditOwnerName={canEditOwnerName} />
             </div>
           </article>
         ))}
@@ -96,7 +104,7 @@ export function PlatformOwnersManager({ owners, returnTo }: { owners: OwnerRow[]
   );
 }
 
-function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }) {
+function OwnerActions({ owner, returnTo, canEditOwnerName }: { owner: OwnerRow; returnTo: string; canEditOwnerName: boolean }) {
   const searchParams = useSearchParams();
   const resetDialogRef = useRef<HTMLDialogElement>(null);
   const editDialogRef = useRef<HTMLDialogElement>(null);
@@ -112,34 +120,38 @@ function OwnerActions({ owner, returnTo }: { owner: OwnerRow; returnTo: string }
 
   return (
     <div className="flex flex-wrap gap-2">
-      <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => editDialogRef.current?.showModal()}>
-        Sửa
-      </button>
+      {canEditOwnerName ? (
+        <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => editDialogRef.current?.showModal()}>
+          Sửa
+        </button>
+      ) : null}
       <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => resetDialogRef.current?.showModal()}>
         Đặt lại mật khẩu
       </button>
 
-      <dialog ref={editDialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
-        <form className="space-y-4 p-5" action={updateOwnerNameAction}>
-          <input name="restaurantId" type="hidden" value={owner.restaurantId} />
-          <input name="ownerUserId" type="hidden" value={owner.ownerUserId} />
-          <input name="returnTo" type="hidden" value={returnTo} />
-          <div>
-            <h2 className="text-lg font-semibold">Sửa chủ quán</h2>
-            <p className="mt-1 text-sm text-slate-600">{owner.restaurantName} · {owner.username}</p>
-          </div>
-          <label className="block text-sm font-medium">
-            Họ tên
-            <input
-              className="mt-1 h-10 w-full rounded-md border px-3 outline-none focus:border-teal-600"
-              name="name"
-              defaultValue={owner.name}
-              required
-            />
-          </label>
-          <DialogActions close={() => editDialogRef.current?.close()} submitLabel="Lưu" />
-        </form>
-      </dialog>
+      {canEditOwnerName ? (
+        <dialog ref={editDialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
+          <form className="space-y-4 p-5" action={updateOwnerNameAction}>
+            <input name="restaurantId" type="hidden" value={owner.restaurantId} />
+            <input name="ownerUserId" type="hidden" value={owner.ownerUserId} />
+            <input name="returnTo" type="hidden" value={returnTo} />
+            <div>
+              <h2 className="text-lg font-semibold">Sửa chủ quán</h2>
+              <p className="mt-1 text-sm text-slate-600">{owner.restaurantName} · {owner.username}</p>
+            </div>
+            <label className="block text-sm font-medium">
+              Họ tên
+              <input
+                className="mt-1 h-10 w-full rounded-md border px-3 outline-none focus:border-teal-600"
+                name="name"
+                defaultValue={owner.name}
+                required
+              />
+            </label>
+            <DialogActions close={() => editDialogRef.current?.close()} submitLabel="Lưu" />
+          </form>
+        </dialog>
+      ) : null}
 
       <dialog ref={resetDialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
         <form className="space-y-4 p-5" action={resetOwnerPasswordAction}>

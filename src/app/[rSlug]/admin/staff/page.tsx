@@ -157,9 +157,11 @@ export default async function AdminStaffPage({
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
 
-      <section className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="text-base font-semibold">Mã đăng nhập theo bộ phận</h2>
-        <div className="mt-3 grid gap-3">
+      <details className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer list-none text-base font-semibold">
+          <span className="inline-flex items-center gap-2">Mã đăng nhập theo bộ phận <span className="text-xs font-medium text-slate-500">(bấm để mở)</span></span>
+        </summary>
+        <div className="mt-4 grid gap-3">
           {loginAccessRows.map((item) => (
             <article key={item.role} className="grid gap-3 rounded-md border p-3 sm:grid-cols-[112px_minmax(0,1fr)]">
               <Image className="h-28 w-28 rounded-md border bg-white" src={item.qrDataUrl} alt={`QR đăng nhập ${item.title}`} width={112} height={112} unoptimized />
@@ -178,11 +180,13 @@ export default async function AdminStaffPage({
             </article>
           ))}
         </div>
-      </section>
+      </details>
 
-      <section className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
+      <details className="mt-4 rounded-lg border bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer list-none text-base font-semibold">
+          <span className="inline-flex items-center gap-2">+ Thêm nhân viên <span className="text-xs font-medium text-slate-500">(bấm để mở)</span></span>
+        </summary>
         <form action={createStaffAction.bind(null, access.restaurant.slug)}>
-          <h2 className="text-base font-semibold">+ Thêm nhân viên</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <Field label="Tên">
               <input className="h-10 w-full min-w-0 rounded-md border px-3 outline-none focus:border-teal-600 disabled:bg-slate-100" name="name" placeholder="Nguyễn Văn A" required />
@@ -208,7 +212,7 @@ export default async function AdminStaffPage({
             Tạo nhân viên
           </button>
         </form>
-      </section>
+      </details>
 
       <section className="mt-6 space-y-5">
         <h2 className="text-base font-semibold">Danh sách nhân sự</h2>

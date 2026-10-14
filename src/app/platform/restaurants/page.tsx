@@ -3,7 +3,7 @@ import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformRestaurantActions } from "@/components/platform/restaurant-row-actions";
 import { SubscriptionRequestsDialog } from "@/components/platform/subscription-requests-dialog";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { getBusinessTypeLabel } from "@/lib/business-type";
 import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/restaurant-status";
@@ -16,9 +16,10 @@ export default async function PlatformRestaurantsPage({
 }: {
   searchParams?: { error?: string; success?: string; view?: string };
 }) {
-  await requirePlatformAdmin();
-  const showDeleted = searchParams?.view === "deleted";
-  const showPending = searchParams?.view === "pending";
+  const user = await requirePlatformAdmin();
+  const canManageSensitive = isPlatformOwnerRole(user.platformRole);
+  const showDeleted = canManageSensitive && searchParams?.view === "deleted";
+  const showPending = canManageSensitive && searchParams?.view === "pending";
   const [restaurants, planPrices] = await Promise.all([
     getPlatformRestaurants({ includeDeleted: showDeleted }),
     getPublicPlanPrices()
@@ -45,12 +46,16 @@ export default async function PlatformRestaurantsPage({
         <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${!showDeleted && !showPending ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={platformRoutes.restaurants}>
           Đang quản lý
         </Link>
-        <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${showPending ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={`${platformRoutes.restaurants}?view=pending`}>
-          Chờ xác nhận
-        </Link>
-        <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${showDeleted ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={`${platformRoutes.restaurants}?view=deleted`}>
-          Đã xóa
-        </Link>
+        {canManageSensitive ? (
+          <>
+            <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${showPending ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={`${platformRoutes.restaurants}?view=pending`}>
+              Chờ xác nhận
+            </Link>
+            <Link className={`rounded-md border px-3 py-2 text-sm font-semibold ${showDeleted ? "bg-teal-700 text-white" : "bg-white hover:bg-slate-50"}`} href={`${platformRoutes.restaurants}?view=deleted`}>
+              Đã xóa
+            </Link>
+          </>
+        ) : null}
       </div>
       <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
         <table className="w-full border-collapse text-left text-sm">
@@ -85,22 +90,24 @@ export default async function PlatformRestaurantsPage({
                       {restaurant.subscriptionRequests.length > 0 ? ` — ${restaurant.subscriptionRequests.length} yêu cầu chờ` : ""}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">Hết hạn: {formatDate(restaurant.subscriptionEnd)}</p>
-                    <SubscriptionRequestsDialog
-                      restaurantName={restaurant.name}
-                      restaurantPlan={restaurant.plan}
-                      subscriptionEnd={restaurant.subscriptionEnd?.toISOString() ?? null}
-                      returnTo={returnTo}
-                      requests={restaurant.subscriptionRequests.map((request) => ({
-                        id: request.id,
-                        requestType: request.requestType,
-                        plan: request.plan,
-                        termMonths: request.termMonths,
-                        priceVnd: request.priceVnd,
-                        status: request.status,
-                        createdAt: request.createdAt.toISOString(),
-                        currentSubscriptionEnd: request.currentSubscriptionEnd?.toISOString() ?? null
-                      }))}
-                    />
+                    {canManageSensitive ? (
+                      <SubscriptionRequestsDialog
+                        restaurantName={restaurant.name}
+                        restaurantPlan={restaurant.plan}
+                        subscriptionEnd={restaurant.subscriptionEnd?.toISOString() ?? null}
+                        returnTo={returnTo}
+                        requests={restaurant.subscriptionRequests.map((request) => ({
+                          id: request.id,
+                          requestType: request.requestType,
+                          plan: request.plan,
+                          termMonths: request.termMonths,
+                          priceVnd: request.priceVnd,
+                          status: request.status,
+                          createdAt: request.createdAt.toISOString(),
+                          currentSubscriptionEnd: request.currentSubscriptionEnd?.toISOString() ?? null
+                        }))}
+                      />
+                    ) : null}
                   </td>
                   <td className="px-3 py-3">
                     <p>{restaurant._count.tables} bàn</p>
@@ -119,6 +126,9 @@ export default async function PlatformRestaurantsPage({
                         businessType={restaurant.businessType}
                         returnTo={returnTo}
                         priceOptions={priceOptions}
+                        showStatusAction={canManageSensitive}
+                        showPlanAction={canManageSensitive}
+                        showDeleteAction={canManageSensitive}
                         compact
                       />
                     </div>

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { requirePlatformAdmin } from "@/lib/rbac/guards";
+import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 
 const platformPasswordSchema = z.object({
@@ -18,7 +18,7 @@ const platformPasswordSchema = z.object({
 });
 
 export async function changePlatformAdminPasswordAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const path = platformRoutes.settings;
   const parsed = platformPasswordSchema.safeParse({
     currentPassword: readString(formData, "currentPassword"),
@@ -33,7 +33,7 @@ export async function changePlatformAdminPasswordAction(formData: FormData) {
   const user = await prisma.user.findFirst({
     where: {
       id: actor.id,
-      platformRole: "PLATFORM_ADMIN",
+      platformRole: { in: ["PLATFORM_OWNER", "PLATFORM_ADMIN"] },
       isActive: true
     },
     select: {
