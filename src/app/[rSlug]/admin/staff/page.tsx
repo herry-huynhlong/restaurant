@@ -181,7 +181,7 @@ export default async function AdminStaffPage({
       rows: staffRows.filter((row) => row.role === role)
     }));
   const safeError = sanitizeFeedbackMessage(searchParams?.error, "Không thể hoàn tất thao tác. Vui lòng thử lại.");
-  const safeSuccess = safeError ? undefined : sanitizeFeedbackMessage(searchParams?.success, "Thao tác đã hoàn tất.");
+  const safeSuccess = safeError ? undefined : sanitizeFeedbackMessage(searchParams?.success, "Đã cập nhật thông tin nhân viên.");
   const totalWorking = staffRows.filter((row) => row.status === "WORKING").length;
   const totalActiveDevices = staffRows.reduce((total, row) => total + row.devices.filter((device) => device.isActive && !device.revokedAt).length, 0);
 

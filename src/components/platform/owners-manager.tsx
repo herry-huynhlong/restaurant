@@ -113,6 +113,7 @@ function OwnerActions({ owner, returnTo, canEditOwnerName }: { owner: OwnerRow; 
 
   useEffect(() => {
     if (!searchParams.get("success")) return;
+    editDialogRef.current?.close();
     resetDialogRef.current?.close();
     setPassword("");
     setConfirmPassword("");

@@ -25,6 +25,12 @@ const restoreSchema = z.object({
   acknowledgeRisk: z.literal("on", { errorMap: () => ({ message: "Vui lòng xác nhận bạn hiểu rủi ro khôi phục." }) })
 });
 
+export type RestoreBackupActionState = {
+  status: "idle" | "success" | "error";
+  message: string | null;
+  restoreJobId: string | null;
+};
+
 export async function updateStoragePolicyAction(formData: FormData) {
   const actor = await requirePlatformOwner();
   const parsed = storagePolicySchema.safeParse({
@@ -181,7 +187,10 @@ export async function checkBackupRestoreReadinessAction(formData: FormData) {
   redirectWithSuccess("Bản sao lưu đã vượt qua kiểm tra tính toàn vẹn.");
 }
 
-export async function restoreBackupAction(formData: FormData) {
+export async function restoreBackupAction(
+  _previousState: RestoreBackupActionState,
+  formData: FormData
+): Promise<RestoreBackupActionState> {
   const actor = await requirePlatformOwner();
   const parsed = restoreSchema.safeParse({
     backupRunId: readString(formData, "backupRunId"),
@@ -189,45 +198,51 @@ export async function restoreBackupAction(formData: FormData) {
     acknowledgeRisk: formData.get("acknowledgeRisk")
   });
   if (!parsed.success) {
-    redirectWithError(validationMessage(parsed.error));
+    return restoreActionError(validationMessage(parsed.error));
   }
 
-  const [user, worker, readiness] = await Promise.all([
-    prisma.user.findUnique({ where: { id: actor.id }, select: { passwordHash: true } }),
-    getBackupWorkerAvailability(),
-    checkBackupRestoreReadiness(parsed.data.backupRunId)
-  ]);
-  if (!user || !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
-    redirectWithError("Mật khẩu xác nhận không đúng.");
-  }
-  if (!worker.ready) {
-    redirectWithError("Dịch vụ sao lưu và khôi phục đang gián đoạn.");
-  }
-  if (readiness.status === "NOT_READY" || !readiness.canRestoreProduction) {
-    redirectWithError("Bản sao lưu chưa đủ điều kiện khôi phục.");
-  }
-
-  let restoreJob;
   try {
-    restoreJob = await createRestoreJob({ backupId: parsed.data.backupRunId, actorUserId: actor.id });
+    const [user, worker, readiness] = await Promise.all([
+      prisma.user.findUnique({ where: { id: actor.id }, select: { passwordHash: true } }),
+      getBackupWorkerAvailability(),
+      checkBackupRestoreReadiness(parsed.data.backupRunId)
+    ]);
+    if (!user || !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+      return restoreActionError("Mật khẩu không chính xác.");
+    }
+    if (!worker.ready) {
+      return restoreActionError("Không thể bắt đầu khôi phục vì dịch vụ đang gián đoạn.");
+    }
+    if (readiness.status === "NOT_READY" || !readiness.canRestoreProduction) {
+      return restoreActionError("Bản sao lưu chưa đủ điều kiện khôi phục.");
+    }
+
+    const restoreJob = await createRestoreJob({ backupId: parsed.data.backupRunId, actorUserId: actor.id });
+    await prisma.auditLog.create({
+      data: {
+        userId: actor.id,
+        action: "PLATFORM_RESTORE_QUEUED",
+        entityType: "PlatformRestoreJob",
+        entityId: restoreJob.id,
+        metadataJson: { backupId: parsed.data.backupRunId }
+      }
+    });
+    revalidatePath(platformRoutes.storage);
+    return {
+      status: "success",
+      message: "Đã tiếp nhận yêu cầu khôi phục dữ liệu.",
+      restoreJobId: restoreJob.id
+    };
   } catch (error) {
     if (error instanceof Error && error.message === "RESTORE_ALREADY_ACTIVE") {
-      redirectWithError("Đang có một lần khôi phục được xử lý.");
+      return restoreActionError("Đang có một lần khôi phục được xử lý.");
     }
-    throw error;
+    return restoreActionError("Không thể bắt đầu khôi phục. Vui lòng thử lại.");
   }
+}
 
-  await prisma.auditLog.create({
-    data: {
-      userId: actor.id,
-      action: "PLATFORM_RESTORE_QUEUED",
-      entityType: "PlatformRestoreJob",
-      entityId: restoreJob.id,
-      metadataJson: { backupId: parsed.data.backupRunId }
-    }
-  });
-  revalidatePath(platformRoutes.storage);
-  redirect(`${platformRoutes.storage}?restoreJob=${encodeURIComponent(restoreJob.id)}`);
+function restoreActionError(message: string): RestoreBackupActionState {
+  return { status: "error", message, restoreJobId: null };
 }
 
 function storageKindLabel(value: string) {

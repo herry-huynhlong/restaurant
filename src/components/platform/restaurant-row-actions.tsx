@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   activateRestaurantSubscriptionAction,
   permanentlyDeleteRestaurantAction,
@@ -52,6 +53,7 @@ export function PlatformRestaurantActions({
   showResetPasswordAction = true,
   showDeleteAction = true
 }: RestaurantActionProps) {
+  const searchParams = useSearchParams();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const subscriptionDialogRef = useRef<HTMLDialogElement>(null);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
@@ -80,6 +82,19 @@ export function PlatformRestaurantActions({
   const confirmMessage = isLocked
     ? `Mở lại nhà hàng ${restaurantName}?`
     : `Khóa nhà hàng ${restaurantName}?\n\nTất cả tài khoản thuộc nhà hàng này sẽ không thể đăng nhập hoặc sử dụng hệ thống cho đến khi được mở lại.`;
+
+  useEffect(() => {
+    if (!searchParams.get("success")) return;
+    dialogRef.current?.close();
+    subscriptionDialogRef.current?.close();
+    deleteDialogRef.current?.close();
+    restoreDialogRef.current?.close();
+    permanentDeleteDialogRef.current?.close();
+    setPassword("");
+    setDeleteSlug("");
+    setRestoreSlug("");
+    setPermanentDeleteSlug("");
+  }, [searchParams]);
 
   return (
     <div className={`flex flex-wrap gap-2 ${compact ? "items-center" : ""}`}>

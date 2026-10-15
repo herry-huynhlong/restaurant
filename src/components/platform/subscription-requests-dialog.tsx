@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { confirmSubscriptionRequestAction, rejectSubscriptionRequestAction } from "@/app/platform/restaurants/actions";
 
 type PendingRequest = {
@@ -27,8 +28,14 @@ export function SubscriptionRequestsDialog({
   requests: PendingRequest[];
   returnTo: string;
 }) {
+  const searchParams = useSearchParams();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const requestCount = requests.length;
+
+  useEffect(() => {
+    if (!searchParams.get("success")) return;
+    dialogRef.current?.close();
+  }, [searchParams]);
 
   if (requestCount === 0) {
     return <p className="mt-1 text-xs text-slate-500">Không có yêu cầu chờ.</p>;

@@ -14,6 +14,9 @@ export function StaffPageInteractions({ success, error }: { success?: string; er
       document.querySelectorAll<HTMLDetailsElement>("[data-staff-panel]").forEach((panel) => {
         panel.open = false;
       });
+      document.querySelectorAll<HTMLInputElement>('input[type="password"]').forEach((input) => {
+        input.value = "";
+      });
       setMessage({ type: "success", text: success });
       timerRef.current = window.setTimeout(() => setMessage(null), 4500);
       return;
@@ -21,7 +24,6 @@ export function StaffPageInteractions({ success, error }: { success?: string; er
 
     if (error) {
       setMessage({ type: "error", text: error });
-      timerRef.current = window.setTimeout(() => setMessage(null), 5000);
     }
   }, [success, error]);
 
