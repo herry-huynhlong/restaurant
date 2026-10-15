@@ -15,6 +15,7 @@ type InvoiceItem = {
 
 type InvoicePrintButtonProps = {
   label?: string;
+  paperSize?: "58mm" | "80mm";
   invoice: {
     restaurantName: string;
     businessName?: string | null;
@@ -46,9 +47,12 @@ type InvoicePrintButtonProps = {
   };
 };
 
-export function InvoicePrintButton({ label = "In hóa đơn", invoice }: InvoicePrintButtonProps) {
+export function InvoicePrintButton({ label = "In hóa đơn", paperSize = "80mm", invoice }: InvoicePrintButtonProps) {
   function printInvoice() {
-    const popup = window.open("", "_blank", "width=380,height=720");
+    const is58mm = paperSize === "58mm";
+    const pageWidth = is58mm ? "58mm" : "80mm";
+    const bodyWidth = is58mm ? "50mm" : "72mm";
+    const popup = window.open("", "_blank", `width=${is58mm ? 300 : 380},height=720`);
     if (!popup) return;
 
     const lines = invoice.items.map((item) => `
@@ -68,18 +72,20 @@ export function InvoicePrintButton({ label = "In hóa đơn", invoice }: Invoice
         <head>
           <title>${escapeHtml(invoice.invoiceNumber ?? "Bill")}</title>
           <style>
-            @page { size: 80mm auto; margin: 4mm; }
+            @page { size: ${pageWidth} auto; margin: 4mm; }
             * { box-sizing: border-box; }
-            body { width: 72mm; margin: 0 auto; font-family: Arial, sans-serif; color: #111; font-size: 12px; }
+            body { width: ${bodyWidth}; margin: 0 auto; font-family: Arial, sans-serif; color: #111; font-size: ${is58mm ? "10px" : "12px"}; }
             .center { text-align: center; }
             .title { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
             .muted { color: #444; }
             .divider { border-top: 1px dashed #111; margin: 8px 0; }
             .row { display: flex; justify-content: space-between; gap: 8px; }
+            .row span:last-child { text-align: right; }
             .item { margin: 8px 0; }
+            .item > div:first-child { overflow-wrap: anywhere; font-weight: 600; }
             .total { font-size: 15px; font-weight: 700; }
             .qr { width: 42mm; height: 42mm; object-fit: contain; margin: 6px auto; display: block; }
-            @media print { button { display: none; } body { width: 72mm; } }
+            @media print { button { display: none; } body { width: ${bodyWidth}; } }
           </style>
         </head>
         <body>

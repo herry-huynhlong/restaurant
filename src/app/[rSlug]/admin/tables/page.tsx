@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { getAdminTablesState } from "@/server/services/table-state-service";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { getRecentPaidPaymentSummaries } from "@/server/services/payment-detail-service";
 
 export default async function TablesPage({
   params,
@@ -19,7 +20,7 @@ export default async function TablesPage({
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER"]);
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-  const [areas, notifications, tableState, products] = await Promise.all([
+  const [areas, notifications, tableState, products, recentPaidPayments] = await Promise.all([
     prisma.area.findMany({
       where: { restaurantId: access.restaurant.id },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
@@ -41,7 +42,8 @@ export default async function TablesPage({
         imageUrl: true,
         isSoldOut: true
       }
-    })
+    }),
+    getRecentPaidPaymentSummaries(access.restaurant.id)
   ]);
 
   return (
@@ -87,6 +89,7 @@ export default async function TablesPage({
         products={products}
         initialState={tableState}
         initialSelectedTableId={searchParams?.table}
+        initialPaidPayments={recentPaidPayments}
       />
     </RestaurantAdminShell>
   );

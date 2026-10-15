@@ -14,7 +14,9 @@ export async function getPaymentBillDetail({
   const payment = await prisma.payment.findFirst({
     where: {
       id: paymentId,
-      restaurantId
+      restaurantId,
+      status: "PAID",
+      paidAt: { not: null }
     },
     include: {
       restaurant: true,
@@ -102,4 +104,33 @@ export async function getPaymentBillDetail({
     })),
     items: Array.from(itemMap.values())
   };
+}
+
+export async function getRecentPaidPaymentSummaries(restaurantId: string, take = 8) {
+  const settings = await prisma.restaurantSetting.findUnique({ where: { restaurantId } });
+  const timeZone = settings?.timezone ?? "Asia/Ho_Chi_Minh";
+  const payments = await prisma.payment.findMany({
+    where: {
+      restaurantId,
+      status: "PAID",
+      paidAt: { not: null }
+    },
+    include: {
+      confirmedBy: { select: { name: true } },
+      diningSession: { include: { table: { select: { name: true } } } }
+    },
+    orderBy: { paidAt: "desc" },
+    take
+  });
+
+  return payments.map((payment) => ({
+    id: payment.id,
+    invoiceNumber: payment.invoiceNumber,
+    paidAtLabel: formatInTimeZone(payment.paidAt!, timeZone, { dateStyle: "short", timeStyle: "short" }),
+    tableName: payment.tableNameSnapshot ?? payment.diningSession.table.name,
+    amount: payment.grandTotal || payment.amount,
+    status: payment.status,
+    paymentMethod: payment.paymentMethod,
+    confirmedByName: payment.confirmedBy?.name ?? null
+  }));
 }

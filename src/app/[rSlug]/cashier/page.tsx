@@ -16,6 +16,8 @@ import { markDiningSessionPaidAction, updateServiceRequestStatusAction } from "@
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 import { calculateBillSummary } from "@/server/services/billing-service";
 import { customerDisplayName } from "@/lib/customer-name";
+import { PaidBillButton } from "@/components/admin/payment-report-table";
+import { getRecentPaidPaymentSummaries } from "@/server/services/payment-detail-service";
 
 function getSessionCustomerName(session: {
   serviceRequests: Array<{ customerName: string; createdAt: Date }>;
@@ -36,7 +38,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
     role: access.membership.role,
     nextPath: `/${access.restaurant.slug}/cashier`
   });
-  const [sessions, paymentRequests, notifications, settings] = await Promise.all([
+  const [sessions, paymentRequests, notifications, settings, recentPaidPayments] = await Promise.all([
     prisma.diningSession.findMany({
       where: {
         restaurantId: access.restaurant.id,
@@ -67,7 +69,8 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
       take: 50
     }),
     getRecentNotifications(access.restaurant.id, access.user.id),
-    prisma.restaurantSetting.findUnique({ where: { restaurantId: access.restaurant.id } })
+    prisma.restaurantSetting.findUnique({ where: { restaurantId: access.restaurant.id } }),
+    getRecentPaidPaymentSummaries(access.restaurant.id)
   ]);
 
   const latestBillSession = sessions[0];
@@ -163,6 +166,28 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
             <EmptyState title="Bill hiện tại" description="Chọn bàn để xem bill khi có dữ liệu." />
           )}
         </section>
+        {recentPaidPayments.length ? (
+          <section className="space-y-3 lg:col-span-3">
+            <h2 className="text-base font-semibold">Bill thanh toán gần đây</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {recentPaidPayments.map((payment) => (
+                <article key={payment.id} className="rounded-lg border bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">Bàn {payment.tableName}</p>
+                      <p className="text-xs text-slate-500">{payment.invoiceNumber ?? payment.id.slice(0, 8)}</p>
+                    </div>
+                    <p className="font-bold text-teal-700">{formatVnd(payment.amount)}</p>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">{payment.paidAtLabel}</p>
+                  <div className="mt-3">
+                    <PaidBillButton slug={access.restaurant.slug} paymentId={payment.id} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </section>
     </main>
   );

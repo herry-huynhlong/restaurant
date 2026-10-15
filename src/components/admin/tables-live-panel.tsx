@@ -8,6 +8,7 @@ import { restaurantRoutes } from "@/lib/routes";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { QrCard } from "@/components/admin/qr-card";
+import { PaidBillButton, type PaymentSummary } from "@/components/admin/payment-report-table";
 
 export type TableState = {
   settings: {
@@ -110,7 +111,8 @@ export function TablesLivePanel({
   showQrTools = true,
   products,
   initialState,
-  initialSelectedTableId
+  initialSelectedTableId,
+  initialPaidPayments = []
 }: {
   slug: string;
   restaurantName: string;
@@ -120,6 +122,7 @@ export function TablesLivePanel({
   products: MenuProduct[];
   initialState: TableState;
   initialSelectedTableId?: string | null;
+  initialPaidPayments?: PaymentSummary[];
 }) {
   const [state, setState] = useState(initialState);
   const [selectedTableId, setSelectedTableId] = useState(initialSelectedTableId ?? initialState.areas[0]?.tables[0]?.id ?? null);
@@ -127,6 +130,7 @@ export function TablesLivePanel({
   const [payingSessionId, setPayingSessionId] = useState<string | null>(null);
   const [orderingTableId, setOrderingTableId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [paidPayments, setPaidPayments] = useState(initialPaidPayments);
   const tables = useMemo(() => state.areas.flatMap((area) => area.tables), [state.areas]);
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0] ?? null;
 
@@ -180,7 +184,27 @@ export function TablesLivePanel({
         throw new Error(data.message || data.error || `Không xác nhận được thanh toán (${response.status}).`);
       }
 
-      await response.json().catch(() => ({}));
+      const data = await response.json().catch(() => ({})) as {
+        payment?: {
+          paymentId: string;
+          invoiceNumber: string | null;
+          grandTotal: number;
+          tableName: string;
+        };
+      };
+      if (data.payment?.paymentId) {
+        const payment: PaymentSummary = {
+          id: data.payment.paymentId,
+          invoiceNumber: data.payment.invoiceNumber,
+          paidAtLabel: new Date().toLocaleString("vi-VN"),
+          tableName: data.payment.tableName,
+          amount: data.payment.grandTotal,
+          status: "PAID",
+          paymentMethod: "CASH",
+          confirmedByName: cashierName ?? null
+        };
+        setPaidPayments((current) => [payment, ...current.filter((item) => item.id !== payment.id)].slice(0, 8));
+      }
       setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
       await refreshTables();
     } catch (error) {
@@ -237,6 +261,34 @@ export function TablesLivePanel({
         showQrTools={showQrTools}
         paymentPending={payingSessionId === selectedTable?.activeSession?.id}
       />
+      {paidPayments.length ? (
+        <section className="rounded-lg border bg-white p-5 shadow-sm xl:col-span-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Bill thanh toán gần đây</h2>
+              <p className="text-sm text-slate-500">Có thể in lại sau khi bàn đã trở về trạng thái trống.</p>
+            </div>
+            <Link className="text-sm font-semibold text-teal-700 hover:underline" href={restaurantRoutes.adminReports(slug)}>Xem lịch sử giao dịch</Link>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {paidPayments.map((payment) => (
+              <article key={payment.id} className="rounded-md border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold">Bàn {payment.tableName}</p>
+                    <p className="text-xs text-slate-500">{payment.invoiceNumber ?? payment.id.slice(0, 8)}</p>
+                  </div>
+                  <p className="font-bold text-teal-700">{formatVnd(payment.amount)}</p>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">{payment.paidAtLabel}</p>
+                <div className="mt-3">
+                  <PaidBillButton slug={slug} paymentId={payment.id} />
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {orderingTableId ? (
         <StaffAddOrderModal
           slug={slug}

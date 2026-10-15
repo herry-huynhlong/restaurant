@@ -7,7 +7,7 @@ import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { formatVnd } from "@/lib/money";
 import { paymentMethodLabels } from "@/lib/payment-method";
 
-type PaymentSummary = {
+export type PaymentSummary = {
   id: string;
   invoiceNumber: string | null;
   paidAtLabel: string;
@@ -18,7 +18,7 @@ type PaymentSummary = {
   confirmedByName: string | null;
 };
 
-type BillDetail = {
+export type BillDetail = {
   id: string;
   restaurantName: string;
   businessName: string | null;
@@ -59,6 +59,44 @@ type BillDetail = {
     }>;
   }>;
 };
+
+export function PaidBillButton({
+  slug,
+  paymentId,
+  label = "In bill thanh toán"
+}: {
+  slug: string;
+  paymentId: string;
+  label?: string;
+}) {
+  const [bill, setBill] = useState<BillDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function openBill() {
+    setError(null);
+    startTransition(async () => {
+      const response = await fetch(`/api/restaurants/${slug}/reports/payments/${paymentId}`, { cache: "no-store" });
+      if (!response.ok) {
+        setError("Không mở được bill thanh toán.");
+        return;
+      }
+      setBill(await response.json() as BillDetail);
+    });
+  }
+
+  return (
+    <>
+      <div className="inline-flex flex-col items-start gap-1">
+        <button className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60" type="button" disabled={isPending} onClick={openBill}>
+          {isPending ? "Đang mở..." : label}
+        </button>
+        {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      </div>
+      {bill ? <BillDetailModal bill={bill} onClose={() => setBill(null)} /> : null}
+    </>
+  );
+}
 
 export function PaymentReportTable({
   slug,
@@ -167,7 +205,8 @@ export function PaymentReportTable({
   );
 }
 
-function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: () => void }) {
+export function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: () => void }) {
+  const [paperSize, setPaperSize] = useState<"58mm" | "80mm">("80mm");
   const invoice = {
     restaurantName: bill.restaurantName,
     businessName: bill.businessName,
@@ -257,8 +296,12 @@ function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: () => v
             </section>
           ) : null}
         </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t p-4">
-          <InvoicePrintButton label="In lại hóa đơn" invoice={invoice} />
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t p-4">
+          <div className="mr-auto inline-flex rounded-md border p-0.5 text-sm" aria-label="Khổ giấy in">
+            <button className={`rounded px-3 py-1.5 ${paperSize === "58mm" ? "bg-teal-700 text-white" : "text-slate-600"}`} type="button" onClick={() => setPaperSize("58mm")}>58 mm</button>
+            <button className={`rounded px-3 py-1.5 ${paperSize === "80mm" ? "bg-teal-700 text-white" : "text-slate-600"}`} type="button" onClick={() => setPaperSize("80mm")}>80 mm</button>
+          </div>
+          <InvoicePrintButton label="In bill thanh toán" paperSize={paperSize} invoice={invoice} />
           <button className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onClose}>
             Đóng
           </button>

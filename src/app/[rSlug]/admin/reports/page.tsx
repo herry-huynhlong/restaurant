@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PaymentReportTable } from "@/components/admin/payment-report-table";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { ReportsAutoRefresh } from "@/components/admin/reports-auto-refresh";
 import { formatVnd } from "@/lib/money";
@@ -22,7 +23,6 @@ export default async function AdminReportsPage({
   const report = await getRestaurantPaymentReport(access.restaurant.id, period);
   const maxBucketAmount = Math.max(...report.buckets.map((bucket) => bucket.amount), 1);
   const previousLabel = getPreviousPeriodLabel(period);
-  const recentPayments = report.payments.slice(0, 8);
   const showPaymentMethods = report.paymentMethods.length >= 2;
   const showRevenueTrend = period !== "today";
 
@@ -97,28 +97,7 @@ export default async function AdminReportsPage({
           </div>
         ) : null}
 
-        <section className="rounded-lg border bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-800">Giao dịch gần đây</h2>
-            <span className="text-sm text-slate-500">{report.summary.invoiceCount} bill</span>
-          </div>
-          {recentPayments.length ? (
-            <div className="mt-4 divide-y rounded-lg border">
-              {recentPayments.map((payment) => (
-                <div key={payment.id} className="grid gap-2 px-4 py-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-                  <div>
-                    <p className="font-semibold">Bàn {payment.tableName}</p>
-                    <p className="text-sm text-slate-500">{payment.invoiceNumber ?? payment.id.slice(0, 8)}</p>
-                  </div>
-                  <p className="font-bold text-teal-700 sm:text-right">{formatVnd(payment.amount)}</p>
-                  <p className="text-sm text-slate-500 sm:text-right">{payment.paidAtLabel}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-4 rounded-md bg-slate-50 p-4 text-sm text-slate-500">Chưa có giao dịch trong kỳ này.</p>
-          )}
-        </section>
+        <PaymentReportTable slug={access.restaurant.slug} payments={report.payments} />
       </section>
     </RestaurantAdminShell>
   );
