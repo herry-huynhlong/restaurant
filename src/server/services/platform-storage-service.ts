@@ -73,7 +73,7 @@ export async function getPlatformStorageDashboard() {
     await refreshRestaurantStorageUsage();
   }
 
-  const [restaurantUsages, backupRuns, maintenanceRuns, successfulBackups, latestFailedBackup, workerHeartbeat, restoreJobs] = await Promise.all([
+  const [restaurantUsages, backupRuns, maintenanceRuns, successfulBackups, latestFailedBackup, workerHeartbeat, restoreJobs, restaurantBackupRuns, restaurantRestoreRuns] = await Promise.all([
     prisma.restaurantStorageUsage.findMany({
       orderBy: { estimatedBytes: "desc" },
       include: {
@@ -107,7 +107,16 @@ export async function getPlatformStorageDashboard() {
     prisma.platformWorkerHeartbeat.findUnique({
       where: { singletonKey: BACKUP_WORKER_KEY }
     }),
-    listRestoreJobs()
+    listRestoreJobs(),
+    prisma.restaurantBackupRun.findMany({
+      where: { status: { not: "EXPIRED" } },
+      orderBy: { createdAt: "desc" },
+      take: 300
+    }),
+    prisma.restaurantRestoreRun.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50
+    })
   ]);
 
   const latestSuccessfulBackup = successfulBackups[0] ?? null;
@@ -139,8 +148,9 @@ export async function getPlatformStorageDashboard() {
       estimatedBytes: restaurantUsages.reduce((sum, usage) => sum + toSafeNumber(usage.estimatedBytes), 0),
       dataBytes: restaurantUsages.reduce((sum, usage) => sum + toSafeNumber(usage.dataBytes), 0),
       uploadBytes: restaurantUsages.reduce((sum, usage) => sum + toSafeNumber(usage.uploadBytes), 0),
-      backupBytes: successfulBackups.reduce((sum, backup) => sum + toSafeNumber(backup.sizeBytes), 0),
-      backupCount: successfulBackups.length,
+      backupBytes: successfulBackups.reduce((sum, backup) => sum + toSafeNumber(backup.sizeBytes), 0)
+        + restaurantBackupRuns.filter((backup) => backup.status === "SUCCESS").reduce((sum, backup) => sum + toSafeNumber(backup.sizeBytes), 0),
+      backupCount: successfulBackups.length + restaurantBackupRuns.filter((backup) => backup.status === "SUCCESS").length,
       restaurantCount: restaurantUsages.length
     },
     nextBackupAt: getNextBackupDate(policy.backupTime),
@@ -158,7 +168,33 @@ export async function getPlatformStorageDashboard() {
       dataBytes: toSafeNumber(usage.dataBytes),
       uploadBytes: toSafeNumber(usage.uploadBytes),
       calculatedAt: usage.calculatedAt,
-      note: usage.note
+      note: usage.note,
+      backups: restaurantBackupRuns
+        .filter((backup) => backup.restaurantId === usage.restaurantId)
+        .map((backup) => ({
+          id: backup.id,
+          status: backup.status,
+          triggerType: backup.triggerType,
+          sizeBytes: toSafeNumber(backup.sizeBytes),
+          verifiedAt: backup.verifiedAt,
+          queuedAt: backup.queuedAt,
+          startedAt: backup.startedAt,
+          completedAt: backup.completedAt,
+          errorMessage: backup.status === "FAILED" ? "Không thể hoàn tất sao lưu cửa hàng." : null
+        })),
+      restores: restaurantRestoreRuns
+        .filter((restore) => restore.restaurantId === usage.restaurantId)
+        .slice(0, 5)
+        .map((restore) => ({
+          id: restore.id,
+          backupRunId: restore.backupRunId,
+          status: restore.status,
+          publicMessage: restore.publicMessage,
+          queuedAt: restore.queuedAt,
+          startedAt: restore.startedAt,
+          completedAt: restore.completedAt,
+          updatedAt: restore.updatedAt
+        }))
     })),
     backupRuns: backupRunsWithRestore.map(({ run, restoreReadiness }) => ({
       id: run.id,

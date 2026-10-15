@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgresql://restaurant_user:${POSTGRES_PASSWORD}@postgres:5432/restaurant_saas?schema=public
       BACKUP_DIR: /app/backups
       PLATFORM_RUNTIME_DIR: /app/runtime
+      TENANT_RESTORE_ENABLED: ${TENANT_RESTORE_ENABLED:-false}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
@@ -53,6 +54,7 @@ services:
       DATABASE_URL: postgresql://restaurant_user:${POSTGRES_PASSWORD}@postgres:5432/restaurant_saas?schema=public
       BACKUP_DIR: /app/backups
       PLATFORM_RUNTIME_DIR: /app/runtime
+      TENANT_RESTORE_ENABLED: ${TENANT_RESTORE_ENABLED:-false}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}

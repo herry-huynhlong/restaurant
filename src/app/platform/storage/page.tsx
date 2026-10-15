@@ -5,6 +5,7 @@ import { BackupHistoryCard } from "@/components/platform/backup-history-card";
 import { BackupJobRefresher } from "@/components/platform/backup-job-refresher";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
 import { RestoreJobRefresher } from "@/components/platform/restore-job-refresher";
+import { RestaurantBackupTable } from "@/components/platform/restaurant-backup-table";
 import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
 import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
@@ -129,7 +130,7 @@ export default async function PlatformStoragePage({
 
           <div className="mt-5 flex flex-col gap-4 border-t pt-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h3 className="font-semibold text-slate-950">Sao lưu &amp; Khôi phục</h3>
+              <h3 className="font-semibold text-slate-950">Sao lưu hệ thống</h3>
               <p className="mt-1 text-sm text-slate-500">
                 {dashboard.policy.backupEnabled ? "Sao lưu tự động đang bật" : "Sao lưu tự động đang tắt"}
                 {dashboard.latestSuccessfulBackup
@@ -137,7 +138,7 @@ export default async function PlatformStoragePage({
                   : " · Chưa có bản sao lưu"}
                 {` · ${dashboard.totals.backupCount} bản đang được giữ`}
               </p>
-              <p className="mt-1 text-xs font-medium text-amber-700">Khôi phục sẽ áp dụng cho toàn bộ hệ thống.</p>
+              <p className="mt-1 text-xs font-medium text-amber-700">Khu vực dự phòng toàn hệ thống dành cho sự cố máy chủ hoặc cơ sở dữ liệu.</p>
               {latestRestore ? (
                 <p className="mt-2 text-sm font-medium text-slate-700">
                   Khôi phục gần nhất: {restoreStatusLabel(latestRestore.status)} · {formatDateTime(new Date(latestRestore.updatedAt))}
@@ -158,6 +159,14 @@ export default async function PlatformStoragePage({
             </div>
           </div>
         </section>
+      </div>
+
+      <div className="mt-5">
+        <RestaurantBackupTable
+          rows={dashboard.restaurantUsages}
+          canManage={canManageStorage}
+          restoreEnabled={process.env.TENANT_RESTORE_ENABLED === "true"}
+        />
       </div>
 
       {canManageStorage ? (

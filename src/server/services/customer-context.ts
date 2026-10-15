@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { CUSTOMER_SESSION_COOKIE, verifyCustomerSessionValue } from "@/lib/customer-session";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 import { canRestaurantOperate } from "@/lib/tenant/restaurant";
+import { isRestaurantInMaintenance } from "@/lib/restaurant-maintenance";
 
 export async function getCustomerContext(request: NextRequest, slug: string) {
   const session = verifyCustomerSessionValue(request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value);
@@ -22,6 +23,10 @@ export async function getCustomerContext(request: NextRequest, slug: string) {
   });
 
   if (!diningSession || !diningSession.table.isActive) {
+    return null;
+  }
+
+  if (await isRestaurantInMaintenance(diningSession.restaurantId)) {
     return null;
   }
 

@@ -174,6 +174,8 @@ model Restaurant {
   auditLogs          AuditLog[]
   storageUsage       RestaurantStorageUsage?
   pushSubscriptions  PushSubscription[]
+  backupRuns         RestaurantBackupRun[]
+  restoreRuns        RestaurantRestoreRun[]
 
   @@index([status])
   @@index([deletedAt])
@@ -640,6 +642,56 @@ model PlatformBackupRun {
 
   @@index([status, queuedAt])
   @@index([createdAt])
+}
+
+model RestaurantBackupRun {
+  id                     String     @id @default(cuid())
+  restaurantId           String
+  restaurantNameSnapshot String
+  status                 String     @default("QUEUED")
+  triggerType            String     @default("MANUAL")
+  backupDate             String?
+  snapshotName           String?
+  uploadsArchiveName     String?
+  sizeBytes              BigInt     @default(0)
+  checksum               String?
+  schemaVersion          Int        @default(1)
+  verifiedAt             DateTime?
+  errorMessage           String?
+  queuedAt               DateTime   @default(now())
+  startedAt              DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  restaurant             Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restoreRuns            RestaurantRestoreRun[]
+
+  @@unique([restaurantId, triggerType, backupDate])
+  @@index([restaurantId, status, queuedAt])
+  @@index([status, queuedAt])
+  @@index([createdAt])
+}
+
+model RestaurantRestoreRun {
+  id             String              @id @default(cuid())
+  restaurantId   String
+  backupRunId    String
+  actorUserId    String
+  status         String              @default("QUEUED")
+  publicMessage  String?
+  rollbackReady  Boolean             @default(false)
+  errorMessage   String?
+  queuedAt       DateTime            @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  restaurant     Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  backupRun      RestaurantBackupRun @relation(fields: [backupRunId], references: [id], onDelete: Restrict)
+
+  @@index([restaurantId, status, queuedAt])
+  @@index([status, queuedAt])
+  @@index([backupRunId])
 }
 
 model PlatformMaintenanceRun {

@@ -25,10 +25,27 @@ const restoreSchema = z.object({
   acknowledgeRisk: z.literal("on", { errorMap: () => ({ message: "Vui lòng xác nhận bạn hiểu rủi ro khôi phục." }) })
 });
 
+const restaurantBackupSchema = z.object({
+  restaurantId: z.string().min(1)
+});
+
+const restaurantRestoreSchema = z.object({
+  restaurantId: z.string().min(1),
+  backupRunId: z.string().min(1),
+  currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại."),
+  acknowledgeRisk: z.literal("on", { errorMap: () => ({ message: "Vui lòng xác nhận bạn hiểu phạm vi khôi phục." }) })
+});
+
 export type RestoreBackupActionState = {
   status: "idle" | "success" | "error";
   message: string | null;
   restoreJobId: string | null;
+};
+
+export type RestaurantRestoreActionState = {
+  status: "idle" | "success" | "error";
+  message: string | null;
+  restoreRunId: string | null;
 };
 
 export async function updateStoragePolicyAction(formData: FormData) {
@@ -131,6 +148,132 @@ export async function queueManualBackupAction() {
 
   revalidatePath(platformRoutes.storage);
   redirect(`${platformRoutes.storage}?backupJob=${encodeURIComponent(run.id)}`);
+}
+
+export async function queueRestaurantBackupAction(formData: FormData) {
+  const actor = await requirePlatformOwner();
+  const parsed = restaurantBackupSchema.safeParse({ restaurantId: readString(formData, "restaurantId") });
+  if (!parsed.success) redirectWithError("Không xác định được cửa hàng cần sao lưu.");
+
+  const [restaurant, worker] = await Promise.all([
+    prisma.restaurant.findUnique({ where: { id: parsed.data.restaurantId }, select: { id: true, name: true, status: true } }),
+    getBackupWorkerAvailability()
+  ]);
+  if (!restaurant || restaurant.status === "DELETED") redirectWithError("Cửa hàng không còn khả dụng.");
+  if (!worker.ready) redirectWithError("Dịch vụ sao lưu đang gián đoạn.");
+
+  const run = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`restaurant-backup:${restaurant.id}`}))`;
+    const active = await tx.restaurantBackupRun.findFirst({
+      where: { restaurantId: restaurant.id, status: { in: ["QUEUED", "RUNNING"] } },
+      select: { id: true }
+    });
+    if (active) return null;
+    const created = await tx.restaurantBackupRun.create({
+      data: {
+        restaurantId: restaurant.id,
+        restaurantNameSnapshot: restaurant.name,
+        triggerType: "MANUAL"
+      }
+    });
+    await tx.auditLog.create({
+      data: {
+        userId: actor.id,
+        restaurantId: restaurant.id,
+        action: "RESTAURANT_BACKUP_QUEUED",
+        entityType: "RestaurantBackupRun",
+        entityId: created.id
+      }
+    });
+    return created;
+  });
+  if (!run) redirectWithError("Cửa hàng này đang có một lần sao lưu được xử lý.");
+
+  revalidatePath(platformRoutes.storage);
+  redirectWithSuccess(`Đã tiếp nhận yêu cầu sao lưu cửa hàng ${restaurant.name}.`);
+}
+
+export async function queueRestaurantRestoreAction(
+  _previousState: RestaurantRestoreActionState,
+  formData: FormData
+): Promise<RestaurantRestoreActionState> {
+  const actor = await requirePlatformOwner();
+  if (process.env.TENANT_RESTORE_ENABLED !== "true") {
+    return restaurantRestoreError("Khôi phục riêng đang chờ hoàn tất kiểm tra vận hành.");
+  }
+  const parsed = restaurantRestoreSchema.safeParse({
+    restaurantId: readString(formData, "restaurantId"),
+    backupRunId: readString(formData, "backupRunId"),
+    currentPassword: String(formData.get("currentPassword") ?? ""),
+    acknowledgeRisk: formData.get("acknowledgeRisk")
+  });
+  if (!parsed.success) return restaurantRestoreError(validationMessage(parsed.error));
+
+  try {
+    const [user, backup, worker] = await Promise.all([
+      prisma.user.findUnique({ where: { id: actor.id }, select: { passwordHash: true } }),
+      prisma.restaurantBackupRun.findFirst({
+        where: {
+          id: parsed.data.backupRunId,
+          restaurantId: parsed.data.restaurantId,
+          status: "SUCCESS",
+          verifiedAt: { not: null }
+        },
+        include: { restaurant: { select: { name: true } } }
+      }),
+      getBackupWorkerAvailability()
+    ]);
+    if (!user || !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+      return restaurantRestoreError("Mật khẩu không chính xác.");
+    }
+    if (!backup) return restaurantRestoreError("Bản sao lưu không còn khả dụng cho cửa hàng này.");
+    if (!worker.ready) return restaurantRestoreError("Dịch vụ sao lưu và khôi phục đang gián đoạn.");
+
+    const run = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`restaurant-restore:${parsed.data.restaurantId}`}))`;
+      const active = await tx.restaurantRestoreRun.findFirst({
+        where: {
+          restaurantId: parsed.data.restaurantId,
+          status: { in: ["QUEUED", "VERIFYING", "PREPARING", "RESTORING"] }
+        },
+        select: { id: true }
+      });
+      if (active) return null;
+      const created = await tx.restaurantRestoreRun.create({
+        data: {
+          restaurantId: parsed.data.restaurantId,
+          backupRunId: backup.id,
+          actorUserId: actor.id,
+          publicMessage: "Yêu cầu khôi phục cửa hàng đang chờ xử lý."
+        }
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: actor.id,
+          restaurantId: parsed.data.restaurantId,
+          action: "RESTAURANT_RESTORE_QUEUED",
+          entityType: "RestaurantRestoreRun",
+          entityId: created.id,
+          metadataJson: { backupRunId: backup.id }
+        }
+      });
+      return created;
+    });
+    if (!run) return restaurantRestoreError("Cửa hàng này đang có một lần khôi phục được xử lý.");
+
+    revalidatePath(platformRoutes.storage);
+    return {
+      status: "success",
+      message: `Đã tiếp nhận yêu cầu khôi phục cửa hàng ${backup.restaurant.name}.`,
+      restoreRunId: run.id
+    };
+  } catch {
+    return restaurantRestoreError("Không thể bắt đầu khôi phục cửa hàng. Vui lòng thử lại.");
+  }
+}
+
+function restaurantRestoreError(message: string): RestaurantRestoreActionState {
+  return { status: "error", message, restoreRunId: null };
 }
 
 export async function queueCleanupAction() {

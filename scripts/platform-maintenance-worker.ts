@@ -7,6 +7,8 @@ import { execFile } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
 import { markInterruptedRestoreJobs, processNextRestoreJob, verifyRestoreCandidate } from "./platform-restore-worker";
 import { isMaintenanceMode } from "@/lib/maintenance-mode";
+import { disableRestaurantMaintenance } from "@/lib/restaurant-maintenance";
+import { createRestaurantBackup, restoreRestaurantBackup } from "@/server/services/restaurant-backup-service";
 
 const execFileAsync = promisify(execFile);
 const prisma = new PrismaClient();
@@ -54,7 +56,10 @@ async function main() {
 
   await touchWorker("OK", "Đang kiểm tra tác vụ nền.");
   await queueAutomaticBackupIfNeeded(policy, false);
+  await queueAutomaticRestaurantBackupsIfNeeded(policy);
   await processNextBackup();
+  await processNextRestaurantBackup();
+  await processNextRestaurantRestore();
   await processNextCleanup();
   await processSubscriptionLifecycle();
   await cleanupOldTaskHistory();
@@ -78,6 +83,7 @@ async function runLoop() {
   });
 
   await markInterruptedRestoreJobs();
+  await recoverInterruptedRestaurantJobs();
 
   while (process.exitCode === undefined) {
     try {
@@ -93,10 +99,17 @@ async function runLoop() {
         await sleep(loopIntervalMs);
         continue;
       }
+      const handledRestaurantRestore = await processNextRestaurantRestore();
+      if (handledRestaurantRestore) {
+        await sleep(loopIntervalMs);
+        continue;
+      }
       const policy = await ensurePolicy();
       await touchWorker("OK", "Dịch vụ sao lưu đang sẵn sàng.");
       await queueAutomaticBackupIfNeeded(policy, false);
+      await queueAutomaticRestaurantBackupsIfNeeded(policy);
       await processNextBackup();
+      await processNextRestaurantBackup();
       await processNextCleanup();
       await processSubscriptionLifecycle();
       await cleanupOldTaskHistory();
@@ -105,6 +118,100 @@ async function runLoop() {
       await touchWorker("ERROR", safeError(error));
     }
     await sleep(loopIntervalMs);
+  }
+}
+
+async function queueAutomaticRestaurantBackupsIfNeeded(policy: Awaited<ReturnType<typeof ensurePolicy>>) {
+  if (!policy.backupEnabled || !isPastBackupTime(policy.backupTime)) return;
+  const backupDate = vietnamDateKey(new Date());
+  const restaurants = await prisma.restaurant.findMany({
+    where: { status: { not: "DELETED" } },
+    select: { id: true, name: true }
+  });
+  for (const restaurant of restaurants) {
+    await prisma.restaurantBackupRun.upsert({
+      where: {
+        restaurantId_triggerType_backupDate: {
+          restaurantId: restaurant.id,
+          triggerType: "AUTOMATIC",
+          backupDate
+        }
+      },
+      create: {
+        restaurantId: restaurant.id,
+        restaurantNameSnapshot: restaurant.name,
+        triggerType: "AUTOMATIC",
+        backupDate
+      },
+      update: {}
+    });
+  }
+}
+
+async function processNextRestaurantBackup() {
+  const run = await prisma.$transaction(async (tx) => {
+    const queued = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "RestaurantBackupRun"
+      WHERE status = 'QUEUED'
+      ORDER BY "queuedAt" ASC
+      FOR UPDATE SKIP LOCKED
+      LIMIT 1
+    `;
+    if (!queued[0]) return null;
+    return tx.restaurantBackupRun.update({
+      where: { id: queued[0].id },
+      data: { status: "RUNNING", startedAt: new Date() },
+      select: { id: true }
+    });
+  });
+  if (!run) return false;
+  await createRestaurantBackup(prisma, run.id).catch(() => undefined);
+  return true;
+}
+
+async function processNextRestaurantRestore() {
+  const run = await prisma.$transaction(async (tx) => {
+    const queued = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "RestaurantRestoreRun"
+      WHERE status = 'QUEUED'
+      ORDER BY "queuedAt" ASC
+      FOR UPDATE SKIP LOCKED
+      LIMIT 1
+    `;
+    if (!queued[0]) return null;
+    return tx.restaurantRestoreRun.update({
+      where: { id: queued[0].id },
+      data: { status: "VERIFYING", startedAt: new Date(), publicMessage: "Đang kiểm tra bản sao lưu." },
+      select: { id: true }
+    });
+  });
+  if (!run) return false;
+  await restoreRestaurantBackup(prisma, run.id).catch(() => undefined);
+  return true;
+}
+
+async function recoverInterruptedRestaurantJobs() {
+  await prisma.restaurantBackupRun.updateMany({
+    where: { status: "RUNNING" },
+    data: { status: "FAILED", completedAt: new Date(), errorMessage: "Dịch vụ sao lưu đã khởi động lại trước khi hoàn tất." }
+  });
+  const interruptedRestores = await prisma.restaurantRestoreRun.findMany({
+    where: { status: { in: ["VERIFYING", "PREPARING", "RESTORING"] } },
+    select: { id: true, restaurantId: true }
+  });
+  for (const run of interruptedRestores) {
+    await disableRestaurantMaintenance(run.restaurantId, run.id).catch(() => undefined);
+    await prisma.restaurantRestoreRun.update({
+      where: { id: run.id },
+      data: {
+        status: "FAILED",
+        completedAt: new Date(),
+        publicMessage: "Khôi phục bị gián đoạn và đã dừng an toàn.",
+        errorMessage: "Dịch vụ khôi phục đã khởi động lại. Dữ liệu database chưa hoàn tất sẽ tự rollback."
+      }
+    });
   }
 }
 
@@ -634,6 +741,15 @@ function startOfVietnamDay(value: Date) {
   const vietnamNow = new Date(value.getTime() + vietnamUtcOffsetHours * 60 * 60 * 1000);
   const vietnamDay = new Date(Date.UTC(vietnamNow.getUTCFullYear(), vietnamNow.getUTCMonth(), vietnamNow.getUTCDate(), 0, 0, 0, 0));
   return new Date(vietnamDay.getTime() - vietnamUtcOffsetHours * 60 * 60 * 1000);
+}
+
+function vietnamDateKey(value: Date) {
+  const vietnamNow = new Date(value.getTime() + vietnamUtcOffsetHours * 60 * 60 * 1000);
+  return [
+    vietnamNow.getUTCFullYear(),
+    String(vietnamNow.getUTCMonth() + 1).padStart(2, "0"),
+    String(vietnamNow.getUTCDate()).padStart(2, "0")
+  ].join("-");
 }
 
 function isPastBackupTime(backupTime: string) {
