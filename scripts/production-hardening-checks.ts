@@ -72,6 +72,8 @@ function checkBackupAndRestoreSafety() {
   assertIncludes("scripts/platform-restore-worker.ts", "createPreRestoreSnapshot", "Restore must create a protected pre-restore snapshot.");
   assertIncludes("scripts/platform-restore-worker.ts", "rollbackRestore", "Restore must include a rollback path.");
   assertIncludes("scripts/platform-restore-worker.ts", "restoreDump", "Database restore must run in the maintenance worker.");
+  assertIncludes("scripts/platform-restore-worker.ts", 'searchParams.delete("schema")', "PostgreSQL CLI URLs must remove Prisma-only query parameters.");
+  assertIncludes("scripts/platform-restore-worker.ts", "PGPASSWORD", "PostgreSQL credentials must not be passed in process arguments.");
   assertNotIncludes("src/components/platform/backup-history-card.tsx", "Checksum", "Technical backup checks must stay out of the user interface.");
   assertIncludes("docs/BACKUP_AND_DATA_LIFECYCLE.md", "database tạm", "Restore documentation must describe isolated verification.");
 }

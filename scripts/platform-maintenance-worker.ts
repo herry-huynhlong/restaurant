@@ -664,7 +664,12 @@ async function checksumFiles(files: string[]) {
 }
 
 function safeError(error: unknown) {
-  if (error instanceof Error) return error.message.slice(0, 500);
+  if (error instanceof Error) {
+    return error.message
+      .replace(/(postgres(?:ql)?:\/\/[^:\s/]+:)[^@\s/]+@/gi, "$1[redacted]@")
+      .replace(/(password=)[^\s]+/gi, "$1[redacted]")
+      .slice(0, 500);
+  }
   return "Tác vụ chưa thành công.";
 }
 

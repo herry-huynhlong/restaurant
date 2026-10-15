@@ -223,10 +223,10 @@ async function createPreRestoreSnapshot(jobId: string, destination: string) {
   const databasePath = path.join(destination, "database.dump");
   const uploadsPath = path.join(destination, "uploads.tar.gz");
   const manifestPath = path.join(destination, "manifest.json");
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) throw new Error("DATABASE_URL_MISSING");
-  await execFileAsync("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", `--dbname=${databaseUrl}`, "--file", databasePath], {
-    env: process.env,
+  const database = parseDatabaseUrl();
+  const connection = postgresCliConnection(database.url);
+  await execFileAsync("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", `--dbname=${connection.url}`, "--file", databasePath], {
+    env: connection.env,
     maxBuffer: 10 * 1024 * 1024
   });
   await execFileAsync("tar", ["-czf", uploadsPath, "-C", path.dirname(uploadRoot), path.basename(uploadRoot)], {
@@ -293,21 +293,25 @@ async function switchDatabase(adminUrl: string, currentName: string, replacement
 }
 
 async function restoreDump(databasePath: string, databaseUrl: string) {
+  const connection = postgresCliConnection(databaseUrl);
   await execFileAsync(
     "pg_restore",
-    ["--exit-on-error", "--no-owner", "--no-privileges", `--dbname=${databaseUrl}`, databasePath],
-    { maxBuffer: 20 * 1024 * 1024 }
+    ["--exit-on-error", "--no-owner", "--no-privileges", `--dbname=${connection.url}`, databasePath],
+    { env: connection.env, maxBuffer: 20 * 1024 * 1024 }
   );
 }
 
 async function validateDatabase(databaseUrl: string) {
+  const connection = postgresCliConnection(databaseUrl);
   const names = requiredTables.map(sqlLiteral).join(",");
   const query = `SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN (${names})`;
-  const { stdout } = await execFileAsync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", query], {
+  const { stdout } = await execFileAsync("psql", [connection.url, "-v", "ON_ERROR_STOP=1", "-Atqc", query], {
+    env: connection.env,
     maxBuffer: 1024 * 1024
   });
   if (Number(stdout.trim()) !== requiredTables.length) throw new Error("RESTORE_DATABASE_VALIDATION_FAILED");
-  await execFileAsync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-Atqc", 'SELECT count(*) FROM "Restaurant"'], {
+  await execFileAsync("psql", [connection.url, "-v", "ON_ERROR_STOP=1", "-Atqc", 'SELECT count(*) FROM "Restaurant"'], {
+    env: connection.env,
     maxBuffer: 1024 * 1024
   });
 }
@@ -346,12 +350,14 @@ function parseDatabaseUrl() {
   const url = new URL(value);
   const name = decodeURIComponent(url.pathname.replace(/^\//, ""));
   if (!name || !/^[a-zA-Z0-9_-]+$/.test(name)) throw new Error("DATABASE_NAME_INVALID");
-  return { url: value, name, adminUrl: databaseUrlFor(value, "postgres") };
+  return { url: databaseUrlFor(value, name), name, adminUrl: databaseUrlFor(value, "postgres") };
 }
 
 function databaseUrlFor(value: string, databaseName: string) {
   const url = new URL(value);
   url.pathname = `/${databaseName}`;
+  // `schema` is a Prisma-only query option and is rejected by libpq tools.
+  url.searchParams.delete("schema");
   return url.toString();
 }
 
@@ -372,7 +378,27 @@ async function terminateDatabaseConnections(adminUrl: string, name: string) {
 }
 
 async function runSql(databaseUrl: string, sql: string) {
-  await execFileAsync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-c", sql], { maxBuffer: 10 * 1024 * 1024 });
+  const connection = postgresCliConnection(databaseUrl);
+  await execFileAsync("psql", [connection.url, "-v", "ON_ERROR_STOP=1", "-c", sql], {
+    env: connection.env,
+    maxBuffer: 10 * 1024 * 1024
+  });
+}
+
+function postgresCliConnection(value: string) {
+  const url = new URL(value);
+  const username = decodeURIComponent(url.username);
+  const password = decodeURIComponent(url.password);
+  url.username = "";
+  url.password = "";
+  return {
+    url: url.toString(),
+    env: {
+      ...process.env,
+      PGUSER: username,
+      PGPASSWORD: password
+    }
+  };
 }
 
 function quoteIdentifier(value: string) {
