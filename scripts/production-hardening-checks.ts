@@ -61,12 +61,19 @@ function checkBackupAndRestoreSafety() {
   assertIncludes("scripts/platform-maintenance-worker.ts", "checksumFiles", "Backup worker must checksum backup artifacts.");
   assertIncludes("scripts/platform-maintenance-worker.ts", "FOR UPDATE SKIP LOCKED", "Backup worker must claim queued jobs atomically.");
   assertIncludes("scripts/platform-maintenance-worker.ts", "expireOldSuccessfulBackups", "Backup worker must retain a bounded number of successful backups.");
+  assertIncludes("scripts/platform-maintenance-worker.ts", 'triggerType: "AUTOMATIC"', "Automatic backup retention must be independent.");
+  assertIncludes("scripts/platform-maintenance-worker.ts", 'triggerType: "MANUAL"', "Manual backup retention must not evict automatic backups.");
   assertIncludes("src/server/services/platform-storage-service.ts", "checkBackupRestoreReadiness", "Storage service must verify backup files before restore is considered.");
   assertIncludes("src/server/services/platform-storage-service.ts", "Checksum không khớp", "Restore readiness must reject checksum mismatches.");
   assertIncludes("src/app/platform/storage/actions.ts", "requirePlatformOwner", "Backup restore checks must require platform owner access.");
-  assertIncludes("src/components/platform/backup-history-card.tsx", "Bản sao lưu này hiện không thể khôi phục.", "Unavailable backups must not expose a misleading restore action.");
+  assertIncludes("src/components/platform/backup-history-card.tsx", 'row.restoreStatus !== "NOT_READY"', "Restore action must only be available for complete backups.");
+  assertIncludes("src/app/platform/storage/actions.ts", "bcrypt.compare", "Production restore must re-authenticate the platform owner.");
+  assertIncludes("src/lib/db/prisma.ts", "SYSTEM_MAINTENANCE", "Application database writes must be blocked during restore.");
+  assertIncludes("scripts/platform-restore-worker.ts", "createPreRestoreSnapshot", "Restore must create a protected pre-restore snapshot.");
+  assertIncludes("scripts/platform-restore-worker.ts", "rollbackRestore", "Restore must include a rollback path.");
+  assertIncludes("scripts/platform-restore-worker.ts", "restoreDump", "Database restore must run in the maintenance worker.");
   assertNotIncludes("src/components/platform/backup-history-card.tsx", "Checksum", "Technical backup checks must stay out of the user interface.");
-  assertIncludes("docs/BACKUP_AND_DATA_LIFECYCLE.md", "Không có nút khôi phục một chạm", "Restore documentation must warn against production one-click restore.");
+  assertIncludes("docs/BACKUP_AND_DATA_LIFECYCLE.md", "database tạm", "Restore documentation must describe isolated verification.");
 }
 
 function checkProductionLogging() {

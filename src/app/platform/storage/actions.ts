@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
 import { checkBackupRestoreReadiness, ensurePlatformDataPolicy, getBackupWorkerAvailability, refreshRestaurantStorageUsage } from "@/server/services/platform-storage-service";
+import { createRestoreJob } from "@/server/services/platform-restore-runtime";
 
 const storagePolicySchema = z.object({
   backupEnabled: z.boolean(),
@@ -15,6 +17,12 @@ const storagePolicySchema = z.object({
   notificationRetentionDays: z.coerce.number().int().min(1, "Số ngày lưu thông báo không hợp lệ.").max(90, "Thông báo không nên giữ quá 90 ngày."),
   temporaryDataRetentionDays: z.coerce.number().int().min(7, "Dữ liệu tạm cần lưu ít nhất 7 ngày.").max(365, "Dữ liệu tạm không nên giữ quá 365 ngày."),
   backupStorageKind: z.literal("LOCAL")
+});
+
+const restoreSchema = z.object({
+  backupRunId: z.string().min(1),
+  currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại."),
+  acknowledgeRisk: z.literal("on", { errorMap: () => ({ message: "Vui lòng xác nhận bạn hiểu rủi ro khôi phục." }) })
 });
 
 export async function updateStoragePolicyAction(formData: FormData) {
@@ -170,7 +178,56 @@ export async function checkBackupRestoreReadinessAction(formData: FormData) {
   if (result.status === "NOT_READY") {
     redirectWithError("Bản sao lưu chưa đủ điều kiện khôi phục. Hãy xem chi tiết kiểm tra.");
   }
-  redirectWithSuccess("Đã kiểm tra bản sao lưu. Khôi phục production vẫn đang khóa để bảo vệ dữ liệu.");
+  redirectWithSuccess("Bản sao lưu đã vượt qua kiểm tra tính toàn vẹn.");
+}
+
+export async function restoreBackupAction(formData: FormData) {
+  const actor = await requirePlatformOwner();
+  const parsed = restoreSchema.safeParse({
+    backupRunId: readString(formData, "backupRunId"),
+    currentPassword: String(formData.get("currentPassword") ?? ""),
+    acknowledgeRisk: formData.get("acknowledgeRisk")
+  });
+  if (!parsed.success) {
+    redirectWithError(validationMessage(parsed.error));
+  }
+
+  const [user, worker, readiness] = await Promise.all([
+    prisma.user.findUnique({ where: { id: actor.id }, select: { passwordHash: true } }),
+    getBackupWorkerAvailability(),
+    checkBackupRestoreReadiness(parsed.data.backupRunId)
+  ]);
+  if (!user || !(await bcrypt.compare(parsed.data.currentPassword, user.passwordHash))) {
+    redirectWithError("Mật khẩu xác nhận không đúng.");
+  }
+  if (!worker.ready) {
+    redirectWithError("Dịch vụ sao lưu và khôi phục đang gián đoạn.");
+  }
+  if (readiness.status === "NOT_READY" || !readiness.canRestoreProduction) {
+    redirectWithError("Bản sao lưu chưa đủ điều kiện khôi phục.");
+  }
+
+  let restoreJob;
+  try {
+    restoreJob = await createRestoreJob({ backupId: parsed.data.backupRunId, actorUserId: actor.id });
+  } catch (error) {
+    if (error instanceof Error && error.message === "RESTORE_ALREADY_ACTIVE") {
+      redirectWithError("Đang có một lần khôi phục được xử lý.");
+    }
+    throw error;
+  }
+
+  await prisma.auditLog.create({
+    data: {
+      userId: actor.id,
+      action: "PLATFORM_RESTORE_QUEUED",
+      entityType: "PlatformRestoreJob",
+      entityId: restoreJob.id,
+      metadataJson: { backupId: parsed.data.backupRunId }
+    }
+  });
+  revalidatePath(platformRoutes.storage);
+  redirect(`${platformRoutes.storage}?restoreJob=${encodeURIComponent(restoreJob.id)}`);
 }
 
 function storageKindLabel(value: string) {

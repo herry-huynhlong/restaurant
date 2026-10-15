@@ -31,12 +31,7 @@ docker compose up -d --build
 
 ## Chạy sao lưu thủ công
 
-Nút **Chạy sao lưu thủ công** trong Platform Admin chỉ đưa tác vụ vào hàng chờ. Sau đó chạy worker:
-
-```bash
-cd /opt/websites/restaurant
-docker compose run --rm maintenance-worker pnpm platform:backup
-```
+Nút **Sao lưu ngay** trong Platform Admin đưa tác vụ vào hàng chờ. `maintenance-worker` đang chạy nền sẽ tự nhận và xử lý, không cần chạy thêm lệnh bằng tay.
 
 ## Chạy dịch vụ sao lưu nền
 
@@ -69,6 +64,14 @@ find backups -maxdepth 2 -type f -printf '%p %s bytes\n'
 ```
 
 Web container đọc thư mục `backups` ở chế độ chỉ đọc; worker là thành phần duy nhất ghi bản sao lưu. Vì vậy file vẫn còn sau khi recreate container nếu thư mục bind mount trên VPS không bị xóa thủ công.
+
+Chính sách giữ bản sao được tách riêng:
+
+- Giữ số bản **tự động** thành công theo cấu hình, mặc định là 3.
+- Giữ tối đa 3 bản **thủ công** thành công.
+- Sao lưu thủ công không làm mất ba bản tự động gần nhất.
+- Lần sao lưu thất bại không kích hoạt dọn các bản thành công.
+- Bản dự phòng được tạo ngay trước khi khôi phục nằm trong `runtime/pre-restore` và không thuộc retention thông thường.
 
 ## Kiểm tra phiên bản công cụ sao lưu
 
@@ -164,31 +167,25 @@ Nếu chỉ lưu trên cùng máy chủ, Platform Admin sẽ hiển thị cảnh
 
 ## Khôi phục dữ liệu
 
-Không có nút khôi phục một chạm trên giao diện production để tránh ghi đè nhầm dữ liệu thật.
+Platform Owner có thể chọn **Khôi phục** trên một bản sao lưu thành công. Server action chỉ xác thực quyền, mật khẩu và xếp job; nó không chạy `pg_restore` trong request HTTP.
 
-Trang `/platform/storage` chỉ cho Platform Owner kiểm tra khả năng khôi phục ở mức an toàn:
+`maintenance-worker` thực hiện tuần tự:
 
-- Bản sao lưu phải ở trạng thái thành công.
-- File `database.dump` phải còn tồn tại và có dữ liệu.
-- File `uploads.tar.gz` được kiểm tra nếu bản sao lưu có lưu ảnh tải lên.
-- File `manifest.json` phải khớp với bản ghi sao lưu.
-- Checksum được đối chiếu khi bấm kiểm tra khả năng khôi phục.
+1. Kiểm tra file database, ảnh, manifest và tính toàn vẹn ở nền.
+2. Khôi phục thử vào một database tạm và kiểm tra các bảng quan trọng.
+3. Giải nén ảnh vào thư mục tạm và kiểm tra khả năng đọc.
+4. Kiểm tra dung lượng trống.
+5. Bật chế độ bảo trì; giao diện và lớp Prisma chặn thao tác ghi.
+6. Tạo bản dự phòng database và uploads ngay trước thao tác.
+7. Chuyển database đã kiểm tra vào vị trí production và khôi phục uploads.
+8. Chạy migration, kiểm tra lại database và uploads.
+9. Chỉ tắt bảo trì sau khi mọi bước đạt yêu cầu.
 
-Nút "Khôi phục" trên giao diện vẫn bị khóa cho tới khi có đủ restore worker cô lập, chế độ bảo trì, bản sao lưu ngay trước khi khôi phục và quy trình rollback đã kiểm chứng. Không gọi `pg_restore` trực tiếp từ request HTTP.
+Nếu khôi phục lỗi sau khi đã thay dữ liệu, worker đổi lại database cũ và phục hồi uploads từ bản dự phòng. Nếu rollback không được kiểm chứng là thành công, hệ thống giữ chế độ bảo trì và đánh dấu **Cần can thiệp**, không tự động chạy lại thao tác phá hủy sau khi worker restart.
 
-Quy trình khôi phục nên thực hiện có kiểm soát:
+Trạng thái restore và cờ bảo trì nằm trong thư mục bind mount `runtime`, bên ngoài database có thể bị thay thế. Không xóa thư mục này trong lúc restore.
 
-1. Dừng ứng dụng web.
-2. Sao lưu lại trạng thái hiện tại trước khi khôi phục.
-3. Kiểm tra bản sao lưu cần khôi phục.
-4. Khôi phục PostgreSQL bằng công cụ quản trị PostgreSQL.
-5. Khôi phục thư mục ảnh tải lên.
-6. Chạy kiểm tra đăng nhập, menu, order, thanh toán và báo cáo.
-7. Mở lại ứng dụng web.
-
-Nên thử khôi phục trên môi trường staging trước khi thực hiện với production.
-
-### Thử khôi phục trên môi trường độc lập
+### Kiểm tra trên môi trường độc lập
 
 Không chạy các lệnh dưới đây trên database production. Dùng một máy staging hoặc một project Docker riêng, copy thư mục của một bản sao lưu thành công sang đó rồi kiểm tra.
 
@@ -225,4 +222,37 @@ Sau khi restore staging, kiểm tra tối thiểu:
 - Kiểm tra menu, bàn, order, thanh toán, báo cáo.
 - Kiểm tra ảnh món/logo còn hiển thị.
 
-Chỉ khi các bước staging đạt yêu cầu mới lập kế hoạch khôi phục production, và luôn sao lưu trạng thái production hiện tại trước khi ghi đè.
+Worker luôn thực hiện bước staging nói trên trước mỗi lần khôi phục production. Khi triển khai bản code mới, vẫn nên chạy một lần trên project Docker thử nghiệm riêng trước khi mở thao tác trên VPS chính.
+
+Có thể kiểm tra riêng một bản sao lưu bằng ID mà không thay đổi database production:
+
+```bash
+BACKUP_ID=$(docker compose exec -T postgres psql -U restaurant_user -d restaurant_saas -Atc \
+  'select id from "PlatformBackupRun" where status = '\''SUCCESS'\'' order by "completedAt" desc limit 1')
+docker compose exec maintenance-worker pnpm exec tsx scripts/platform-maintenance-worker.ts restore-verify "$BACKUP_ID"
+```
+
+Lệnh này tạo database tạm, khôi phục và kiểm tra dữ liệu/ảnh, rồi xóa database tạm. Nó không chuyển database production sang bản cũ.
+
+## Triển khai trên VPS
+
+```bash
+cd /opt/websites/restaurant
+git pull
+mkdir -p backups runtime public/uploads host-metrics
+docker compose build app maintenance-worker
+docker compose run --rm app pnpm prisma:deploy
+docker compose up -d --force-recreate app maintenance-worker
+docker compose ps
+docker compose logs maintenance-worker --tail=100
+```
+
+Kiểm tra mount và công cụ:
+
+```bash
+docker compose exec app sh -lc 'test -d /app/backups && test -d /app/runtime && echo OK'
+docker compose exec maintenance-worker sh -lc 'test -w /app/backups && test -w /app/runtime && test -w /app/public/uploads && echo OK'
+docker compose exec maintenance-worker pg_dump --version
+```
+
+Không chạy thử nút khôi phục trên dữ liệu production chỉ để kiểm tra giao diện. Hãy dùng project Docker cô lập hoặc bản sao VPS trước.

@@ -5,6 +5,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import { PrismaClient } from "@prisma/client";
+import { markInterruptedRestoreJobs, processNextRestoreJob, verifyRestoreCandidate } from "./platform-restore-worker";
+import { isMaintenanceMode } from "@/lib/maintenance-mode";
 
 const execFileAsync = promisify(execFile);
 const prisma = new PrismaClient();
@@ -15,6 +17,7 @@ const workerKey = "backup-worker";
 const vietnamUtcOffsetHours = 7;
 const loopIntervalMs = Number(process.env.MAINTENANCE_WORKER_INTERVAL_MS ?? 30000);
 const taskHistoryRetentionDays = 7;
+const manualBackupRetentionCount = 3;
 
 async function main() {
   const mode = process.argv[2] ?? "worker";
@@ -38,6 +41,14 @@ async function main() {
     await queueCleanup();
     await processNextCleanup();
     await touchWorker("OK", "Đã xử lý xong lượt dọn dữ liệu tạm.");
+    return;
+  }
+
+  if (mode === "restore-verify") {
+    const backupId = process.argv[3];
+    if (!backupId) throw new Error("BACKUP_ID_REQUIRED");
+    await verifyRestoreCandidate(prisma, backupId);
+    process.stdout.write("Restore staging verification passed.\n");
     return;
   }
 
@@ -66,8 +77,22 @@ async function runLoop() {
     process.exitCode = 0;
   });
 
+  await markInterruptedRestoreJobs();
+
   while (process.exitCode === undefined) {
     try {
+      if (await isMaintenanceMode()) {
+        await sleep(loopIntervalMs);
+        continue;
+      }
+      const handledRestore = await processNextRestoreJob(prisma);
+      if (handledRestore) {
+        if (!(await isMaintenanceMode())) {
+          await touchWorker("OK", "Đã xử lý yêu cầu khôi phục dữ liệu.");
+        }
+        await sleep(loopIntervalMs);
+        continue;
+      }
       const policy = await ensurePolicy();
       await touchWorker("OK", "Dịch vụ sao lưu đang sẵn sàng.");
       await queueAutomaticBackupIfNeeded(policy, false);
@@ -196,26 +221,26 @@ async function processNextBackup() {
     });
 
     await dumpDatabase(databaseDumpPath);
-    const hasUploads = await archiveUploads(uploadsArchivePath);
+    await archiveUploads(uploadsArchivePath);
 
     const databaseInfo = await stat(databaseDumpPath);
     if (!databaseInfo.isFile() || databaseInfo.size <= 0) {
       throw new Error("BACKUP_DATABASE_FILE_EMPTY");
     }
 
-    const uploadsInfo = hasUploads ? await stat(uploadsArchivePath) : null;
+    const uploadsInfo = await stat(uploadsArchivePath);
     const manifest = {
       backupId: run.id,
       createdAt: new Date().toISOString(),
       files: {
         database: databaseDumpName,
-        uploads: hasUploads ? uploadsArchiveName : null
+        uploads: uploadsArchiveName
       }
     };
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
 
-    const checksum = await checksumFiles([databaseDumpPath, ...(hasUploads ? [uploadsArchivePath] : []), manifestPath]);
-    const sizeBytes = databaseInfo.size + (uploadsInfo?.size ?? 0) + (await stat(manifestPath)).size;
+    const checksum = await checksumFiles([databaseDumpPath, uploadsArchivePath, manifestPath]);
+    const sizeBytes = databaseInfo.size + uploadsInfo.size + (await stat(manifestPath)).size;
 
     await prisma.platformBackupRun.update({
       where: { id: run.id },
@@ -223,7 +248,7 @@ async function processNextBackup() {
         status: "SUCCESS",
         locationLabel: storageKindLabel(run.storageKind),
         databaseDumpName,
-        uploadsArchiveName: hasUploads ? uploadsArchiveName : null,
+        uploadsArchiveName,
         sizeBytes,
         checksum,
         verifiedAt: new Date(),
@@ -281,26 +306,28 @@ async function dumpDatabase(outputPath: string) {
 }
 
 async function archiveUploads(outputPath: string) {
-  try {
-    const info = await stat(uploadRoot);
-    if (!info.isDirectory()) return false;
-  } catch {
-    return false;
-  }
+  await mkdir(uploadRoot, { recursive: true });
 
   await execFileAsync("tar", ["-czf", outputPath, "-C", path.dirname(uploadRoot), path.basename(uploadRoot)], {
     maxBuffer: 1024 * 1024
   });
-  return true;
 }
 
 async function expireOldSuccessfulBackups() {
   const policy = await ensurePolicy();
-  const oldBackups = await prisma.platformBackupRun.findMany({
-    where: { status: "SUCCESS" },
-    orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
-    skip: policy.backupRetentionCount
-  });
+  const [oldAutomaticBackups, oldManualBackups] = await Promise.all([
+    prisma.platformBackupRun.findMany({
+      where: { status: "SUCCESS", triggerType: "AUTOMATIC" },
+      orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+      skip: policy.backupRetentionCount
+    }),
+    prisma.platformBackupRun.findMany({
+      where: { status: "SUCCESS", triggerType: "MANUAL" },
+      orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+      skip: manualBackupRetentionCount
+    })
+  ]);
+  const oldBackups = [...oldAutomaticBackups, ...oldManualBackups];
 
   for (const backup of oldBackups) {
     await removeBackupFiles(backup.databaseDumpName, backup.uploadsArchiveName);

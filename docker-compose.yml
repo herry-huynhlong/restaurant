@@ -26,6 +26,7 @@ services:
     environment:
       DATABASE_URL: postgresql://restaurant_user:${POSTGRES_PASSWORD}@postgres:5432/restaurant_saas?schema=public
       BACKUP_DIR: /app/backups
+      PLATFORM_RUNTIME_DIR: /app/runtime
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
@@ -38,6 +39,7 @@ services:
       - ./public/uploads:/app/public/uploads
       - ./backups:/app/backups:ro
       - ./host-metrics:/app/host-metrics:ro
+      - ./runtime:/app/runtime
 
   maintenance-worker:
     build:
@@ -50,15 +52,17 @@ services:
     environment:
       DATABASE_URL: postgresql://restaurant_user:${POSTGRES_PASSWORD}@postgres:5432/restaurant_saas?schema=public
       BACKUP_DIR: /app/backups
+      PLATFORM_RUNTIME_DIR: /app/runtime
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
       VAPID_SUBJECT: ${VAPID_SUBJECT}
     volumes:
-      - ./public/uploads:/app/public/uploads:ro
+      - ./public/uploads:/app/public/uploads
       - ./backups:/app/backups
       - ./host-metrics:/app/host-metrics:ro
+      - ./runtime:/app/runtime
     command: ["pnpm", "platform:worker:loop"]
     restart: unless-stopped
 

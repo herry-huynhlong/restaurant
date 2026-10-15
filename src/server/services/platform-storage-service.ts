@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import path from "node:path";
 import { readFile, stat } from "node:fs/promises";
 import { prisma } from "@/lib/db/prisma";
+import { listRestoreJobs } from "@/server/services/platform-restore-runtime";
 
 const UPLOAD_ROOT = path.resolve(process.cwd(), "public", "uploads");
 const POLICY_KEY = "default";
@@ -18,7 +19,7 @@ export type BackupRestoreReadiness = {
   backupId: string;
   status: "READY" | "NEEDS_CHECK" | "NOT_READY";
   checkedAt: Date;
-  canRestoreProduction: false;
+  canRestoreProduction: boolean;
   productionRestoreMessage: string;
   checks: Array<{
     key: string;
@@ -72,7 +73,7 @@ export async function getPlatformStorageDashboard() {
     await refreshRestaurantStorageUsage();
   }
 
-  const [restaurantUsages, backupRuns, maintenanceRuns, successfulBackups, latestFailedBackup, workerHeartbeat] = await Promise.all([
+  const [restaurantUsages, backupRuns, maintenanceRuns, successfulBackups, latestFailedBackup, workerHeartbeat, restoreJobs] = await Promise.all([
     prisma.restaurantStorageUsage.findMany({
       orderBy: { estimatedBytes: "desc" },
       include: {
@@ -97,7 +98,6 @@ export async function getPlatformStorageDashboard() {
     }),
     prisma.platformBackupRun.findMany({
       where: { status: "SUCCESS" },
-      take: policy.backupRetentionCount,
       orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }]
     }),
     prisma.platformBackupRun.findFirst({
@@ -106,7 +106,8 @@ export async function getPlatformStorageDashboard() {
     }),
     prisma.platformWorkerHeartbeat.findUnique({
       where: { singletonKey: BACKUP_WORKER_KEY }
-    })
+    }),
+    listRestoreJobs()
   ]);
 
   const latestSuccessfulBackup = successfulBackups[0] ?? null;
@@ -139,6 +140,7 @@ export async function getPlatformStorageDashboard() {
       dataBytes: restaurantUsages.reduce((sum, usage) => sum + toSafeNumber(usage.dataBytes), 0),
       uploadBytes: restaurantUsages.reduce((sum, usage) => sum + toSafeNumber(usage.uploadBytes), 0),
       backupBytes: successfulBackups.reduce((sum, backup) => sum + toSafeNumber(backup.sizeBytes), 0),
+      backupCount: successfulBackups.length,
       restaurantCount: restaurantUsages.length
     },
     nextBackupAt: getNextBackupDate(policy.backupTime),
@@ -173,6 +175,7 @@ export async function getPlatformStorageDashboard() {
       completedAt: run.completedAt,
       restoreReadiness
     })),
+    restoreJobs: restoreJobs.slice(0, 5),
     maintenanceRuns
   };
 }
@@ -219,7 +222,7 @@ export async function checkBackupRestoreReadiness(backupRunId: string) {
       backupId: backupRunId,
       status: "NOT_READY" as const,
       checkedAt: new Date(),
-      canRestoreProduction: false as const,
+      canRestoreProduction: false,
       productionRestoreMessage: productionRestoreLockedMessage(),
       checks: [
         {
@@ -435,8 +438,8 @@ function restoreReadiness(backupId: string, checkedAt: Date, checks: BackupResto
     backupId,
     status: failed ? "NOT_READY" : needsManualStaging || pendingChecksum ? "NEEDS_CHECK" : "READY",
     checkedAt,
-    canRestoreProduction: false,
-    productionRestoreMessage: productionRestoreLockedMessage(),
+    canRestoreProduction: !failed,
+    productionRestoreMessage: failed ? "Bản sao lưu chưa đủ điều kiện khôi phục." : "Bản sao lưu sẽ được kiểm tra trong môi trường cô lập trước khi khôi phục.",
     checks
   };
 }
@@ -446,7 +449,7 @@ function hasFailedRequiredChecks(checks: BackupRestoreReadiness["checks"]) {
 }
 
 function productionRestoreLockedMessage() {
-  return "Khôi phục production đang khóa cho đến khi có restore worker cô lập, chế độ bảo trì và bản dự phòng trước khôi phục.";
+  return "Bản sao lưu chưa đủ điều kiện khôi phục.";
 }
 
 function safeBackupPath(relativePath: string | null) {

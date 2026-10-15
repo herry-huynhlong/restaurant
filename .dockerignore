@@ -9,3 +9,6 @@ dist
 .gitignore
 README.md
 docs
+backups
+runtime
+host-metrics

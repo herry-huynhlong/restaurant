@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import type { Sharp } from "sharp";
 import { debugLog } from "@/lib/debug-log";
+import { assertSystemWritable } from "@/lib/maintenance-mode";
 
 export const MAX_UPLOAD_IMAGE_SIZE = 5 * 1024 * 1024;
 export const allowedUploadImageTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -31,6 +32,7 @@ export function validateUploadImageFile(file: File) {
 }
 
 export async function saveOptimizedUploadImage(file: File, folder: UploadFolder): Promise<ProcessedImage | undefined> {
+  await assertSystemWritable();
   if (!(file instanceof File) || file.size === 0) return undefined;
   validateUploadImageFile(file);
 

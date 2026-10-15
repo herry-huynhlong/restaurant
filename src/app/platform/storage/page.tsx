@@ -4,6 +4,7 @@ import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { BackupHistoryCard } from "@/components/platform/backup-history-card";
 import { BackupJobRefresher } from "@/components/platform/backup-job-refresher";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
+import { RestoreJobRefresher } from "@/components/platform/restore-job-refresher";
 import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
 import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
@@ -11,7 +12,7 @@ import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction,
 export default async function PlatformStoragePage({
   searchParams
 }: {
-  searchParams?: { success?: string; error?: string; backupJob?: string };
+  searchParams?: { success?: string; error?: string; backupJob?: string; restoreJob?: string };
 }) {
   const user = await requirePlatformAdmin();
   const dashboard = await getPlatformStorageDashboard();
@@ -19,11 +20,16 @@ export default async function PlatformStoragePage({
   const trackedBackup = searchParams?.backupJob
     ? dashboard.backupRuns.find((run) => run.id === searchParams.backupJob)
     : undefined;
+  const trackedRestore = searchParams?.restoreJob
+    ? dashboard.restoreJobs.find((job) => job.id === searchParams.restoreJob)
+    : undefined;
+  const latestRestore = dashboard.restoreJobs[0];
 
   return (
     <PlatformShell title="Tài nguyên & Sao lưu" subtitle="Quản lý dung lượng lưu trữ và bảo vệ dữ liệu cửa hàng.">
       <FeedbackBanner success={searchParams?.success} error={searchParams?.error} />
       <BackupJobRefresher jobId={searchParams?.backupJob} status={trackedBackup?.status} />
+      <RestoreJobRefresher jobId={searchParams?.restoreJob} status={trackedRestore?.status} />
 
       <ServerResourceMonitor />
 
@@ -120,6 +126,37 @@ export default async function PlatformStoragePage({
               </tbody>
             </table>
           </div>
+
+          <div className="mt-5 flex flex-col gap-4 border-t pt-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h3 className="font-semibold text-slate-950">Sao lưu &amp; Khôi phục</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                {dashboard.policy.backupEnabled ? "Sao lưu tự động đang bật" : "Sao lưu tự động đang tắt"}
+                {dashboard.latestSuccessfulBackup
+                  ? ` · Lần gần nhất ${formatDateTime(dashboard.latestSuccessfulBackup.completedAt ?? dashboard.latestSuccessfulBackup.updatedAt)}`
+                  : " · Chưa có bản sao lưu"}
+                {` · ${dashboard.totals.backupCount} bản đang được giữ`}
+              </p>
+              <p className="mt-1 text-xs font-medium text-amber-700">Khôi phục sẽ áp dụng cho toàn bộ hệ thống.</p>
+              {latestRestore ? (
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  Khôi phục gần nhất: {restoreStatusLabel(latestRestore.status)} · {formatDateTime(new Date(latestRestore.updatedAt))}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <a className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50" href="#backup-history">
+                Xem lịch sử
+              </a>
+              {canManageStorage ? (
+                <form action={queueManualBackupAction}>
+                  <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+                    Sao lưu ngay
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          </div>
         </section>
       </div>
 
@@ -166,11 +203,6 @@ export default async function PlatformStoragePage({
           </form>
 
           <div className="flex flex-wrap gap-3 border-t bg-slate-50 px-5 py-4">
-            <form action={queueManualBackupAction}>
-              <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
-                Sao lưu ngay
-              </button>
-            </form>
             <form action={queueCleanupAction}>
               <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
                 Dọn dữ liệu tạm
@@ -181,17 +213,20 @@ export default async function PlatformStoragePage({
       ) : null}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <BackupHistoryCard
-          rows={dashboard.backupRuns.map((run) => ({
-            id: run.id,
-            status: run.status,
-            title: backupStatusLabel(run.status),
-            meta: `${run.triggerType === "MANUAL" ? "Thủ công" : "Tự động"} · ${formatDateTime(run.completedAt ?? run.startedAt ?? run.queuedAt)}`,
-            sizeLabel: run.status === "SUCCESS" ? formatBytes(run.sizeBytes) : null,
-            errorMessage: run.status === "FAILED" ? run.errorMessage : null,
-            restoreStatus: run.restoreReadiness.status
-          }))}
-        />
+        <div id="backup-history">
+          <BackupHistoryCard
+            canRestore={canManageStorage}
+            rows={dashboard.backupRuns.map((run) => ({
+              id: run.id,
+              status: run.status,
+              title: backupStatusLabel(run.status),
+              meta: `${run.triggerType === "MANUAL" ? "Thủ công" : "Tự động"} · ${formatDateTime(run.completedAt ?? run.startedAt ?? run.queuedAt)}`,
+              sizeLabel: run.status === "SUCCESS" ? formatBytes(run.sizeBytes) : null,
+              errorMessage: run.status === "FAILED" ? run.errorMessage : null,
+              restoreStatus: run.restoreReadiness.status
+            }))}
+          />
+        </div>
         <HistoryCard
           title="Lịch sử dọn dữ liệu"
           emptyText="Chưa có lần dọn dữ liệu."
@@ -315,6 +350,20 @@ function backupStatusLabel(status: string) {
     SUCCESS: "Sao lưu thành công",
     FAILED: "Sao lưu chưa thành công",
     EXPIRED: "Đã hết hạn lưu"
+  };
+  return labels[status] ?? status;
+}
+
+function restoreStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    QUEUED: "Đang chờ",
+    VERIFYING: "Đang kiểm tra",
+    PREPARING: "Đang chuẩn bị",
+    RESTORING: "Đang khôi phục",
+    VALIDATING: "Đang xác minh",
+    SUCCESS: "Hoàn tất",
+    FAILED: "Chưa thành công",
+    NEEDS_INTERVENTION: "Cần kiểm tra"
   };
   return labels[status] ?? status;
 }
