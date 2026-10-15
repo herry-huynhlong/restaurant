@@ -3,6 +3,7 @@ import { getRestaurantBySlug, canRestaurantOperate } from "@/lib/tenant/restaura
 import { prisma } from "@/lib/db/prisma";
 import { sanitizeFeedbackMessage } from "@/lib/safe-user-message";
 import { startCustomerSessionAction } from "@/app/[rSlug]/welcome/actions";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 
 export default async function WelcomePage({
   params,
@@ -45,9 +46,9 @@ export default async function WelcomePage({
             Tên của bạn / Your name
             <input className="mt-1 h-11 w-full rounded-md border px-3" name="customerName" maxLength={80} required />
           </label>
-          <button className="mt-4 h-11 w-full rounded-md bg-teal-700 text-sm font-semibold text-white" type="submit">
+          <PendingSubmitButton className="mt-4 h-11 w-full rounded-md bg-teal-700 text-sm font-semibold text-white" pendingLabel="Đang bắt đầu...">
             Bắt đầu gọi món
-          </button>
+          </PendingSubmitButton>
         </form>
       )}
     </CustomerShell>

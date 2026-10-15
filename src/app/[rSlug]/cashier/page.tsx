@@ -4,6 +4,7 @@ import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { formatVnd } from "@/lib/money";
 import { servedUploadUrl } from "@/lib/upload-url";
@@ -118,7 +119,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {request.status === "NEW" ? (
                     <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "ACKNOWLEDGED")}>
-                      <button className="rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đã nhận</button>
+                      <PendingSubmitButton className="rounded-md border px-3 py-2 text-sm font-semibold" pendingLabel="Đang nhận...">Đã nhận</PendingSubmitButton>
                     </form>
                   ) : null}
                   <form className="flex flex-wrap gap-2" action={markDiningSessionPaidAction.bind(null, access.restaurant.slug, request.diningSessionId)}>

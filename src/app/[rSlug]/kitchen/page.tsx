@@ -3,6 +3,7 @@ import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
 import { FoodItemDisplayCard } from "@/components/ops/food-item-display-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
@@ -205,11 +206,11 @@ function KitchenItemCard({
           ) : null}
           {mode === "waiting" ? (
             <form action={claimKitchenItemAction.bind(null, slug, item.id)}>
-              <button className="min-h-11 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Nhận món</button>
+              <PendingSubmitButton className="min-h-11 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang nhận...">Nhận món</PendingSubmitButton>
             </form>
           ) : isMine ? (
             <form action={markKitchenItemReadyAction.bind(null, slug, item.id)}>
-              <button className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">Hoàn thành</button>
+              <PendingSubmitButton className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">Hoàn thành</PendingSubmitButton>
             </form>
           ) : null}
         </>

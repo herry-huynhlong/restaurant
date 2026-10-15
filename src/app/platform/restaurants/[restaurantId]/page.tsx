@@ -33,6 +33,7 @@ import { restaurantStatusLabel, subscriptionStatusLabel } from "@/lib/platform/r
 import { planDisplayLabel } from "@/lib/plan/features";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { servedUploadUrl } from "@/lib/upload-url";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { getPlatformRestaurantDetail } from "@/server/services/platform-service";
 import { changePlanAction, extendSubscriptionAction } from "@/app/platform/restaurants/actions";
 
@@ -157,9 +158,9 @@ export default async function RestaurantDetailPage({
                 </select>
               </label>
               {restaurant.businessType === "DRINK_SHOP" ? <input name="plan" type="hidden" value="BASIC" /> : null}
-              <button className="mt-3 inline-flex h-10 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+              <PendingSubmitButton className="mt-3 inline-flex h-10 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" pendingLabel="Đang đổi...">
                 Đổi gói
-              </button>
+              </PendingSubmitButton>
             </form>
 
             <form className="rounded-xl border border-slate-200 bg-slate-50 p-4" action={extendSubscriptionAction}>
@@ -169,9 +170,9 @@ export default async function RestaurantDetailPage({
                 <input className="mt-2 h-11 w-full rounded-md border bg-white px-3 text-sm" name="subscriptionEnd" type="date" />
               </label>
               <input name="plan" type="hidden" value={restaurant.businessType === "DRINK_SHOP" ? "BASIC" : restaurant.plan === "PRO" ? "PRO" : "BASIC"} />
-              <button className="mt-3 inline-flex h-10 items-center rounded-md border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100" type="submit">
+              <PendingSubmitButton className="mt-3 inline-flex h-10 items-center rounded-md border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900 hover:bg-amber-100" pendingLabel="Đang gia hạn...">
                 Gia hạn
-              </button>
+              </PendingSubmitButton>
             </form>
           </div>
         </section>

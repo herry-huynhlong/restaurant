@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { resetOwnerPasswordAction, updateOwnerNameAction } from "@/app/platform/restaurants/actions";
+import { FormCancelButton, PendingSubmitButton } from "@/components/ui/pending-submit-button";
 
 type OwnerRow = {
   membershipId: string;
@@ -206,12 +207,10 @@ function OwnerActions({ owner, returnTo, canEditOwnerName }: { owner: OwnerRow; 
 function DialogActions({ close, submitLabel }: { close: () => void; submitLabel: string }) {
   return (
     <div className="flex justify-end gap-2">
-      <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={close}>
-        Hủy
-      </button>
-      <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" type="submit">
+      <FormCancelButton className="rounded-md border px-3 py-2 text-sm" onClick={close} />
+      <PendingSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">
         {submitLabel}
-      </button>
+      </PendingSubmitButton>
     </div>
   );
 }

@@ -4,12 +4,14 @@ import { useFormStatus } from "react-dom";
 
 export function ConfirmSubmitButton({
   children,
+  pendingLabel = "Đang xử lý...",
   message,
   description,
   className,
   disabled = false
 }: {
   children: React.ReactNode;
+  pendingLabel?: string;
   message: string;
   description?: string;
   className?: string;
@@ -31,7 +33,7 @@ export function ConfirmSubmitButton({
         }
       }}
     >
-      {children}
+      {pending ? pendingLabel : children}
     </button>
   );
 }

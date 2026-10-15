@@ -3,6 +3,8 @@ import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { changePlatformAdminPasswordAction } from "@/app/platform/settings/actions";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { ActionFormEffects } from "@/components/ui/action-form-effects";
 
 export default async function PlatformSettingsPage({
   searchParams
@@ -14,6 +16,7 @@ export default async function PlatformSettingsPage({
   return (
     <PlatformShell title="Cài đặt nền tảng">
       <FeedbackBanner success={searchParams.success} error={searchParams.error} />
+      <ActionFormEffects success={searchParams.success} />
 
       <section className="rounded-2xl border bg-white p-5 shadow-sm">
         <div className="flex items-start gap-3">
@@ -79,9 +82,9 @@ export default async function PlatformSettingsPage({
               </label>
             </div>
 
-            <button className="mt-5 inline-flex h-11 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+            <PendingSubmitButton className="mt-5 inline-flex h-11 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" pendingLabel="Đang đổi...">
               Đổi mật khẩu
-            </button>
+            </PendingSubmitButton>
           </form>
         </div>
       </section>

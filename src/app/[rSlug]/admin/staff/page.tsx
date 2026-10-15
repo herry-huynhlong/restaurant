@@ -4,7 +4,6 @@ import Image from "next/image";
 import { headers } from "next/headers";
 import { ChefHat, Clock3, Receipt, Smartphone, UserCog, Users, type LucideIcon } from "lucide-react";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
-import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { CopyLoginLinkButton, StaffDirectoryFilters, StaffPageInteractions, StaffSubmitButton } from "@/components/admin/staff-page-interactions";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { prisma } from "@/lib/db/prisma";
@@ -197,7 +196,6 @@ export default async function AdminStaffPage({
       planEntitlement={access.restaurant.planEntitlement}
       businessType={access.restaurant.businessType}
     >
-      <FeedbackBanner error={safeError} success={safeSuccess} />
       <StaffPageInteractions error={safeError} success={safeSuccess} />
 
       <details data-staff-panel className="mt-4 rounded-lg border bg-white p-4 shadow-sm">

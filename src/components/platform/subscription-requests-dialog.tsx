@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { confirmSubscriptionRequestAction, rejectSubscriptionRequestAction } from "@/app/platform/restaurants/actions";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 
 type PendingRequest = {
   id: string;
@@ -94,16 +95,16 @@ export function SubscriptionRequestsDialog({
                 <form action={confirmSubscriptionRequestAction}>
                   <input name="requestId" type="hidden" value={request.id} />
                   <input name="returnTo" type="hidden" value={returnTo} />
-                  <button className="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800" type="submit">
+                  <PendingSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800" pendingLabel="Đang xác nhận...">
                     Xác nhận
-                  </button>
+                  </PendingSubmitButton>
                 </form>
                 <form action={rejectSubscriptionRequestAction}>
                   <input name="requestId" type="hidden" value={request.id} />
                   <input name="returnTo" type="hidden" value={returnTo} />
-                  <button className="rounded-md border border-amber-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-amber-100" type="submit">
+                  <PendingSubmitButton className="rounded-md border border-amber-300 bg-white px-3 py-2 text-xs font-semibold hover:bg-amber-100" pendingLabel="Đang từ chối...">
                     Từ chối
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               </div>
             </article>

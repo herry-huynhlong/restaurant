@@ -14,6 +14,7 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "test:hardening": "tsx scripts/production-hardening-checks.ts",
     "test:backup-restore": "tsx scripts/backup-restore-hardening-checks.ts",
+    "test:form-ux": "tsx scripts/popup-form-ux-checks.ts",
     "platform:worker": "tsx scripts/platform-maintenance-worker.ts",
     "platform:worker:loop": "tsx scripts/platform-maintenance-worker.ts loop",
     "platform:backup": "tsx scripts/platform-maintenance-worker.ts backup",

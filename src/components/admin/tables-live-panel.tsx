@@ -534,7 +534,7 @@ export function StaffAddOrderModal({
   if (!table) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-0 sm:items-center sm:p-4">
+    <div aria-modal="true" className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-0 sm:items-center sm:p-4" role="dialog">
       <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b p-4">
           <div>
@@ -542,7 +542,7 @@ export function StaffAddOrderModal({
             <h2 className="text-xl font-semibold">Bàn {table.name}</h2>
             <p className="text-sm text-slate-500">{table.areaName} · món sẽ vào cùng phiên phục vụ hiện tại</p>
           </div>
-          <button className="rounded-md border p-2 hover:bg-slate-50" type="button" onClick={onClose} aria-label="Đóng">
+          <button className="rounded-md border p-2 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60" type="button" disabled={isSubmitting} onClick={onClose} aria-label="Đóng">
             <X className="h-5 w-5" />
           </button>
         </div>

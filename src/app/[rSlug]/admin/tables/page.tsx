@@ -8,6 +8,7 @@ import { createAreaAction, createTableAction } from "@/app/[rSlug]/admin/actions
 import { prisma } from "@/lib/db/prisma";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { getAdminTablesState } from "@/server/services/table-state-service";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 
 export default async function TablesPage({
   params,
@@ -62,7 +63,7 @@ export default async function TablesPage({
           <h2 className="flex items-center gap-2 text-base font-semibold"><Plus className="h-4 w-4" /> Tạo khu vực</h2>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <input className="h-10 flex-1 rounded-md border px-3" name="name" placeholder="Tên khu vực, ví dụ Khu A" required />
-            <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Tạo khu vực</button>
+            <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang tạo...">Tạo khu vực</PendingSubmitButton>
           </div>
         </form>
 
@@ -73,7 +74,7 @@ export default async function TablesPage({
             <select className="h-10 rounded-md border bg-white px-3" name="areaId" required>
               {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
             </select>
-            <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Tạo bàn</button>
+            <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang tạo...">Tạo bàn</PendingSubmitButton>
           </div>
         </form>
       </section>

@@ -11,6 +11,8 @@ import { restaurantRoutes } from "@/lib/routes";
 import { daysRemaining } from "@/server/services/subscription-service";
 import { planDisplayLabel } from "@/lib/plan/features";
 import { changeOwnerPasswordAction, updateRestaurantSettingsAction } from "@/app/[rSlug]/admin/actions";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { ActionFormEffects } from "@/components/ui/action-form-effects";
 
 export default async function SettingsPage({
   params,
@@ -40,6 +42,7 @@ export default async function SettingsPage({
   return (
     <RestaurantAdminShell slug={access.restaurant.slug} restaurantName={access.restaurant.name} role={access.membership.role} title="Cài đặt" userName={access.user.name} notifications={notifications} plan={access.restaurant.plan} planEntitlement={access.restaurant.planEntitlement} businessType={access.restaurant.businessType}>
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
+      <ActionFormEffects success={searchParams?.success} />
       <form className="space-y-6" action={updateRestaurantSettingsAction.bind(null, access.restaurant.slug)} encType="multipart/form-data">
         <SettingsSection title="Thông tin quán">
           <Text name="restaurantName" label="Tên quán" defaultValue={settings?.restaurantName ?? restaurant.name} required />
@@ -100,9 +103,9 @@ export default async function SettingsPage({
           <Check name="notificationSoundEnabled" label="Âm thanh" defaultChecked={settings?.notificationSoundEnabled ?? true} />
         </SettingsSection>
 
-        <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">
+        <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">
           Lưu cài đặt
-        </button>
+        </PendingSubmitButton>
       </form>
 
       {access.membership.role === "OWNER" ? (
@@ -126,9 +129,9 @@ export default async function SettingsPage({
               <input className="mt-1 h-10 w-full rounded-md border px-3" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} required />
             </label>
             <div className="flex items-end">
-              <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">
+              <PendingSubmitButton className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang đổi...">
                 Đổi mật khẩu
-              </button>
+              </PendingSubmitButton>
             </div>
           </SettingsSection>
         </form>

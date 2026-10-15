@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { BusinessPlanFields } from "@/components/platform/business-plan-fields";
 import { LogoUploadInput } from "@/components/platform/restaurant-form-controls";
 import { TextField, SelectField } from "@/components/ui/form-fields";
@@ -65,7 +66,7 @@ export default async function EditRestaurantPage({
             </div>
           </section>
         ) : null}
-        <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Lưu thay đổi</button>
+        <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">Lưu thay đổi</PendingSubmitButton>
       </form>
     </PlatformShell>
   );

@@ -123,7 +123,7 @@ export function QrCard({
         ) : null}
       </div>
       {confirmOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 text-left">
+        <div aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 text-left" role="dialog">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
             <div className="flex items-start gap-3">
               <span className="rounded-full bg-amber-50 p-2 text-amber-700">

@@ -6,6 +6,7 @@ import { BackupJobRefresher } from "@/components/platform/backup-job-refresher";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
 import { RestoreJobRefresher } from "@/components/platform/restore-job-refresher";
 import { RestaurantBackupTable } from "@/components/platform/restaurant-backup-table";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
 import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
@@ -86,10 +87,10 @@ export default async function PlatformStoragePage({
             </div>
             {canManageStorage ? (
               <form action={refreshStorageUsageAction}>
-                <button className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="submit">
+                <PendingSubmitButton className="inline-flex items-center gap-2 rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" pendingLabel="Đang cập nhật...">
                   <RefreshCw className="h-4 w-4" />
                   Cập nhật dung lượng
-                </button>
+                </PendingSubmitButton>
               </form>
             ) : null}
           </div>
@@ -151,9 +152,9 @@ export default async function PlatformStoragePage({
               </a>
               {canManageStorage ? (
                 <form action={queueManualBackupAction}>
-                  <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+                  <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" pendingLabel="Đang tiếp nhận...">
                     Sao lưu ngay
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               ) : null}
             </div>
@@ -205,17 +206,17 @@ export default async function PlatformStoragePage({
             </Field>
 
             <div className="flex flex-wrap gap-3 md:col-span-2 xl:col-span-3">
-              <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+              <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800" pendingLabel="Đang lưu...">
                 Lưu chính sách
-              </button>
+              </PendingSubmitButton>
             </div>
           </form>
 
           <div className="flex flex-wrap gap-3 border-t bg-slate-50 px-5 py-4">
             <form action={queueCleanupAction}>
-              <button className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" type="submit">
+              <PendingSubmitButton className="rounded-md border bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100" pendingLabel="Đang tiếp nhận...">
                 Dọn dữ liệu tạm
-              </button>
+              </PendingSubmitButton>
             </form>
           </div>
         </section>

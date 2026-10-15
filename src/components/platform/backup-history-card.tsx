@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormState } from "react-dom";
 import { RotateCcw, X } from "lucide-react";
 import {
   restoreBackupAction
 } from "@/app/platform/storage/actions";
 import type { RestoreBackupActionState } from "@/app/platform/storage/actions";
+import { FormCancelButton, PendingSubmitButton } from "@/components/ui/pending-submit-button";
 
 export type BackupHistoryRow = {
   id: string;
@@ -216,23 +217,14 @@ function RestoreDialog({
             </p>
           ) : null}
           <div className="flex justify-end gap-3">
-            <button className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onClose}>
-              Hủy
-            </button>
-            <RestoreSubmitButton />
+            <FormCancelButton className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-slate-50" onClick={onClose} />
+            <PendingSubmitButton className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800" pendingLabel="Đang xử lý...">
+              Xác nhận khôi phục
+            </PendingSubmitButton>
           </div>
         </form>
       </section>
     </div>
-  );
-}
-
-function RestoreSubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60" disabled={pending} type="submit">
-      {pending ? "Đang xử lý..." : "Xác nhận khôi phục"}
-    </button>
   );
 }
 

@@ -28,8 +28,20 @@ export function FeedbackBanner({ success, error }: { success?: string; error?: s
 
   if (!visible || (!safeSuccess && !safeError)) return null;
   return (
-    <div aria-live={safeError ? "assertive" : "polite"} className={`mb-4 rounded-md border px-4 py-3 text-sm ${safeError ? "border-red-200 bg-red-50 text-red-700" : "border-teal-200 bg-teal-50 text-teal-800"}`} role={safeError ? "alert" : "status"}>
-      {safeError ?? safeSuccess}
+    <div
+      aria-live={safeError ? "assertive" : "polite"}
+      className={`fixed left-4 right-4 top-4 z-[80] flex items-start gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-xl sm:left-auto sm:max-w-md ${safeError ? "border-red-200 bg-red-50 text-red-800" : "border-teal-200 bg-white text-teal-900"}`}
+      role={safeError ? "alert" : "status"}
+    >
+      <span className="min-w-0 flex-1">{safeError ?? safeSuccess}</span>
+      <button
+        aria-label="Đóng thông báo"
+        className="shrink-0 rounded px-1 text-lg leading-none opacity-70 hover:opacity-100"
+        type="button"
+        onClick={() => setVisible(false)}
+      >
+        ×
+      </button>
     </div>
   );
 }

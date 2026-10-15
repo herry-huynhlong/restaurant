@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormState } from "react-dom";
 import { Archive, RotateCcw, X } from "lucide-react";
 import {
   queueRestaurantBackupAction,
   queueRestaurantRestoreAction
 } from "@/app/platform/storage/actions";
 import type { RestaurantRestoreActionState } from "@/app/platform/storage/actions";
+import { FormCancelButton, PendingSubmitButton } from "@/components/ui/pending-submit-button";
 
 type BackupRow = {
   id: string;
@@ -143,11 +144,10 @@ export function RestaurantBackupTable({ rows, canManage, restoreEnabled }: { row
 }
 
 function TenantBackupSubmitButton() {
-  const { pending } = useFormStatus();
   return (
-    <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300" disabled={pending} type="submit">
-      {pending ? "Đang tiếp nhận..." : "Sao lưu ngay"}
-    </button>
+    <PendingSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300" pendingLabel="Đang tiếp nhận...">
+      Sao lưu ngay
+    </PendingSubmitButton>
   );
 }
 
@@ -213,17 +213,14 @@ function RestaurantRestoreDialog({
         </label>
         {state.status === "error" && state.message ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{state.message}</p> : null}
         <div className="flex justify-end gap-2">
-          <button className="rounded-md border px-4 py-2 text-sm font-semibold" type="button" onClick={onClose}>Hủy</button>
-          <TenantRestoreSubmitButton />
+          <FormCancelButton className="rounded-md border px-4 py-2 text-sm font-semibold" onClick={onClose} />
+          <PendingSubmitButton className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300" pendingLabel="Đang xử lý...">
+            Xác nhận khôi phục
+          </PendingSubmitButton>
         </div>
       </form>
     </Modal>
   );
-}
-
-function TenantRestoreSubmitButton() {
-  const { pending } = useFormStatus();
-  return <button className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-slate-300" disabled={pending} type="submit">{pending ? "Đang xử lý..." : "Xác nhận khôi phục"}</button>;
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {

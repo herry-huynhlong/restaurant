@@ -6,6 +6,7 @@ import { TablesLivePanel } from "@/components/admin/tables-live-panel";
 import { FoodItemDisplayCard } from "@/components/ops/food-item-display-card";
 import { StaffWorkspaceTabs } from "@/components/staff/staff-workspace-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { hasPlanFeature } from "@/lib/plan/features";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
@@ -163,11 +164,11 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
                   <div className="mt-3 flex flex-wrap gap-2">
                     {request.status === "NEW" ? (
                       <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "ACKNOWLEDGED")}>
-                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" type="submit">Đã nhận</button>
+                        <PendingSubmitButton className="rounded-md border px-3 py-2 text-sm font-semibold" pendingLabel="Đang nhận...">Đã nhận</PendingSubmitButton>
                       </form>
                     ) : null}
                     <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "COMPLETED")}>
-                      <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" type="submit">Hoàn tất</button>
+                      <PendingSubmitButton className="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">Hoàn tất</PendingSubmitButton>
                     </form>
                   </div>
                 </article>
@@ -241,11 +242,11 @@ function WaiterItemCard({
       ) : null}
         {!item.waiterAssignedToUserId ? (
           <form action={claimWaiterItemAction.bind(null, slug, item.id)}>
-            <button className="min-h-11 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="submit">Nhận đi món</button>
+            <PendingSubmitButton className="min-h-11 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang nhận...">Nhận đi món</PendingSubmitButton>
           </form>
         ) : isMine ? (
           <form action={markWaiterItemServedAction.bind(null, slug, item.id)}>
-            <button className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit">Đã phục vụ</button>
+            <PendingSubmitButton className="min-h-11 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">Đã phục vụ</PendingSubmitButton>
           </form>
         ) : null}
         </>

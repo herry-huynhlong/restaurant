@@ -14,6 +14,7 @@ import {
 } from "@/lib/plan/features";
 import { confirmPlanPermissionsAction, updatePlanPriceAction } from "@/app/platform/plans/actions";
 import { getPlanPricingDashboard, planPriceDescription } from "@/server/services/subscription-service";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 
 const planFeatures: Record<CommercialPlan, PlanFeature[]> = {
   BASIC: basicPlanFeatures,
@@ -109,12 +110,12 @@ export default async function PlatformPlansPage({
                           Đề xuất
                         </label>
                       </div>
-                      <button
+                      <PendingSubmitButton
                         className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800"
-                        type="submit"
+                        pendingLabel="Đang lưu..."
                       >
                         Lưu
-                      </button>
+                      </PendingSubmitButton>
                     </div>
                   </form>
                 ))}
@@ -169,9 +170,9 @@ export default async function PlatformPlansPage({
             <h2 className="text-lg font-semibold">Quyền theo gói</h2>
             <p className="mt-1 text-sm text-slate-500">Tích xanh là quyền đang được bật cho từng gói.</p>
           </div>
-          <button className="inline-flex h-11 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" type="submit">
+          <PendingSubmitButton className="inline-flex h-11 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" pendingLabel="Đang xác nhận...">
             Xác nhận đã kiểm tra
-          </button>
+          </PendingSubmitButton>
         </div>
 
         <div className="overflow-x-auto">

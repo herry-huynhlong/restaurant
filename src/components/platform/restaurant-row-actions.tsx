@@ -10,6 +10,8 @@ import {
   setRestaurantStatusAction,
   softDeleteRestaurantAction
 } from "@/app/platform/restaurants/actions";
+import { FormCancelButton, PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 
 type RestaurantActionProps = {
   restaurantId: string;
@@ -65,6 +67,7 @@ export function PlatformRestaurantActions({
   const restoreSlugId = useId();
   const permanentDeleteSlugId = useId();
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<"TRAIN" | "BASIC" | "PRO">(plan === "TRAIN" ? "TRAIN" : plan === "PRO" ? "PRO" : "BASIC");
   const [selectedEntitlement, setSelectedEntitlement] = useState<"BASIC" | "PRO">(planEntitlement === "PRO" || plan === "PRO" ? "PRO" : "BASIC");
   const [selectedTerm, setSelectedTerm] = useState("12");
@@ -91,6 +94,7 @@ export function PlatformRestaurantActions({
     restoreDialogRef.current?.close();
     permanentDeleteDialogRef.current?.close();
     setPassword("");
+    setConfirmPassword("");
     setDeleteSlug("");
     setRestoreSlug("");
     setPermanentDeleteSlug("");
@@ -103,17 +107,13 @@ export function PlatformRestaurantActions({
           <input name="restaurantId" type="hidden" value={restaurantId} />
           <input name="status" type="hidden" value={nextStatus} />
           <input name="returnTo" type="hidden" value={returnTo} />
-          <button
+          <ConfirmSubmitButton
             className={`rounded-md border px-2 py-1 text-sm ${isLocked ? "" : "border-red-200 text-red-700"}`}
-            type="submit"
-            onClick={(event) => {
-              if (!window.confirm(confirmMessage)) {
-                event.preventDefault();
-              }
-            }}
+            message={confirmMessage}
+            pendingLabel="Đang xử lý..."
           >
             {statusLabel}
-          </button>
+          </ConfirmSubmitButton>
         </form>
       ) : null}
 
@@ -178,15 +178,19 @@ export function PlatformRestaurantActions({
               required
               pattern={escapePattern(password)}
               title="Xác nhận mật khẩu phải khớp."
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.currentTarget.value)}
             />
           </label>
           <div className="flex justify-end gap-2">
-            <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => dialogRef.current?.close()}>
-              Hủy
-            </button>
-            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" type="submit">
+            <FormCancelButton className="rounded-md border px-3 py-2 text-sm" onClick={() => {
+              dialogRef.current?.close();
+              setPassword("");
+              setConfirmPassword("");
+            }} />
+            <PendingSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" pendingLabel="Đang đặt lại...">
               Xác nhận
-            </button>
+            </PendingSubmitButton>
           </div>
         </form>
       </dialog>
@@ -283,12 +287,10 @@ export function PlatformRestaurantActions({
             <span>Tôi xác nhận thao tác này sẽ cập nhật gói và thời hạn sử dụng của nhà hàng.</span>
           </label>
           <div className="flex justify-end gap-2">
-            <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={() => subscriptionDialogRef.current?.close()}>
-              Hủy
-            </button>
-            <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" disabled={selectedPlan !== "TRAIN" && grantType === "PAID" && !currentPrice}>
+            <FormCancelButton className="rounded-md border px-3 py-2 text-sm" onClick={() => subscriptionDialogRef.current?.close()} />
+            <PendingSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300" disabled={selectedPlan !== "TRAIN" && grantType === "PAID" && !currentPrice} pendingLabel="Đang lưu...">
               Lưu thay đổi
-            </button>
+            </PendingSubmitButton>
           </div>
         </form>
       </dialog>
@@ -428,12 +430,10 @@ function DialogActions({
 }) {
   return (
     <div className="flex justify-end gap-2">
-      <button className="rounded-md border px-3 py-2 text-sm" type="button" onClick={onCancel}>
-        Hủy
-      </button>
-      <button className={`rounded-md px-3 py-2 text-sm font-semibold ${confirmClassName}`} type="submit" disabled={confirmDisabled}>
+      <FormCancelButton className="rounded-md border px-3 py-2 text-sm" onClick={onCancel} />
+      <PendingSubmitButton className={`rounded-md px-3 py-2 text-sm font-semibold ${confirmClassName}`} disabled={confirmDisabled} pendingLabel="Đang xử lý...">
         {confirmLabel}
-      </button>
+      </PendingSubmitButton>
     </div>
   );
 }

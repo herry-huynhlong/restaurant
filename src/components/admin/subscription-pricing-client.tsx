@@ -3,8 +3,8 @@
 import { CheckCircle2, Crown, ShieldCheck, XCircle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import { createRestaurantSubscriptionRequestAction } from "@/app/[rSlug]/admin/subscription/actions";
+import { FormCancelButton, PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import type { CommercialPlan, PlanFeature } from "@/lib/plan/features";
 
 type PlanPrice = {
@@ -228,24 +228,18 @@ export function SubscriptionPricingClient({
               )}
             </dl>
             <div className="mt-5 flex justify-end gap-2">
-              <button className="rounded-md border px-4 py-2 text-sm font-semibold" type="button" onClick={() => dialogRef.current?.close()}>
-                Hủy
-              </button>
-              <SubmitButton />
+              <FormCancelButton className="rounded-md border px-4 py-2 text-sm font-semibold" onClick={() => {
+                dialogRef.current?.close();
+                setSelectedPrice(null);
+              }} />
+              <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-wait disabled:bg-slate-400" pendingLabel="Đang gửi...">
+                Gửi yêu cầu
+              </PendingSubmitButton>
             </div>
           </form>
         ) : null}
       </dialog>
     </>
-  );
-}
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-wait disabled:bg-slate-400" type="submit" disabled={pending}>
-      {pending ? "Đang gửi..." : "Gửi yêu cầu"}
-    </button>
   );
 }
 
