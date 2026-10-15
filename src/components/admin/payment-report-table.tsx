@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { PaymentMethod, PaymentStatus } from "@prisma/client";
 import { X } from "lucide-react";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
@@ -9,6 +9,7 @@ import { paymentMethodLabels } from "@/lib/payment-method";
 
 export type PaymentSummary = {
   id: string;
+  tableId?: string | null;
   invoiceNumber: string | null;
   paidAtLabel: string;
   tableName: string;
@@ -59,6 +60,167 @@ export type BillDetail = {
     }>;
   }>;
 };
+
+type BillHistoryItem = {
+  id: string;
+  tableId: string;
+  invoiceNumber: string | null;
+  tableName: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  paidAt: string;
+  timeLabel: string;
+  dateKey: string;
+  dateLabel: string;
+  dayHeading: string;
+  confirmedByName: string | null;
+};
+
+type BillHistoryPage = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  timeZone: string;
+  items: BillHistoryItem[];
+};
+
+type BillHistoryFilters = {
+  query: string;
+  tableId: string;
+  from: string;
+  to: string;
+};
+
+const emptyHistoryFilters: BillHistoryFilters = { query: "", tableId: "", from: "", to: "" };
+
+export function BillHistoryButton({ slug, tables }: { slug: string; tables: Array<{ id: string; name: string }> }) {
+  const [open, setOpen] = useState(false);
+  const [history, setHistory] = useState<BillHistoryPage | null>(null);
+  const [filters, setFilters] = useState<BillHistoryFilters>(emptyHistoryFilters);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadHistory = useCallback(async (page: number, nextFilters = filters) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (nextFilters.query.trim()) params.set("q", nextFilters.query.trim());
+      if (nextFilters.tableId) params.set("tableId", nextFilters.tableId);
+      if (nextFilters.from) params.set("from", nextFilters.from);
+      if (nextFilters.to) params.set("to", nextFilters.to);
+      const response = await fetch(`/api/restaurants/${slug}/reports/payments?${params.toString()}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("history_failed");
+      setHistory(await response.json() as BillHistoryPage);
+    } catch {
+      setError("Không tải được lịch sử bill. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, slug]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  const groups = useMemo(() => {
+    const result: Array<{ key: string; heading: string; items: BillHistoryItem[] }> = [];
+    for (const item of history?.items ?? []) {
+      const current = result[result.length - 1];
+      if (current?.key === item.dateKey) current.items.push(item);
+      else result.push({ key: item.dateKey, heading: item.dayHeading, items: [item] });
+    }
+    return result;
+  }, [history]);
+
+  return (
+    <>
+      <button className="rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={() => {
+        setOpen(true);
+        if (!history) void loadHistory(1);
+      }}>
+        Lịch sử bill
+      </button>
+      {open ? (
+        <div className="fixed inset-0 z-50 bg-black/40 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label="Lịch sử bill" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setOpen(false);
+        }}>
+          <div className="mx-auto flex max-h-[calc(100vh-16px)] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl sm:max-h-[calc(100vh-48px)]">
+            <div className="flex items-start justify-between gap-3 border-b p-4">
+              <div>
+                <h2 className="text-lg font-semibold">Lịch sử bill</h2>
+                <p className="text-sm text-slate-500">Bill đã thanh toán, sắp xếp mới nhất trước.</p>
+              </div>
+              <button className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border hover:bg-slate-50" type="button" aria-label="Đóng lịch sử bill" onClick={() => setOpen(false)}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form className="grid gap-3 border-b p-4 sm:grid-cols-2 lg:grid-cols-[1fr_180px_150px_150px_auto]" onSubmit={(event) => {
+              event.preventDefault();
+              void loadHistory(1);
+            }}>
+              <input className="h-10 min-w-0 rounded-md border px-3 text-sm" value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} placeholder="Tìm mã bill" />
+              <select className="h-10 min-w-0 rounded-md border bg-white px-3 text-sm" value={filters.tableId} onChange={(event) => setFilters((current) => ({ ...current, tableId: event.target.value }))}>
+                <option value="">Tất cả bàn</option>
+                {tables.map((table) => <option key={table.id} value={table.id}>Bàn {table.name}</option>)}
+              </select>
+              <input className="h-10 min-w-0 rounded-md border px-3 text-sm" type="date" aria-label="Từ ngày" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
+              <input className="h-10 min-w-0 rounded-md border px-3 text-sm" type="date" aria-label="Đến ngày" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
+              <div className="flex gap-2">
+                <button className="h-10 rounded-md bg-teal-700 px-4 text-sm font-semibold text-white disabled:opacity-60" type="submit" disabled={loading}>Lọc</button>
+                <button className="h-10 rounded-md border px-3 text-sm font-semibold" type="button" onClick={() => {
+                  setFilters(emptyHistoryFilters);
+                  void loadHistory(1, emptyHistoryFilters);
+                }}>Xóa lọc</button>
+              </div>
+            </form>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {error ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+              {loading && !history ? <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-500">Đang tải lịch sử...</p> : null}
+              {!loading && history && history.items.length === 0 ? <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-500">Không tìm thấy bill phù hợp.</p> : null}
+              <div className="space-y-5">
+                {groups.map((group) => (
+                  <section key={group.key}>
+                    <h3 className="sticky top-0 z-10 bg-white py-2 text-sm font-bold text-slate-800">{group.heading}</h3>
+                    <div className="divide-y rounded-md border">
+                      {group.items.map((item) => (
+                        <article key={item.id} className="grid gap-3 p-3 sm:grid-cols-[70px_1fr_auto_auto] sm:items-center">
+                          <p className="font-semibold">{item.timeLabel}</p>
+                          <div className="min-w-0">
+                            <p className="font-semibold">Bàn {item.tableName}</p>
+                            <p className="truncate text-xs text-slate-500">{item.invoiceNumber ?? item.id}</p>
+                            <p className="text-xs text-slate-500">{paymentMethodLabels[item.paymentMethod]}</p>
+                          </div>
+                          <p className="font-bold text-teal-700 sm:text-right">{formatVnd(item.amount)}</p>
+                          <PaidBillButton slug={slug} paymentId={item.id} label="In bill" />
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+            {history ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm">
+                <p className="text-slate-500">{history.total} bill · Trang {history.page}/{history.totalPages}</p>
+                <div className="flex gap-2">
+                  <button className="rounded-md border px-3 py-2 font-semibold disabled:opacity-40" type="button" disabled={loading || history.page <= 1} onClick={() => void loadHistory(history.page - 1)}>Trang trước</button>
+                  <button className="rounded-md border px-3 py-2 font-semibold disabled:opacity-40" type="button" disabled={loading || history.page >= history.totalPages} onClick={() => void loadHistory(history.page + 1)}>Trang sau</button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 export function PaidBillButton({
   slug,
@@ -228,7 +390,7 @@ export function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 p-3 sm:p-6">
+    <div className="fixed inset-0 z-[70] bg-black/40 p-3 sm:p-6">
       <div className="mx-auto flex max-h-[calc(100vh-24px)] max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl sm:max-h-[calc(100vh-48px)]">
         <div className="flex items-start justify-between gap-3 border-b p-4">
           <div>

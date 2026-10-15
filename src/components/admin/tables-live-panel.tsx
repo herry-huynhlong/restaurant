@@ -8,7 +8,7 @@ import { restaurantRoutes } from "@/lib/routes";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { QrCard } from "@/components/admin/qr-card";
-import { PaidBillButton, type PaymentSummary } from "@/components/admin/payment-report-table";
+import { BillHistoryButton, PaidBillButton, type PaymentSummary } from "@/components/admin/payment-report-table";
 
 export type TableState = {
   settings: {
@@ -133,6 +133,8 @@ export function TablesLivePanel({
   const [paidPayments, setPaidPayments] = useState(initialPaidPayments);
   const tables = useMemo(() => state.areas.flatMap((area) => area.tables), [state.areas]);
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0] ?? null;
+  const selectedTableIdForBill = selectedTable?.id ?? null;
+  const selectedSessionIdForBill = selectedTable?.activeSession?.id ?? null;
 
   const refreshTables = useCallback(async () => {
     try {
@@ -157,6 +159,51 @@ export function TablesLivePanel({
       window.clearInterval(interval);
     };
   }, [refreshTables]);
+
+  useEffect(() => {
+    if (!selectedTableIdForBill || selectedSessionIdForBill) return;
+    const controller = new AbortController();
+
+    void fetch(`/api/restaurants/${slug}/reports/payments?page=1&tableId=${encodeURIComponent(selectedTableIdForBill)}`, {
+      cache: "no-store",
+      signal: controller.signal
+    }).then(async (response) => {
+      if (!response.ok) return;
+      const data = await response.json() as {
+        items: Array<{
+          id: string;
+          tableId: string;
+          invoiceNumber: string | null;
+          tableName: string;
+          amount: number;
+          paymentMethod: PaymentSummary["paymentMethod"];
+          dateLabel: string;
+          timeLabel: string;
+          confirmedByName: string | null;
+        }>;
+      };
+      const latest = data.items[0];
+      setPaidPayments((current) => {
+        const otherTables = current.filter((payment) => payment.tableId !== selectedTableIdForBill);
+        if (!latest) return otherTables;
+        return [{
+          id: latest.id,
+          tableId: latest.tableId,
+          invoiceNumber: latest.invoiceNumber,
+          paidAtLabel: `${latest.timeLabel} ${latest.dateLabel}`,
+          tableName: latest.tableName,
+          amount: latest.amount,
+          status: "PAID",
+          paymentMethod: latest.paymentMethod,
+          confirmedByName: latest.confirmedByName
+        }, ...otherTables];
+      });
+    }).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+    });
+
+    return () => controller.abort();
+  }, [selectedSessionIdForBill, selectedTableIdForBill, slug]);
 
   async function confirmPaid(table: LiveTable) {
     if (!table.activeSession) return;
@@ -195,6 +242,7 @@ export function TablesLivePanel({
       if (data.payment?.paymentId) {
         const payment: PaymentSummary = {
           id: data.payment.paymentId,
+          tableId: table.id,
           invoiceNumber: data.payment.invoiceNumber,
           paidAtLabel: new Date().toLocaleString("vi-VN"),
           tableName: data.payment.tableName,
@@ -203,7 +251,7 @@ export function TablesLivePanel({
           paymentMethod: "CASH",
           confirmedByName: cashierName ?? null
         };
-        setPaidPayments((current) => [payment, ...current.filter((item) => item.id !== payment.id)].slice(0, 8));
+        setPaidPayments((current) => [payment, ...current.filter((item) => item.tableId !== table.id)]);
       }
       setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
       await refreshTables();
@@ -217,6 +265,13 @@ export function TablesLivePanel({
 
   return (
     <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 xl:col-span-2">
+        <div>
+          <h2 className="font-semibold">Sơ đồ bàn</h2>
+          <p className="text-sm text-slate-500">Chọn bàn để thao tác nhanh hoặc in bill.</p>
+        </div>
+        <BillHistoryButton slug={slug} tables={tables.map((table) => ({ id: table.id, name: table.name }))} />
+      </div>
       <div className="space-y-5">
         {status === "reconnecting" ? (
           <div className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
@@ -260,35 +315,8 @@ export function TablesLivePanel({
         onAddOrder={() => setOrderingTableId(selectedTable?.id ?? null)}
         showQrTools={showQrTools}
         paymentPending={payingSessionId === selectedTable?.activeSession?.id}
+        latestPaidPayment={paidPayments.find((payment) => payment.tableId === selectedTable?.id) ?? null}
       />
-      {paidPayments.length ? (
-        <section className="rounded-lg border bg-white p-5 shadow-sm xl:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-semibold">Bill thanh toán gần đây</h2>
-              <p className="text-sm text-slate-500">Có thể in lại sau khi bàn đã trở về trạng thái trống.</p>
-            </div>
-            <Link className="text-sm font-semibold text-teal-700 hover:underline" href={restaurantRoutes.adminReports(slug)}>Xem lịch sử giao dịch</Link>
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {paidPayments.map((payment) => (
-              <article key={payment.id} className="rounded-md border p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold">Bàn {payment.tableName}</p>
-                    <p className="text-xs text-slate-500">{payment.invoiceNumber ?? payment.id.slice(0, 8)}</p>
-                  </div>
-                  <p className="font-bold text-teal-700">{formatVnd(payment.amount)}</p>
-                </div>
-                <p className="mt-2 text-xs text-slate-500">{payment.paidAtLabel}</p>
-                <div className="mt-3">
-                  <PaidBillButton slug={slug} paymentId={payment.id} />
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
       {orderingTableId ? (
         <StaffAddOrderModal
           slug={slug}
@@ -373,7 +401,8 @@ function TableDetail({
   onRefresh,
   onAddOrder,
   showQrTools,
-  paymentPending
+  paymentPending,
+  latestPaidPayment
 }: {
   slug: string;
   restaurantName: string;
@@ -386,6 +415,7 @@ function TableDetail({
   onAddOrder: () => void;
   showQrTools: boolean;
   paymentPending: boolean;
+  latestPaidPayment: PaymentSummary | null;
 }) {
   if (!table) {
     return <aside className="rounded-lg border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Chưa có bàn để xem chi tiết.</p></aside>;
@@ -430,7 +460,7 @@ function TableDetail({
           Xem Order
         </Link>
         {session ? (
-          <InvoicePrintButton label="In phiếu tạm tính" invoice={{
+          <InvoicePrintButton label="In bill tạm tính" invoice={{
             restaurantName,
             businessName: settings.invoiceBusinessName ?? restaurantName,
             taxCode: settings.invoiceTaxCode,
@@ -459,6 +489,9 @@ function TableDetail({
               transferContent: settings.paymentTransferContent || `Bàn ${table.name}`
             }
           }} />
+        ) : null}
+        {!session && latestPaidPayment ? (
+          <PaidBillButton slug={slug} paymentId={latestPaidPayment.id} label="In bill gần nhất" />
         ) : null}
         {canUsePayment && session ? (
           <button

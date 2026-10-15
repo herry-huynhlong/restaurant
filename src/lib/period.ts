@@ -45,6 +45,26 @@ function zonedDateToUtc(parts: { year: number; month: number; day: number; hour?
   return new Date(utcGuess.getTime() + wantedUtc - asUtc);
 }
 
+export function localDateBoundaryToUtc(value: string, timeZone = "Asia/Ho_Chi_Minh", dayOffset = 0) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const input = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (
+    input.getUTCFullYear() !== Number(match[1])
+    || input.getUTCMonth() !== Number(match[2]) - 1
+    || input.getUTCDate() !== Number(match[3])
+  ) return null;
+  const anchor = new Date(input);
+  anchor.setUTCDate(anchor.getUTCDate() + dayOffset);
+
+  return zonedDateToUtc({
+    year: anchor.getUTCFullYear(),
+    month: anchor.getUTCMonth() + 1,
+    day: anchor.getUTCDate()
+  }, timeZone);
+}
+
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
