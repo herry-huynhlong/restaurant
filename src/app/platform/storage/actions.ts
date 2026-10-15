@@ -6,7 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { requirePlatformOwner } from "@/lib/rbac/guards";
 import { platformRoutes } from "@/lib/routes";
-import { checkBackupRestoreReadiness, ensurePlatformDataPolicy, refreshRestaurantStorageUsage } from "@/server/services/platform-storage-service";
+import { checkBackupRestoreReadiness, ensurePlatformDataPolicy, getBackupWorkerAvailability, refreshRestaurantStorageUsage } from "@/server/services/platform-storage-service";
 
 const storagePolicySchema = z.object({
   backupEnabled: z.boolean(),
@@ -77,28 +77,46 @@ export async function refreshStorageUsageAction() {
 
 export async function queueManualBackupAction() {
   const actor = await requirePlatformOwner();
+  const worker = await getBackupWorkerAvailability();
+  if (!worker.ready) {
+    redirectWithError("Dịch vụ sao lưu đang gián đoạn. Vui lòng kiểm tra để tiếp tục bảo vệ dữ liệu.");
+  }
+
   const policy = await ensurePlatformDataPolicy();
-  const run = await prisma.platformBackupRun.create({
-    data: {
-      status: "QUEUED",
-      triggerType: "MANUAL",
-      storageKind: policy.backupStorageKind,
-      locationLabel: storageKindLabel(policy.backupStorageKind)
-    }
+  const run = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('platform_backup_queue'))`;
+    const activeRun = await tx.platformBackupRun.findFirst({
+      where: { status: { in: ["QUEUED", "RUNNING"] } },
+      select: { id: true }
+    });
+    if (activeRun) return null;
+
+    const created = await tx.platformBackupRun.create({
+      data: {
+        status: "QUEUED",
+        triggerType: "MANUAL",
+        storageKind: policy.backupStorageKind,
+        locationLabel: storageKindLabel(policy.backupStorageKind)
+      }
+    });
+    await tx.auditLog.create({
+      data: {
+        userId: actor.id,
+        action: "PLATFORM_BACKUP_QUEUED",
+        entityType: "PlatformBackupRun",
+        entityId: created.id,
+        metadataJson: { triggerType: "MANUAL", storageKind: policy.backupStorageKind }
+      }
+    });
+    return created;
   });
 
-  await prisma.auditLog.create({
-    data: {
-      userId: actor.id,
-      action: "PLATFORM_BACKUP_QUEUED",
-      entityType: "PlatformBackupRun",
-      entityId: run.id,
-      metadataJson: { triggerType: "MANUAL", storageKind: policy.backupStorageKind }
-    }
-  });
+  if (!run) {
+    redirectWithError("Đang có một lần sao lưu được xử lý. Vui lòng chờ hoàn tất.");
+  }
 
   revalidatePath(platformRoutes.storage);
-  redirectWithSuccess("Đã tiếp nhận yêu cầu sao lưu.");
+  redirect(`${platformRoutes.storage}?backupJob=${encodeURIComponent(run.id)}`);
 }
 
 export async function queueCleanupAction() {

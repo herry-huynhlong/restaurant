@@ -57,6 +57,13 @@ export async function ensurePlatformDataPolicy() {
   });
 }
 
+export async function getBackupWorkerAvailability() {
+  const heartbeat = await prisma.platformWorkerHeartbeat.findUnique({
+    where: { singletonKey: BACKUP_WORKER_KEY }
+  });
+  return buildBackupWorkerStatus(heartbeat, []);
+}
+
 export async function getPlatformStorageDashboard() {
   await markTimedOutBackupRuns();
   const policy = await ensurePlatformDataPolicy();
@@ -164,7 +171,6 @@ export async function getPlatformStorageDashboard() {
       queuedAt: run.queuedAt,
       startedAt: run.startedAt,
       completedAt: run.completedAt,
-      verifiedAtLabel: run.verifiedAt,
       restoreReadiness
     })),
     maintenanceRuns

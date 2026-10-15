@@ -55,13 +55,17 @@ function checkTenantGuards() {
 
 function checkBackupAndRestoreSafety() {
   assertIncludes("Dockerfile", "postgresql-client-16", "Maintenance image must include pg_dump 16 for PostgreSQL 16.");
+  assertIncludes("docker-compose.yml", "- ./backups:/app/backups:ro", "Web app must read backup artifacts from the shared backup directory.");
+  assertNotIncludes("docker-compose.yml", "profiles: [\"maintenance\"]", "Maintenance worker must start with the default Docker Compose stack.");
   assertIncludes("scripts/platform-maintenance-worker.ts", "verifyPostgresBackupCompatibility", "Backup worker must verify pg_dump/server compatibility.");
   assertIncludes("scripts/platform-maintenance-worker.ts", "checksumFiles", "Backup worker must checksum backup artifacts.");
+  assertIncludes("scripts/platform-maintenance-worker.ts", "FOR UPDATE SKIP LOCKED", "Backup worker must claim queued jobs atomically.");
   assertIncludes("scripts/platform-maintenance-worker.ts", "expireOldSuccessfulBackups", "Backup worker must retain a bounded number of successful backups.");
   assertIncludes("src/server/services/platform-storage-service.ts", "checkBackupRestoreReadiness", "Storage service must verify backup files before restore is considered.");
   assertIncludes("src/server/services/platform-storage-service.ts", "Checksum không khớp", "Restore readiness must reject checksum mismatches.");
   assertIncludes("src/app/platform/storage/actions.ts", "requirePlatformOwner", "Backup restore checks must require platform owner access.");
-  assertIncludes("src/components/platform/backup-history-card.tsx", "Khôi phục production đang khóa", "Production restore button must remain locked until restore safeguards exist.");
+  assertIncludes("src/components/platform/backup-history-card.tsx", "Bản sao lưu này hiện không thể khôi phục.", "Unavailable backups must not expose a misleading restore action.");
+  assertNotIncludes("src/components/platform/backup-history-card.tsx", "Checksum", "Technical backup checks must stay out of the user interface.");
   assertIncludes("docs/BACKUP_AND_DATA_LIFECYCLE.md", "Không có nút khôi phục một chạm", "Restore documentation must warn against production one-click restore.");
 }
 

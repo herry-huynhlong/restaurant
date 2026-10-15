@@ -102,19 +102,22 @@ async function touchWorker(status: string, message: string) {
 }
 
 async function queueManualBackupIfNeeded(policy: Awaited<ReturnType<typeof ensurePolicy>>) {
-  const existing = await prisma.platformBackupRun.findFirst({
-    where: { status: "QUEUED" },
-    orderBy: { queuedAt: "asc" }
-  });
-  if (existing) return;
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('platform_backup_queue'))`;
+    const existing = await tx.platformBackupRun.findFirst({
+      where: { status: { in: ["QUEUED", "RUNNING"] } },
+      select: { id: true }
+    });
+    if (existing) return;
 
-  await prisma.platformBackupRun.create({
-    data: {
-      status: "QUEUED",
-      triggerType: "MANUAL",
-      storageKind: policy.backupStorageKind,
-      locationLabel: storageKindLabel(policy.backupStorageKind)
-    }
+    await tx.platformBackupRun.create({
+      data: {
+        status: "QUEUED",
+        triggerType: "MANUAL",
+        storageKind: policy.backupStorageKind,
+        locationLabel: storageKindLabel(policy.backupStorageKind)
+      }
+    });
   });
 }
 
@@ -122,38 +125,53 @@ async function queueAutomaticBackupIfNeeded(policy: Awaited<ReturnType<typeof en
   if (!policy.backupEnabled) return;
   if (!force && !isPastBackupTime(policy.backupTime)) return;
 
-  const todayStart = startOfVietnamDay(new Date());
-  const existing = await prisma.platformBackupRun.findFirst({
-    where: {
-      triggerType: "AUTOMATIC",
-      createdAt: { gte: todayStart }
-    }
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('platform_backup_queue'))`;
+    const todayStart = startOfVietnamDay(new Date());
+    const existing = await tx.platformBackupRun.findFirst({
+      where: {
+        triggerType: "AUTOMATIC",
+        createdAt: { gte: todayStart }
+      },
+      select: { id: true }
+    });
+    if (existing && !force) return;
 
-  if (existing && !force) return;
+    const activeRun = await tx.platformBackupRun.findFirst({
+      where: { status: { in: ["QUEUED", "RUNNING"] } },
+      select: { id: true }
+    });
+    if (activeRun) return;
 
-  await prisma.platformBackupRun.create({
-    data: {
-      status: "QUEUED",
-      triggerType: "AUTOMATIC",
-      storageKind: policy.backupStorageKind,
-      locationLabel: storageKindLabel(policy.backupStorageKind)
-    }
+    await tx.platformBackupRun.create({
+      data: {
+        status: "QUEUED",
+        triggerType: "AUTOMATIC",
+        storageKind: policy.backupStorageKind,
+        locationLabel: storageKindLabel(policy.backupStorageKind)
+      }
+    });
   });
 }
 
 async function processNextBackup() {
-  const run = await prisma.platformBackupRun.findFirst({
-    where: { status: "QUEUED" },
-    orderBy: { queuedAt: "asc" }
+  const startedAt = new Date();
+  const run = await prisma.$transaction(async (tx) => {
+    const queued = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM "PlatformBackupRun"
+      WHERE status = 'QUEUED'
+      ORDER BY "queuedAt" ASC
+      FOR UPDATE SKIP LOCKED
+      LIMIT 1
+    `;
+    if (!queued[0]) return null;
+    return tx.platformBackupRun.update({
+      where: { id: queued[0].id },
+      data: { status: "RUNNING", startedAt }
+    });
   });
   if (!run) return;
-
-  const startedAt = new Date();
-  await prisma.platformBackupRun.update({
-    where: { id: run.id },
-    data: { status: "RUNNING", startedAt }
-  });
 
   try {
     await verifyPostgresBackupCompatibility();

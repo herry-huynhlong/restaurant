@@ -25,6 +25,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://restaurant_user:${POSTGRES_PASSWORD}@postgres:5432/restaurant_saas?schema=public
+      BACKUP_DIR: /app/backups
       NEXTAUTH_URL: ${NEXTAUTH_URL}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
@@ -35,6 +36,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - ./public/uploads:/app/public/uploads
+      - ./backups:/app/backups:ro
       - ./host-metrics:/app/host-metrics:ro
 
   maintenance-worker:
@@ -42,7 +44,6 @@ services:
       context: .
       args:
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
-    profiles: ["maintenance"]
     depends_on:
       postgres:
         condition: service_healthy

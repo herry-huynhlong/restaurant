@@ -26,7 +26,7 @@ Sau khi cập nhật code trên máy chủ:
 ```bash
 cd /opt/websites/restaurant
 docker compose run --rm app pnpm prisma:deploy
-docker compose up -d --build app
+docker compose up -d --build
 ```
 
 ## Chạy sao lưu thủ công
@@ -35,17 +35,19 @@ Nút **Chạy sao lưu thủ công** trong Platform Admin chỉ đưa tác vụ 
 
 ```bash
 cd /opt/websites/restaurant
-docker compose --profile maintenance run --rm maintenance-worker pnpm platform:backup
+docker compose run --rm maintenance-worker pnpm platform:backup
 ```
 
 ## Chạy dịch vụ sao lưu nền
 
-Để nút **Chạy sao lưu thủ công** được xử lý tự động, cần chạy dịch vụ nền:
+`maintenance-worker` là service mặc định của Docker Compose và phải chạy cùng ứng dụng. Lệnh triển khai thông thường:
 
 ```bash
 cd /opt/websites/restaurant
-docker compose --profile maintenance up -d maintenance-worker
+docker compose up -d
 ```
+
+Không cần dùng `--profile maintenance`. Nút **Sao lưu ngay** chỉ tạo tác vụ khi worker đã cập nhật trạng thái sẵn sàng trong vòng 5 phút. Trong lúc một lần sao lưu đang chờ hoặc đang chạy, hệ thống từ chối tạo thêm tác vụ trùng.
 
 Dịch vụ này:
 
@@ -58,6 +60,16 @@ Dịch vụ này:
 
 Nếu dịch vụ này chưa chạy, giao diện sẽ báo **Dịch vụ sao lưu chưa sẵn sàng**.
 
+Kiểm tra trên VPS:
+
+```bash
+docker compose ps
+docker compose logs maintenance-worker --tail=100
+find backups -maxdepth 2 -type f -printf '%p %s bytes\n'
+```
+
+Web container đọc thư mục `backups` ở chế độ chỉ đọc; worker là thành phần duy nhất ghi bản sao lưu. Vì vậy file vẫn còn sau khi recreate container nếu thư mục bind mount trên VPS không bị xóa thủ công.
+
 ## Kiểm tra phiên bản công cụ sao lưu
 
 PostgreSQL server đang dùng phiên bản 16, vì vậy worker cần `pg_dump` cùng phiên bản chính 16.
@@ -65,7 +77,7 @@ PostgreSQL server đang dùng phiên bản 16, vì vậy worker cần `pg_dump` 
 Kiểm tra trong container:
 
 ```bash
-docker compose --profile maintenance run --rm maintenance-worker pg_dump --version
+docker compose run --rm maintenance-worker pg_dump --version
 ```
 
 Kết quả nên là:
@@ -82,7 +94,7 @@ Nút **Xếp lịch dọn dữ liệu tạm** chỉ đưa tác vụ vào hàng c
 
 ```bash
 cd /opt/websites/restaurant
-docker compose --profile maintenance run --rm maintenance-worker pnpm platform:cleanup
+docker compose run --rm maintenance-worker pnpm platform:cleanup
 ```
 
 Tác vụ này chỉ dọn:
@@ -99,7 +111,7 @@ Tác vụ này không xóa đơn hàng, thanh toán hoặc chứng từ.
 Khuyến nghị dùng systemd timer hoặc cron của máy chủ để gọi worker. Ví dụ cron chạy lúc 02:05:
 
 ```cron
-5 2 * * * cd /opt/websites/restaurant && docker compose --profile maintenance run --rm maintenance-worker pnpm platform:worker >> /var/log/restaurant-maintenance.log 2>&1
+5 2 * * * cd /opt/websites/restaurant && docker compose run --rm maintenance-worker pnpm platform:worker >> /var/log/restaurant-maintenance.log 2>&1
 ```
 
 Thời gian hiển thị trong giao diện là giờ Việt Nam. Cron nên đặt trễ vài phút so với giờ cấu hình để tránh trùng lúc máy chủ đang khởi động.

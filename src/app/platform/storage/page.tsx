@@ -2,23 +2,28 @@ import { AlertTriangle, Archive, CalendarClock, CheckCircle2, HardDrive, Refresh
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { BackupHistoryCard } from "@/components/platform/backup-history-card";
+import { BackupJobRefresher } from "@/components/platform/backup-job-refresher";
 import { ServerResourceMonitor } from "@/components/platform/server-resource-monitor";
 import { isPlatformOwnerRole, requirePlatformAdmin } from "@/lib/rbac/guards";
 import { getPlatformStorageDashboard } from "@/server/services/platform-storage-service";
-import { checkBackupRestoreReadinessAction, queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
+import { queueCleanupAction, queueManualBackupAction, refreshStorageUsageAction, updateStoragePolicyAction } from "./actions";
 
 export default async function PlatformStoragePage({
   searchParams
 }: {
-  searchParams?: { success?: string; error?: string };
+  searchParams?: { success?: string; error?: string; backupJob?: string };
 }) {
   const user = await requirePlatformAdmin();
   const dashboard = await getPlatformStorageDashboard();
   const canManageStorage = isPlatformOwnerRole(user.platformRole);
+  const trackedBackup = searchParams?.backupJob
+    ? dashboard.backupRuns.find((run) => run.id === searchParams.backupJob)
+    : undefined;
 
   return (
     <PlatformShell title="Tài nguyên & Sao lưu" subtitle="Quản lý dung lượng lưu trữ và bảo vệ dữ liệu cửa hàng.">
       <FeedbackBanner success={searchParams?.success} error={searchParams?.error} />
+      <BackupJobRefresher jobId={searchParams?.backupJob} status={trackedBackup?.status} />
 
       <ServerResourceMonitor />
 
@@ -44,24 +49,22 @@ export default async function PlatformStoragePage({
         <StatCard
           icon={<CalendarClock className="h-5 w-5" />}
           label="Lịch sao lưu tiếp theo"
-          value={dashboard.policy.backupEnabled ? formatDateTime(dashboard.nextBackupAt) : "Đang tắt"}
-          helper="Theo múi giờ Việt Nam"
+          value={!dashboard.policy.backupEnabled ? "Đang tắt" : dashboard.backupWorker.ready ? formatDateTime(dashboard.nextBackupAt) : "Đang gián đoạn"}
+          helper={dashboard.backupWorker.ready ? "Theo múi giờ Việt Nam" : "Dịch vụ sao lưu cần được khởi động"}
         />
       </section>
 
       {(dashboard.latestFailedBackup || !dashboard.backupWorker.ready) ? (
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          {dashboard.latestFailedBackup ? (
-            <WarningCard
-              title="Có lần sao lưu chưa thành công"
-              message="Hãy kiểm tra lần sao lưu gần nhất và thử lại sau khi xử lý nguyên nhân."
-            />
-          ) : null}
-
+        <div className="mt-5">
           {!dashboard.backupWorker.ready ? (
             <WarningCard
-              title="Dịch vụ sao lưu chưa sẵn sàng"
-              message={dashboard.backupWorker.message}
+              title="Dịch vụ sao lưu đang gián đoạn"
+              message="Vui lòng kiểm tra để tiếp tục bảo vệ dữ liệu."
+            />
+          ) : dashboard.latestFailedBackup ? (
+            <WarningCard
+              title="Lần sao lưu gần nhất chưa thành công"
+              message="Dịch vụ đang hoạt động. Bạn có thể thử sao lưu lại."
             />
           ) : null}
         </div>
@@ -179,8 +182,6 @@ export default async function PlatformStoragePage({
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <BackupHistoryCard
-          canManageRestore={canManageStorage}
-          checkRestoreAction={checkBackupRestoreReadinessAction}
           rows={dashboard.backupRuns.map((run) => ({
             id: run.id,
             status: run.status,
@@ -188,11 +189,7 @@ export default async function PlatformStoragePage({
             meta: `${run.triggerType === "MANUAL" ? "Thủ công" : "Tự động"} · ${formatDateTime(run.completedAt ?? run.startedAt ?? run.queuedAt)}`,
             sizeLabel: run.status === "SUCCESS" ? formatBytes(run.sizeBytes) : null,
             errorMessage: run.status === "FAILED" ? run.errorMessage : null,
-            diagnosticMessage: run.diagnosticMessage,
-            startedAtLabel: formatDateTime(run.startedAt),
-            completedAtLabel: formatDateTime(run.completedAt),
-            verifiedAtLabel: formatDateTime(run.verifiedAtLabel),
-            restoreReadiness: run.restoreReadiness
+            restoreStatus: run.restoreReadiness.status
           }))}
         />
         <HistoryCard
