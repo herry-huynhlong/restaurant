@@ -44,7 +44,7 @@ export default async function WelcomePage({
           {table ? <p className="mt-1 text-slate-600">Bàn {table.name}</p> : null}
           <label className="mt-5 block text-sm font-medium">
             Tên của bạn / Your name
-            <input className="mt-1 h-11 w-full rounded-md border px-3" name="customerName" maxLength={80} required />
+            <input className="mt-1 h-11 w-full rounded-md border px-3" name="customerName" maxLength={80} autoComplete="name" required />
           </label>
           <PendingSubmitButton className="mt-4 h-11 w-full rounded-md bg-teal-700 text-sm font-semibold text-white" pendingLabel="Đang bắt đầu...">
             Bắt đầu gọi món

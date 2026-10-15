@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
 import { formatInTimeZone } from "@/lib/period";
+import { customerDisplayName, normalizeCustomerName } from "@/lib/customer-name";
 
 export async function getPaymentBillDetail({
   restaurantId,
@@ -76,7 +77,7 @@ export async function getPaymentBillDetail({
     email: payment.invoiceEmail,
     invoiceNumber: payment.invoiceNumber,
     tableName: payment.tableNameSnapshot ?? payment.diningSession.table.name,
-    customerName: firstOrder?.customerName ?? null,
+    customerName: normalizeCustomerName(firstOrder?.customerName),
     cashierName: payment.confirmedBy?.name ?? null,
     paidAt: payment.paidAt ? formatInTimeZone(payment.paidAt, timeZone, { dateStyle: "short", timeStyle: "short" }) : null,
     paymentMethod: payment.paymentMethod,
@@ -88,7 +89,7 @@ export async function getPaymentBillDetail({
     orders: payment.diningSession.orders.map((order) => ({
       id: order.id,
       orderNumber: order.orderNumber,
-      customerName: order.customerName,
+      customerName: customerDisplayName(order.customerName),
       subtotal: order.subtotal,
       createdAt: formatInTimeZone(order.createdAt, timeZone, { dateStyle: "short", timeStyle: "short" }),
       items: order.items.map((item) => ({

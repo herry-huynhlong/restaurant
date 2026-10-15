@@ -4,10 +4,11 @@ import { prisma } from "@/lib/db/prisma";
 import { restaurantRoutes } from "@/lib/routes";
 import { getRestaurantBySlug, canRestaurantOperate } from "@/lib/tenant/restaurant";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
+import { normalizeCustomerName } from "@/lib/customer-name";
 
 export async function requireCustomerPageContext(slug: string) {
   const restaurant = await getRestaurantBySlug(slug);
-  const customerSession = getCustomerSessionCookie();
+  const customerSession = getCustomerSessionCookie(restaurant.slug);
 
   if (!canRestaurantOperate({
     restaurantStatus: restaurant.status,
@@ -19,6 +20,11 @@ export async function requireCustomerPageContext(slug: string) {
 
   if (!customerSession || customerSession.restaurantId !== restaurant.id || customerSession.restaurantSlug !== restaurant.slug) {
     redirect(restaurantRoutes.welcome(restaurant.slug));
+  }
+
+  const customerName = normalizeCustomerName(customerSession.customerName);
+  if (!customerName) {
+    redirect(`${restaurantRoutes.welcome(restaurant.slug)}?t=${encodeURIComponent(customerSession.qrToken)}&error=${encodeURIComponent("Vui lòng nhập lại tên của bạn.")}`);
   }
 
   const diningSession = await prisma.diningSession.findFirst({
@@ -35,5 +41,5 @@ export async function requireCustomerPageContext(slug: string) {
     redirect(`${restaurantRoutes.welcome(restaurant.slug)}?t=${encodeURIComponent(customerSession.qrToken)}&error=${encodeURIComponent("Phiên gọi món không hợp lệ. Vui lòng nhập lại tên.")}`);
   }
 
-  return { restaurant, customerSession, diningSession };
+  return { restaurant, customerSession: { ...customerSession, customerName }, diningSession };
 }

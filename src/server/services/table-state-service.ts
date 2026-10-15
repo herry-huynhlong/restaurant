@@ -4,6 +4,7 @@ import { getTableQrUrl } from "@/lib/qr";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { calculateBillSummary } from "@/server/services/billing-service";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
+import { customerDisplayName, normalizeCustomerName } from "@/lib/customer-name";
 
 export async function getAdminTablesState(restaurantId: string, slug: string, baseUrl: string) {
   const [areas, settings] = await Promise.all([
@@ -111,12 +112,12 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
               0
             ),
             orderCount: activeSession.orders.length,
-            customers: Array.from(new Set(activeSession.orders.map((order) => order.customerName).filter(Boolean))),
+            customers: Array.from(new Set(activeSession.orders.map((order) => normalizeCustomerName(order.customerName)).filter((name): name is string => Boolean(name)))),
             items: Array.from(aggregatedItems.values()),
             serviceRequests: activeSession.serviceRequests.map((request) => ({
               id: request.id,
               type: request.requestType,
-              customerName: request.customerName,
+              customerName: customerDisplayName(request.customerName),
               status: request.status,
               createdAt: request.createdAt.toISOString()
             }))

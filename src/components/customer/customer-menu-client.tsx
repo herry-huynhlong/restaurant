@@ -22,11 +22,13 @@ type CartItem = Product & {
 
 export function CustomerMenuClient({
   slug,
+  customerName,
   businessType,
   products,
   primaryColor
 }: {
   slug: string;
+  customerName: string;
   businessType: BusinessType;
   products: Product[];
   primaryColor: string;
@@ -84,13 +86,14 @@ export function CustomerMenuClient({
           items: cartItems.map((item) => ({ productId: item.id, quantity: item.quantity }))
         })
       });
-      const data = await response.json();
+      const data = await response.json() as { error?: string; orderNumber?: number; customerName?: string };
       if (!response.ok) {
-        setMessage(data.error ?? "Không gửi được order.");
+        setMessage(data.error ?? "Không gửi được món.");
         return;
       }
       setCart({});
-      setMessage(`Đã gửi order #${data.orderNumber}.`);
+      const confirmedName = data.customerName ?? customerName;
+      setMessage(`${confirmedName}, bạn đã gửi món thành công.${data.orderNumber ? ` Mã lượt gọi #${data.orderNumber}.` : ""}`);
     });
   }
 

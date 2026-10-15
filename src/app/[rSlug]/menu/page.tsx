@@ -21,6 +21,7 @@ export default async function CustomerMenuPage({ params }: { params: { rSlug: st
     <CustomerShell slug={restaurant.slug} restaurantName={restaurant.name} tableName={diningSession.table.name} customerName={customerSession.customerName} plan={restaurant.plan} planEntitlement={restaurant.planEntitlement} businessType={restaurant.businessType}>
       <CustomerMenuClient
         slug={restaurant.slug}
+        customerName={customerSession.customerName}
         businessType={restaurant.businessType}
         primaryColor={restaurant.settings?.primaryColor ?? "#0f766e"}
         products={products.map((product) => ({

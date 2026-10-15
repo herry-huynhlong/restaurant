@@ -137,7 +137,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   }
 
   if (isDuplicate) {
-    return NextResponse.json({ ok: true, duplicate: true, orderId: order.id, orderNumber: order.orderNumber });
+    return NextResponse.json({ ok: true, duplicate: true, orderId: order.id, orderNumber: order.orderNumber, customerName: context.session.customerName });
   }
 
   const notificationTitle = `Đơn mới - Bàn ${context.table.name}`;
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
     }
   });
 
-  return NextResponse.json({ ok: true, orderId: order.id, orderNumber: order.orderNumber });
+  return NextResponse.json({ ok: true, orderId: order.id, orderNumber: order.orderNumber, customerName: context.session.customerName });
 }
 
 function findOrderByIdempotencyKey(restaurantId: string, idempotencyKey: string) {

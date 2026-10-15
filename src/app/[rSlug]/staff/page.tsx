@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { prisma } from "@/lib/db/prisma";
 import { hasPlanFeature } from "@/lib/plan/features";
+import { customerDisplayName } from "@/lib/customer-name";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
 import { getActiveTableOrders } from "@/server/services/order-board-service";
@@ -158,7 +159,7 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
               serviceRequests.map((request) => (
                 <article key={request.id} className="rounded-lg border bg-white p-4 shadow-sm">
                   <p className="text-sm font-semibold">Bàn {request.table.name} · {serviceLabels[request.requestType]}</p>
-                  <p className="mt-1 text-sm text-slate-600">{request.customerName}</p>
+                  <p className="mt-1 text-sm text-slate-600">{customerDisplayName(request.customerName)}</p>
                   {request.message ? <p className="mt-2 rounded-md bg-slate-50 p-2 text-sm">{request.message}</p> : null}
                   <p className="mt-2 text-xs text-slate-500">{formatTime(request.createdAt)}</p>
                   <div className="mt-3 flex flex-wrap gap-2">

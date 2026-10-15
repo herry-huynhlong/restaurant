@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCustomerContext } from "@/server/services/customer-context";
 import { calculateBillSummary } from "@/server/services/billing-service";
+import { customerDisplayName } from "@/lib/customer-name";
 
 function buildBill(orders: Array<{
   id: string;
@@ -17,7 +18,7 @@ function buildBill(orders: Array<{
     quantity: number;
     subtotal: number;
   }>;
-}>, bill: { subtotal: number; taxRate: number; taxAmount: number; grandTotal: number }) {
+}>, bill: { subtotal: number; taxRate: number; taxAmount: number; grandTotal: number }, customerName: string) {
   const itemMap = new Map<string, {
     productName: string;
     quantity: number;
@@ -44,6 +45,7 @@ function buildBill(orders: Array<{
   }
 
   return {
+    customerName,
     totalAmount: bill.grandTotal,
     subtotal: bill.subtotal,
     taxRate: bill.taxRate,
@@ -53,7 +55,7 @@ function buildBill(orders: Array<{
     orders: orders.map((order) => ({
       id: order.id,
       orderNumber: order.orderNumber,
-      customerName: order.customerName,
+      customerName: customerDisplayName(order.customerName),
       status: order.status,
       subtotal: order.subtotal,
       createdAt: order.createdAt.toISOString(),
@@ -94,5 +96,5 @@ export async function GET(request: NextRequest, { params }: { params: { rSlug: s
   }
 
   const bill = calculateBillSummary(refreshedSession.orders, refreshedSession.restaurant.settings);
-  return NextResponse.json(buildBill(refreshedSession.orders, bill));
+  return NextResponse.json(buildBill(refreshedSession.orders, bill, context.session.customerName));
 }

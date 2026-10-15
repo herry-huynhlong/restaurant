@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { customerDisplayName } from "@/lib/customer-name";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 
 export type ActiveTableOrder = {
@@ -115,7 +116,7 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
       orders: session.orders.map((order) => ({
         id: order.id,
         orderNumber: order.orderNumber,
-        customerName: order.customerName,
+        customerName: customerDisplayName(order.customerName),
         status: order.status,
         subtotal: order.subtotal,
         createdAt: order.createdAt.toISOString(),
@@ -133,7 +134,7 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
       requests: session.serviceRequests.map((request) => ({
         id: request.id,
         requestType: request.requestType,
-        customerName: request.customerName,
+        customerName: customerDisplayName(request.customerName),
         message: request.message,
         status: request.status,
         createdAt: request.createdAt.toISOString()

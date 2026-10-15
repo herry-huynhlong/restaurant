@@ -7,6 +7,7 @@ import { restaurantRoutes } from "@/lib/routes";
 import { setCustomerSessionCookie } from "@/lib/customer-session";
 import { canRestaurantOperate } from "@/lib/tenant/restaurant";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
+import { normalizeCustomerName } from "@/lib/customer-name";
 
 const startSessionSchema = z.object({
   customerName: z.string().trim().min(1).max(80),
@@ -14,8 +15,9 @@ const startSessionSchema = z.object({
 });
 
 export async function startCustomerSessionAction(slug: string, formData: FormData) {
+  const customerName = normalizeCustomerName(formData.get("customerName"));
   const parsed = startSessionSchema.safeParse({
-    customerName: String(formData.get("customerName") ?? ""),
+    customerName,
     qrToken: String(formData.get("qrToken") ?? "")
   });
 
@@ -87,7 +89,7 @@ export async function startCustomerSessionAction(slug: string, formData: FormDat
     tableName: table.name,
     qrToken: table.qrToken,
     diningSessionId: diningSession.id,
-    customerName: parsed.data.customerName.trim(),
+    customerName: parsed.data.customerName,
     createdAt: Date.now()
   });
 

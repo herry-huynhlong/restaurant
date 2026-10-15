@@ -15,6 +15,7 @@ import { requireActiveStaffDeviceSession } from "@/server/services/staff-device-
 import { markDiningSessionPaidAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 import { calculateBillSummary } from "@/server/services/billing-service";
+import { customerDisplayName } from "@/lib/customer-name";
 
 function getSessionCustomerName(session: {
   serviceRequests: Array<{ customerName: string; createdAt: Date }>;
@@ -22,7 +23,7 @@ function getSessionCustomerName(session: {
 }) {
   const latestRequest = session.serviceRequests[0];
   const latestOrder = session.orders[0];
-  return latestRequest?.customerName ?? latestOrder?.customerName ?? "Khách";
+  return customerDisplayName(latestRequest?.customerName ?? latestOrder?.customerName);
 }
 
 export default async function CashierPage({ params }: { params: { rSlug: string } }) {
@@ -113,7 +114,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
             paymentRequests.map((request) => (
               <article key={request.id} className="rounded-lg border bg-white p-4 shadow-sm">
                 <p className="font-semibold">Bàn {request.table.name}</p>
-                <p className="text-sm text-slate-600">{request.customerName}</p>
+                <p className="text-sm text-slate-600">{customerDisplayName(request.customerName)}</p>
                 <p className="mt-3 text-lg font-bold text-teal-700">{formatVnd(calculateBillSummary([], settings).taxRate ? request.diningSession.totalAmount : request.diningSession.totalAmount)}</p>
                 <p className="mt-1 text-xs text-slate-500">Phương thức: tiền mặt</p>
                 <div className="mt-3 flex flex-wrap gap-2">

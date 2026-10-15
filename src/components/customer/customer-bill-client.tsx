@@ -21,6 +21,7 @@ type BillOrder = {
 };
 
 type CustomerBill = {
+  customerName: string;
   totalAmount: number;
   subtotal: number;
   taxRate: number;
@@ -31,6 +32,7 @@ type CustomerBill = {
 };
 
 const emptyBill: CustomerBill = {
+  customerName: "",
   totalAmount: 0,
   subtotal: 0,
   taxRate: 0,
@@ -52,6 +54,7 @@ export function CustomerBillClient({ slug, mode }: { slug: string; mode: "orders
       if (!response.ok) throw new Error("bill_failed");
       const data = await response.json() as Partial<CustomerBill>;
       setBill({
+        customerName: typeof data.customerName === "string" ? data.customerName : "",
         totalAmount: data.grandTotal ?? data.totalAmount ?? 0,
         subtotal: data.subtotal ?? data.totalAmount ?? 0,
         taxRate: data.taxRate ?? 0,
@@ -105,6 +108,7 @@ export function CustomerBillClient({ slug, mode }: { slug: string; mode: "orders
           <LiveBadge status={status} />
         </div>
         <div className="mt-4 rounded-md bg-slate-50 p-4">
+          {bill.customerName ? <p className="mb-2 text-sm font-medium text-slate-700">Khách: {bill.customerName}</p> : null}
           <p className="text-sm text-slate-600">Tổng bàn</p>
           <p className="mt-1 text-3xl font-bold text-teal-700">{formatVnd(bill.grandTotal)}</p>
         </div>
