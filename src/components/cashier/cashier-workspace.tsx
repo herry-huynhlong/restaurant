@@ -1,8 +1,7 @@
 "use client";
 
 import { AlertCircle, ChevronRight, Clock3, CreditCard, Eye, ReceiptText, Utensils, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { PaidBillButton } from "@/components/admin/payment-report-table";
@@ -10,48 +9,9 @@ import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { formatVnd } from "@/lib/money";
 import { paymentMethodLabels } from "@/lib/payment-method";
 import { getStaffDeviceId } from "@/lib/staff-device";
+import type { CashierSession, CashierSummary } from "@/server/services/cashier-state-service";
 
 type PaymentMethod = "CASH" | "QR" | "BANK_TRANSFER" | "CARD" | "OTHER";
-
-export type CashierSession = {
-  id: string;
-  tableName: string;
-  areaName: string;
-  status: string;
-  paymentStatus: string;
-  customerName: string | null;
-  openedAtLabel: string;
-  itemCount: number;
-  orderCount: number;
-  bill: {
-    subtotal: number;
-    taxRate: number;
-    taxAmount: number;
-    grandTotal: number;
-  };
-  orders: Array<{
-    id: string;
-    orderNumber: number;
-    customerName: string;
-    statusLabel: string;
-    createdAtLabel: string;
-    items: Array<{
-      id: string;
-      name: string;
-      quantity: number;
-      unitPrice: number;
-      subtotal: number;
-      note: string | null;
-      statusLabel: string;
-    }>;
-  }>;
-  paymentRequest: {
-    id: string;
-    status: string;
-    customerName: string;
-    createdAtLabel: string;
-  } | null;
-};
 
 export type CashierSettings = {
   restaurantName: string;
@@ -74,34 +34,95 @@ export function CashierWorkspace({
   slug,
   cashierName,
   sessions,
+  initialSummary,
   settings
 }: {
   slug: string;
   cashierName: string | null;
   sessions: CashierSession[];
+  initialSummary: CashierSummary;
   settings: CashierSettings;
 }) {
-  const router = useRouter();
+  const [liveSessions, setLiveSessions] = useState(sessions);
+  const [summary, setSummary] = useState(initialSummary);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [paymentSessionId, setPaymentSessionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [paidPaymentId, setPaidPaymentId] = useState<string | null>(null);
+  const latestRefreshRef = useRef(0);
 
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
-  const paymentSession = sessions.find((session) => session.id === paymentSessionId) ?? null;
+  const selectedSession = liveSessions.find((session) => session.id === selectedSessionId) ?? null;
+  const paymentSession = liveSessions.find((session) => session.id === paymentSessionId) ?? null;
   const paymentRequests = useMemo(
-    () => sessions.filter((session) => session.paymentRequest),
-    [sessions]
+    () => liveSessions.filter((session) => session.paymentRequest),
+    [liveSessions]
   );
 
+  const refreshState = useCallback(async () => {
+    const refreshId = ++latestRefreshRef.current;
+    try {
+      const response = await fetch(`/api/restaurants/${slug}/cashier/state?deviceId=${encodeURIComponent(getStaffDeviceId())}`, {
+        cache: "no-store"
+      });
+      if (response.status === 403) {
+        window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
+        return;
+      }
+      if (!response.ok) return;
+      const data = await response.json() as {
+        sessions: CashierSession[];
+        summary: CashierSummary;
+      };
+      if (refreshId !== latestRefreshRef.current) return;
+      setLiveSessions(data.sessions);
+      setSummary(data.summary);
+    } catch {
+      // Keep the last known state. SSE reconnect and the fallback poll will retry.
+    }
+  }, [slug]);
+
   useEffect(() => {
-    if (selectedSessionId && !sessions.some((session) => session.id === selectedSessionId)) {
+    setLiveSessions(sessions);
+    setSummary(initialSummary);
+  }, [initialSummary, sessions]);
+
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let refreshTimer: number | null = null;
+    const refreshSoon = () => {
+      if (document.visibilityState !== "visible") return;
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refreshState(), 150);
+    };
+    try {
+      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream?deviceId=${encodeURIComponent(getStaffDeviceId())}`);
+      eventSource.addEventListener("notification", refreshSoon);
+    } catch {
+      // The lightweight polling fallback below remains active.
+    }
+
+    const interval = window.setInterval(() => void refreshState(), 15000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void refreshState();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      eventSource?.close();
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [refreshState, slug]);
+
+  useEffect(() => {
+    if (selectedSessionId && !liveSessions.some((session) => session.id === selectedSessionId)) {
       setSelectedSessionId(null);
     }
-    if (paymentSessionId && !sessions.some((session) => session.id === paymentSessionId)) {
+    if (paymentSessionId && !liveSessions.some((session) => session.id === paymentSessionId)) {
       setPaymentSessionId(null);
     }
-  }, [paymentSessionId, selectedSessionId, sessions]);
+  }, [liveSessions, paymentSessionId, selectedSessionId]);
 
   function openDetails(sessionId: string) {
     setSelectedSessionId(sessionId);
@@ -115,6 +136,12 @@ export function CashierWorkspace({
 
   return (
     <div className="space-y-6">
+      <section className="grid gap-3 sm:grid-cols-3">
+        <QuickStat label="Bàn đang phục vụ" value={String(summary.activeSessionCount)} tone="teal" />
+        <QuickStat label="Yêu cầu thanh toán" value={String(summary.paymentRequestCount)} tone={summary.paymentRequestCount ? "amber" : "slate"} />
+        <QuickStat label="Bill đã thanh toán hôm nay" value={`${summary.paidBillCount} · ${formatVnd(summary.paidRevenue)}`} tone="slate" />
+      </section>
+
       {message ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">
           <span>{message}</span>
@@ -129,12 +156,12 @@ export function CashierWorkspace({
             <h2 className="mt-1 text-lg font-semibold text-slate-950">Bàn đang phục vụ</h2>
             <p className="mt-1 text-sm text-slate-500">Mọi phiên đang mở đều xuất hiện tại đây, kể cả bàn chưa gọi món.</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{sessions.length} bàn</span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{liveSessions.length} bàn</span>
         </div>
 
-        {sessions.length ? (
+        {liveSessions.length ? (
           <div className="divide-y">
-            {sessions.map((session) => (
+            {liveSessions.map((session) => (
               <article key={session.id} className="grid gap-4 px-4 py-4 transition-colors hover:bg-slate-50 sm:px-5 lg:grid-cols-[minmax(180px,1.2fr)_minmax(160px,0.8fr)_minmax(140px,0.7fr)_auto] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -239,10 +266,25 @@ export function CashierWorkspace({
             setSelectedSessionId(null);
             setPaidPaymentId(paymentId);
             setMessage(`Đã thanh toán bàn ${paymentSession.tableName} thành công.`);
-            router.refresh();
+            void refreshState();
           }}
+          onRefresh={refreshState}
         />
       ) : null}
+    </div>
+  );
+}
+
+function QuickStat({ label, value, tone }: { label: string; value: string; tone: "teal" | "amber" | "slate" }) {
+  const toneClass = tone === "teal"
+    ? "border-teal-100 bg-teal-50 text-teal-800"
+    : tone === "amber"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-slate-200 bg-white text-slate-800";
+  return (
+    <div className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-sm font-medium opacity-80">{label}</p>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>
   );
 }
@@ -334,14 +376,14 @@ function SessionDetailDialog({ session, settings, cashierName, onClose, onPay }:
   );
 }
 
-function PaymentDialog({ slug, session, settings, onClose, onSuccess }: {
+function PaymentDialog({ slug, session, settings, onClose, onSuccess, onRefresh }: {
   slug: string;
   session: CashierSession;
   settings: CashierSettings;
   onClose: () => void;
   onSuccess: (paymentId: string) => void;
+  onRefresh: () => Promise<void>;
 }) {
-  const router = useRouter();
   const methods = getAvailablePaymentMethods(settings);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(methods[0]);
   const [busy, setBusy] = useState(false);
@@ -365,7 +407,7 @@ function PaymentDialog({ slug, session, settings, onClose, onSuccess }: {
       const result = await response.json().catch(() => null) as { ok?: boolean; message?: string; payment?: { paymentId: string } } | null;
       if (!response.ok || !result?.ok || !result.payment) {
         setError(result?.message ?? "Không thể hoàn tất thanh toán. Vui lòng thử lại.");
-        if (response.status === 409) router.refresh();
+        if (response.status === 409) await onRefresh();
         return;
       }
       onSuccess(result.payment.paymentId);
