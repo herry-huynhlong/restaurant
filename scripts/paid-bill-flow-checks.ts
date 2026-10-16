@@ -30,8 +30,17 @@ includes(detailService, 'status: "PAID"', "Paid bill lookup must reject unpaid p
 includes(detailService, "paidAt: { not: null }", "Paid bill lookup must require a completed payment time.");
 includes(detailRoute, '["OWNER", "MANAGER", "CASHIER"]', "Only permitted restaurant roles may read a paid bill.");
 includes(detailRoute, '"BILL_PRINT"', "Paid bill API must enforce the plan bill-print feature.");
-includes(tablePanel, 'label="In bill tạm tính"', "The active table must keep its clearly labelled unpaid bill.");
+includes(tablePanel, 'label="In phiếu tạm tính"', "The active table must keep its clearly labelled unpaid bill.");
 includes(tablePanel, "PaidBillButton", "The table page must expose a paid bill separately from the preliminary receipt.");
+includes(tablePanel, "Xác nhận thanh toán và in bill", "Payment-and-print must require an explicit confirmation dialog.");
+includes(tablePanel, "Xác nhận thanh toán & In bill", "Payment-and-print must expose a single guarded confirmation command.");
+includes(tablePanel, "/ops/pay-session", "Payment-and-print must reuse the existing payment endpoint.");
+includes(tablePanel, "expectedGrandTotal", "Payment-and-print must verify the amount displayed before charging.");
+includes(tablePanel, "BillDetailModal", "A successful payment must open the official paid bill interface.");
+includes("src/server/services/payment-service.ts", "FOR UPDATE", "Concurrent payment confirmation must lock the active dining session.");
+includes("src/server/services/payment-service.ts", "payment-request-${diningSessionId}", "Payment confirmation must remain idempotent per dining session.");
+includes("src/server/services/payment-service.ts", 'status: "AVAILABLE"', "Successful payment must release the table.");
+includes("src/server/services/payment-service.ts", 'reason: "BILL_CHANGED"', "Changed bills must be rejected before payment is recorded.");
 includes(tablePanel, 'label="In bill gần nhất"', "An empty table must expose its latest real paid bill.");
 includes(tablePanel, "BillHistoryButton", "The table page must expose the compact bill history entry point.");
 excludes(tablePanel, "Bill thanh toán gần đây", "Paid bill history must not stay expanded on the table page.");

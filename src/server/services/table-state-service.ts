@@ -47,6 +47,7 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
       invoiceDisplayName: settings?.invoiceDisplayName ?? null,
       address: settings?.invoiceAddress ?? settings?.address ?? null,
       phone: settings?.invoicePhone ?? settings?.phone ?? null,
+      cashEnabled: settings?.cashEnabled ?? true,
       qrPaymentEnabled: settings?.qrPaymentEnabled ?? false,
       paymentQrImage: servedUploadUrl(settings?.paymentQrImage),
       bankName: settings?.bankName ?? null,

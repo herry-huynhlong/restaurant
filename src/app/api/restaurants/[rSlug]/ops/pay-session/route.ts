@@ -22,6 +22,9 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     });
     const body = await request.json().catch(() => ({}));
     const diningSessionId = typeof body.diningSessionId === "string" ? body.diningSessionId : "";
+    const expectedGrandTotal = Number.isSafeInteger(body.expectedGrandTotal) && body.expectedGrandTotal >= 0
+      ? body.expectedGrandTotal
+      : undefined;
 
     debugLog("CONFIRM PAYMENT REQUEST", {
       slug: params.rSlug,
@@ -39,11 +42,19 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
       restaurantId: access.restaurant.id,
       diningSessionId,
       confirmedByUserId: access.user.id,
-      paymentMethod: readPaymentMethod(body.paymentMethod ?? null)
+      paymentMethod: readPaymentMethod(body.paymentMethod ?? null),
+      expectedGrandTotal
     });
 
     if (!result.ok) {
-      return NextResponse.json({ ok: false, error: result.reason, message: "Không tìm thấy phiên phục vụ đang mở để thanh toán." }, { status: 409 });
+      return NextResponse.json({
+        ok: false,
+        error: result.reason,
+        message: result.reason === "BILL_CHANGED"
+          ? "Bill vừa thay đổi. Vui lòng kiểm tra tổng tiền mới và xác nhận lại."
+          : "Không tìm thấy phiên phục vụ đang mở để thanh toán.",
+        grandTotal: result.grandTotal
+      }, { status: 409 });
     }
 
     publishNotificationRefresh(access.restaurant.id);

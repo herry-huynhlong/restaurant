@@ -1,14 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { PaymentMethod } from "@prisma/client";
 import Link from "next/link";
 import { AlertTriangle, Clock, Plus, Search, X } from "lucide-react";
 import { formatVnd } from "@/lib/money";
+import { paymentMethodLabels } from "@/lib/payment-method";
 import { restaurantRoutes } from "@/lib/routes";
 import { servedUploadUrl } from "@/lib/upload-url";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { QrCard } from "@/components/admin/qr-card";
-import { BillHistoryButton, PaidBillButton, type PaymentSummary } from "@/components/admin/payment-report-table";
+import {
+  BillDetailModal,
+  BillHistoryButton,
+  PaidBillButton,
+  type BillDetail,
+  type PaymentSummary
+} from "@/components/admin/payment-report-table";
 
 export type TableState = {
   settings: {
@@ -20,6 +28,7 @@ export type TableState = {
     invoiceDisplayName: string | null;
     address: string | null;
     phone: string | null;
+    cashEnabled: boolean;
     qrPaymentEnabled: boolean;
     paymentQrImage: string | null;
     bankName: string | null;
@@ -88,6 +97,14 @@ type CartItem = MenuProduct & {
   note: string;
 };
 
+type PaymentTarget = {
+  tableId: string;
+  tableName: string;
+  sessionId: string;
+  itemCount: number;
+  grandTotal: number;
+};
+
 const tableStatusLabels: Record<string, string> = {
   AVAILABLE: "Đang trống",
   OCCUPIED: "Đang phục vụ",
@@ -131,6 +148,10 @@ export function TablesLivePanel({
   const [orderingTableId, setOrderingTableId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [paidPayments, setPaidPayments] = useState(initialPaidPayments);
+  const [paymentDialog, setPaymentDialog] = useState<PaymentTarget | null>(null);
+  const [paymentDialogError, setPaymentDialogError] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
+  const [paidBill, setPaidBill] = useState<BillDetail | null>(null);
   const tables = useMemo(() => state.areas.flatMap((area) => area.tables), [state.areas]);
   const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0] ?? null;
   const selectedTableIdForBill = selectedTable?.id ?? null;
@@ -205,61 +226,100 @@ export function TablesLivePanel({
     return () => controller.abort();
   }, [selectedSessionIdForBill, selectedTableIdForBill, slug]);
 
-  async function confirmPaid(table: LiveTable) {
-    if (!table.activeSession) return;
-    const ok = window.confirm(`Xác nhận Bàn ${table.name} đã thanh toán ${formatVnd(table.activeSession.grandTotal)}?`);
-    if (!ok) return;
-
-    setPayingSessionId(table.activeSession.id);
-    setMessage(null);
+  async function paySession(target: PaymentTarget, method: PaymentMethod, verifyDisplayedTotal = false) {
+    setPayingSessionId(target.sessionId);
     try {
       const response = await fetch(`/api/restaurants/${slug}/ops/pay-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          diningSessionId: table.activeSession.id,
-          paymentMethod: "CASH"
+          diningSessionId: target.sessionId,
+          paymentMethod: method,
+          ...(verifyDisplayedTotal ? { expectedGrandTotal: target.grandTotal } : {})
         })
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        console.error("CONFIRM PAYMENT RESPONSE", {
-          status: response.status,
-          data
-        });
-        throw new Error(data.message || data.error || `Không xác nhận được thanh toán (${response.status}).`);
-      }
-
       const data = await response.json().catch(() => ({})) as {
+        message?: string;
+        error?: string;
+        grandTotal?: number;
         payment?: {
           paymentId: string;
           invoiceNumber: string | null;
           grandTotal: number;
           tableName: string;
+          paymentMethod: PaymentMethod;
+          paidAt: string;
         };
       };
-      if (data.payment?.paymentId) {
-        const payment: PaymentSummary = {
-          id: data.payment.paymentId,
-          tableId: table.id,
-          invoiceNumber: data.payment.invoiceNumber,
-          paidAtLabel: new Date().toLocaleString("vi-VN"),
-          tableName: data.payment.tableName,
-          amount: data.payment.grandTotal,
-          status: "PAID",
-          paymentMethod: "CASH",
-          confirmedByName: cashierName ?? null
-        };
-        setPaidPayments((current) => [payment, ...current.filter((item) => item.tableId !== table.id)]);
+      if (!response.ok) {
+        if (data.error === "BILL_CHANGED" && Number.isSafeInteger(data.grandTotal)) {
+          setPaymentDialog((current) => current?.sessionId === target.sessionId
+            ? { ...current, grandTotal: data.grandTotal as number }
+            : current);
+        }
+        throw new Error(data.message || data.error || `Không xác nhận được thanh toán (${response.status}).`);
       }
-      setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
+      if (!data.payment?.paymentId) throw new Error("Không nhận được thông tin giao dịch đã thanh toán.");
+
+      const payment: PaymentSummary = {
+        id: data.payment.paymentId,
+        tableId: target.tableId,
+        invoiceNumber: data.payment.invoiceNumber,
+        paidAtLabel: new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(data.payment.paidAt)),
+        tableName: data.payment.tableName,
+        amount: data.payment.grandTotal,
+        status: "PAID",
+        paymentMethod: data.payment.paymentMethod,
+        confirmedByName: cashierName ?? null
+      };
+      setPaidPayments((current) => [payment, ...current.filter((item) => item.tableId !== target.tableId)]);
       await refreshTables();
-    } catch (error) {
-      console.error("CONFIRM PAYMENT CLIENT ERROR", error);
-      setMessage("Không xác nhận được thanh toán. Vui lòng thử lại.");
+      return payment;
     } finally {
       setPayingSessionId(null);
+    }
+  }
+
+  async function confirmPaid(table: LiveTable) {
+    if (!table.activeSession) return;
+    const ok = window.confirm(`Xác nhận Bàn ${table.name} đã thanh toán ${formatVnd(table.activeSession.grandTotal)}?`);
+    if (!ok) return;
+
+    setMessage(null);
+    try {
+      await paySession(toPaymentTarget(table), "CASH");
+      setMessage(`Đã thanh toán Bàn ${table.name}. Bàn đã trở về trạng thái trống.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không xác nhận được thanh toán. Vui lòng thử lại.");
+    }
+  }
+
+  function openPaymentAndPrint(table: LiveTable) {
+    if (!table.activeSession) return;
+    setPaymentDialogError(null);
+    setPaymentMethod(state.settings.cashEnabled ? "CASH" : state.settings.qrPaymentEnabled ? "QR" : "");
+    setPaymentDialog(toPaymentTarget(table));
+  }
+
+  async function confirmPaymentAndPrint() {
+    if (!paymentDialog || !paymentMethod) return;
+    setPaymentDialogError(null);
+    setMessage(null);
+    try {
+      const payment = await paySession(paymentDialog, paymentMethod, true);
+      setPaymentDialog(null);
+      setPaymentMethod("");
+      setMessage("Đã thanh toán thành công. Bàn đã được giải phóng.");
+
+      const response = await fetch(`/api/restaurants/${slug}/reports/payments/${payment.id}`, { cache: "no-store" });
+      if (!response.ok) {
+        setMessage("Đã thanh toán thành công. Không tự mở được bill; bạn có thể in lại trong Lịch sử bill.");
+        return;
+      }
+      setPaidBill(await response.json() as BillDetail);
+    } catch (error) {
+      setPaymentDialogError(error instanceof Error ? error.message : "Không thể bắt đầu thanh toán. Vui lòng thử lại.");
     }
   }
 
@@ -270,7 +330,7 @@ export function TablesLivePanel({
           <h2 className="font-semibold">Sơ đồ bàn</h2>
           <p className="text-sm text-slate-500">Chọn bàn để thao tác nhanh hoặc in bill.</p>
         </div>
-        <BillHistoryButton slug={slug} tables={tables.map((table) => ({ id: table.id, name: table.name }))} />
+        {canUsePayment ? <BillHistoryButton slug={slug} tables={tables.map((table) => ({ id: table.id, name: table.name }))} /> : null}
       </div>
       <div className="space-y-5">
         {status === "reconnecting" ? (
@@ -311,6 +371,7 @@ export function TablesLivePanel({
         table={selectedTable}
         canUsePayment={canUsePayment}
         onConfirmPaid={confirmPaid}
+        onPaymentAndPrint={openPaymentAndPrint}
         onRefresh={refreshTables}
         onAddOrder={() => setOrderingTableId(selectedTable?.id ?? null)}
         showQrTools={showQrTools}
@@ -330,6 +391,24 @@ export function TablesLivePanel({
           }}
         />
       ) : null}
+      {paymentDialog ? (
+        <PaymentAndPrintDialog
+          target={paymentDialog}
+          settings={state.settings}
+          paymentMethod={paymentMethod}
+          error={paymentDialogError}
+          pending={payingSessionId === paymentDialog.sessionId}
+          onPaymentMethodChange={setPaymentMethod}
+          onCancel={() => {
+            if (payingSessionId === paymentDialog.sessionId) return;
+            setPaymentDialog(null);
+            setPaymentDialogError(null);
+            setPaymentMethod("");
+          }}
+          onConfirm={() => void confirmPaymentAndPrint()}
+        />
+      ) : null}
+      {paidBill ? <BillDetailModal bill={paidBill} onClose={() => setPaidBill(null)} /> : null}
     </section>
   );
 }
@@ -398,6 +477,7 @@ function TableDetail({
   table,
   canUsePayment,
   onConfirmPaid,
+  onPaymentAndPrint,
   onRefresh,
   onAddOrder,
   showQrTools,
@@ -411,6 +491,7 @@ function TableDetail({
   table: LiveTable | null;
   canUsePayment: boolean;
   onConfirmPaid: (table: LiveTable) => void;
+  onPaymentAndPrint: (table: LiveTable) => void;
   onRefresh: () => Promise<void>;
   onAddOrder: () => void;
   showQrTools: boolean;
@@ -460,7 +541,7 @@ function TableDetail({
           Xem Order
         </Link>
         {session ? (
-          <InvoicePrintButton label="In bill tạm tính" invoice={{
+          <InvoicePrintButton label="In phiếu tạm tính" invoice={{
             restaurantName,
             businessName: settings.invoiceBusinessName ?? restaurantName,
             taxCode: settings.invoiceTaxCode,
@@ -492,6 +573,16 @@ function TableDetail({
         ) : null}
         {!session && latestPaidPayment ? (
           <PaidBillButton slug={slug} paymentId={latestPaidPayment.id} label="In bill gần nhất" />
+        ) : null}
+        {canUsePayment && session && session.itemCount > 0 ? (
+          <button
+            className="rounded-md border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            disabled={paymentPending}
+            onClick={() => onPaymentAndPrint(table)}
+          >
+            In bill thanh toán
+          </button>
         ) : null}
         {canUsePayment && session ? (
           <button
@@ -526,6 +617,99 @@ function TableDetail({
         </details>
       ) : null}
     </aside>
+  );
+}
+
+function PaymentAndPrintDialog({
+  target,
+  settings,
+  paymentMethod,
+  error,
+  pending,
+  onPaymentMethodChange,
+  onCancel,
+  onConfirm
+}: {
+  target: PaymentTarget;
+  settings: TableState["settings"];
+  paymentMethod: PaymentMethod | "";
+  error: string | null;
+  pending: boolean;
+  onPaymentMethodChange: (method: PaymentMethod | "") => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const paymentMethods: PaymentMethod[] = [
+    ...(settings.cashEnabled ? ["CASH" as const] : []),
+    ...(settings.qrPaymentEnabled ? ["QR" as const] : [])
+  ];
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !pending) onCancel();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel, pending]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/40 p-0 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payment-print-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !pending) onCancel();
+      }}
+    >
+      <div className="w-full max-w-lg rounded-t-xl bg-white shadow-2xl sm:rounded-xl">
+        <div className="flex items-start justify-between gap-3 border-b p-4">
+          <div>
+            <p className="text-xs font-semibold uppercase text-teal-700">Thanh toán và in</p>
+            <h2 className="mt-1 text-lg font-semibold" id="payment-print-title">Xác nhận thanh toán và in bill</h2>
+          </div>
+          <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-slate-50 disabled:opacity-50" type="button" disabled={pending} onClick={onCancel} aria-label="Đóng xác nhận thanh toán">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4 p-4">
+          <div className="grid gap-3 rounded-md bg-slate-50 p-3 text-sm sm:grid-cols-2">
+            <InfoLine label="Bàn" value={`Bàn ${target.tableName}`} />
+            <InfoLine label="Số lượng món" value={`${target.itemCount} món`} />
+            <div className="sm:col-span-2">
+              <InfoLine label="Tổng tiền cần thu" value={formatVnd(target.grandTotal)} strong />
+            </div>
+          </div>
+
+          <label className="block text-sm font-semibold">
+            Phương thức thanh toán
+            <select
+              className="mt-2 h-11 w-full rounded-md border bg-white px-3 font-normal outline-none focus:border-teal-600"
+              value={paymentMethod}
+              disabled={pending}
+              onChange={(event) => onPaymentMethodChange(event.target.value as PaymentMethod | "")}
+            >
+              <option value="">Chọn phương thức</option>
+              {paymentMethods.map((method) => <option key={method} value={method}>{paymentMethodLabels[method]}</option>)}
+            </select>
+          </label>
+
+          {!paymentMethods.length ? (
+            <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">Chưa có phương thức thanh toán được bật trong Cài đặt.</p>
+          ) : null}
+          <p className="text-sm leading-6 text-slate-600">Bạn xác nhận đã nhận thanh toán cho bàn này? Sau khi hoàn tất, bill sẽ được mở để in và bàn sẽ trở về trạng thái trống.</p>
+          {error ? <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+        </div>
+
+        <div className="flex flex-col-reverse gap-2 border-t p-4 sm:flex-row sm:justify-end">
+          <button className="rounded-md border px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50" type="button" disabled={pending} onClick={onCancel}>Hủy</button>
+          <button className="rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300" type="button" disabled={pending || !paymentMethod} onClick={onConfirm}>
+            {pending ? "Đang xử lý..." : "Xác nhận thanh toán & In bill"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -734,6 +918,17 @@ function InfoLine({ label, value, strong = false }: { label: string; value: stri
       <p className={strong ? "font-bold text-teal-700" : "font-semibold text-slate-900"}>{value}</p>
     </div>
   );
+}
+
+function toPaymentTarget(table: LiveTable): PaymentTarget {
+  if (!table.activeSession) throw new Error("Bàn không còn phiên phục vụ đang mở.");
+  return {
+    tableId: table.id,
+    tableName: table.name,
+    sessionId: table.activeSession.id,
+    itemCount: table.activeSession.itemCount,
+    grandTotal: table.activeSession.grandTotal
+  };
 }
 
 function statusBadgeClass(table: LiveTable) {

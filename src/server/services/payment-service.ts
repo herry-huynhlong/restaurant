@@ -5,19 +5,29 @@ import { activeDiningSessionWhere } from "@/server/services/dining-session-servi
 import { calculateBillSummary, generateInvoiceNumber } from "@/server/services/billing-service";
 
 export type ConfirmPaymentResult =
-  | { ok: true; paymentId: string; invoiceNumber: string | null; grandTotal: number; tableName: string }
-  | { ok: false; reason: "SESSION_NOT_ACTIVE" };
+  | {
+    ok: true;
+    paymentId: string;
+    invoiceNumber: string | null;
+    grandTotal: number;
+    tableName: string;
+    paymentMethod: PaymentMethod;
+    paidAt: string;
+  }
+  | { ok: false; reason: "SESSION_NOT_ACTIVE" | "BILL_CHANGED"; grandTotal?: number };
 
 export async function confirmDiningSessionPaid({
   restaurantId,
   diningSessionId,
   confirmedByUserId,
-  paymentMethod
+  paymentMethod,
+  expectedGrandTotal
 }: {
   restaurantId: string;
   diningSessionId: string;
   confirmedByUserId: string;
   paymentMethod: PaymentMethod;
+  expectedGrandTotal?: number;
 }): Promise<ConfirmPaymentResult> {
   const paymentIdempotencyKey = `payment-request-${diningSessionId}`;
 
@@ -69,6 +79,9 @@ export async function confirmDiningSessionPaid({
 
     const paidAt = new Date();
     const bill = calculateBillSummary(session.orders, session.restaurant.settings);
+    if (expectedGrandTotal !== undefined && bill.grandTotal !== expectedGrandTotal) {
+      return { ok: false, reason: "BILL_CHANGED", grandTotal: bill.grandTotal };
+    }
     const invoiceNumber = generateInvoiceNumber(paidAt);
 
     debugLog("CONFIRM PAYMENT BILL", {
@@ -198,7 +211,9 @@ export async function confirmDiningSessionPaid({
       paymentId: payment.id,
       invoiceNumber: payment.invoiceNumber,
       grandTotal: bill.grandTotal,
-      tableName: session.table.name
+      tableName: session.table.name,
+      paymentMethod: payment.paymentMethod,
+      paidAt: payment.paidAt?.toISOString() ?? paidAt.toISOString()
     };
   });
 }
@@ -208,6 +223,8 @@ function paidPaymentResult(payment: {
   invoiceNumber: string | null;
   grandTotal: number;
   amount: number;
+  paymentMethod: PaymentMethod;
+  paidAt: Date | null;
   tableNameSnapshot: string | null;
   diningSession: { table: { name: string } };
 }): ConfirmPaymentResult {
@@ -216,6 +233,8 @@ function paidPaymentResult(payment: {
     paymentId: payment.id,
     invoiceNumber: payment.invoiceNumber,
     grandTotal: payment.grandTotal || payment.amount,
-    tableName: payment.tableNameSnapshot ?? payment.diningSession.table.name
+    tableName: payment.tableNameSnapshot ?? payment.diningSession.table.name,
+    paymentMethod: payment.paymentMethod,
+    paidAt: payment.paidAt?.toISOString() ?? new Date().toISOString()
   };
 }
