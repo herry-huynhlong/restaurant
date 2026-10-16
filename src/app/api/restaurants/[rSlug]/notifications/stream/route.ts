@@ -9,7 +9,13 @@ const streamRoles = ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"] as cons
 export async function GET(_request: NextRequest, { params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, [...streamRoles]);
   const deviceId = _request.nextUrl.searchParams.get("deviceId");
-  if (isStaffDeviceRole(access.membership.role) && deviceId) {
+  if (isStaffDeviceRole(access.membership.role)) {
+    if (!deviceId) {
+      return new Response(JSON.stringify({ ok: false, code: "DEVICE_REVOKED" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
     const deviceSession = await prisma.staffDeviceSession.findUnique({
       where: {
         restaurantId_userId_deviceId: {

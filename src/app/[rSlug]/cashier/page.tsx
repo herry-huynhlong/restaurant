@@ -1,32 +1,19 @@
 import { AppHeader } from "@/components/app-shell/app-header";
 import { NotificationBell } from "@/components/app-shell/notification-bell";
 import { OpsLiveRefresher } from "@/components/app-shell/ops-live-refresher";
-import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
-import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
+import { BillHistoryButton } from "@/components/admin/payment-report-table";
+import { CashierWorkspace, type CashierSession } from "@/components/cashier/cashier-workspace";
 import { prisma } from "@/lib/db/prisma";
+import { customerDisplayName, normalizeCustomerName } from "@/lib/customer-name";
 import { formatVnd } from "@/lib/money";
-import { servedUploadUrl } from "@/lib/upload-url";
+import { formatInTimeZone, getPeriodRange } from "@/lib/period";
 import { requireRestaurantAccess, requireRestaurantFeature } from "@/lib/rbac/guards";
 import { getRoleLabel } from "@/lib/restaurant-role-labels";
+import { servedUploadUrl } from "@/lib/upload-url";
+import { calculateBillSummary } from "@/server/services/billing-service";
+import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
 import { getRecentNotifications } from "@/server/services/notification-service";
 import { requireActiveStaffDeviceSession } from "@/server/services/staff-device-session-service";
-import { markDiningSessionPaidAction, updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
-import { activeDiningSessionWhere } from "@/server/services/dining-session-service";
-import { calculateBillSummary } from "@/server/services/billing-service";
-import { customerDisplayName } from "@/lib/customer-name";
-import { PaidBillButton } from "@/components/admin/payment-report-table";
-import { getRecentPaidPaymentSummaries } from "@/server/services/payment-detail-service";
-
-function getSessionCustomerName(session: {
-  serviceRequests: Array<{ customerName: string; createdAt: Date }>;
-  orders: Array<{ customerName: string; createdAt: Date }>;
-}) {
-  const latestRequest = session.serviceRequests[0];
-  const latestOrder = session.orders[0];
-  return customerDisplayName(latestRequest?.customerName ?? latestOrder?.customerName);
-}
 
 export default async function CashierPage({ params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "CASHIER"]);
@@ -38,42 +25,93 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
     role: access.membership.role,
     nextPath: `/${access.restaurant.slug}/cashier`
   });
-  const [sessions, paymentRequests, notifications, settings, recentPaidPayments] = await Promise.all([
+
+  const settings = await prisma.restaurantSetting.findUnique({ where: { restaurantId: access.restaurant.id } });
+  const timeZone = settings?.timezone ?? "Asia/Ho_Chi_Minh";
+  const todayRange = getPeriodRange("today", timeZone);
+
+  const [sessions, notifications, tables, paidToday] = await Promise.all([
     prisma.diningSession.findMany({
       where: {
         restaurantId: access.restaurant.id,
         ...activeDiningSessionWhere()
       },
       include: {
-        table: true,
+        table: { include: { area: true } },
         orders: {
-          orderBy: { createdAt: "desc" },
-          include: { items: true }
+          orderBy: { createdAt: "asc" },
+          include: { items: { orderBy: { createdAt: "asc" } } }
         },
         serviceRequests: {
+          where: {
+            requestType: "REQUEST_PAYMENT",
+            status: { in: ["NEW", "ACKNOWLEDGED"] }
+          },
           orderBy: { createdAt: "desc" }
         }
       },
-      orderBy: { openedAt: "desc" },
-      take: 50
-    }),
-    prisma.serviceRequest.findMany({
-      where: {
-        restaurantId: access.restaurant.id,
-        requestType: "REQUEST_PAYMENT",
-        status: { in: ["NEW", "ACKNOWLEDGED"] },
-        diningSession: activeDiningSessionWhere()
-      },
-      include: { table: true, diningSession: true },
-      orderBy: { createdAt: "desc" },
-      take: 50
+      orderBy: { openedAt: "asc" }
     }),
     getRecentNotifications(access.restaurant.id, access.user.id),
-    prisma.restaurantSetting.findUnique({ where: { restaurantId: access.restaurant.id } }),
-    getRecentPaidPaymentSummaries(access.restaurant.id)
+    prisma.restaurantTable.findMany({
+      where: { restaurantId: access.restaurant.id },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" }
+    }),
+    prisma.payment.aggregate({
+      where: {
+        restaurantId: access.restaurant.id,
+        status: "PAID",
+        paidAt: { gte: todayRange.start, lt: todayRange.end }
+      },
+      _count: { _all: true },
+      _sum: { amount: true }
+    })
   ]);
 
-  const latestBillSession = sessions[0];
+  const cashierSessions: CashierSession[] = sessions.map((session) => {
+    const bill = calculateBillSummary(session.orders, settings);
+    const latestOrder = session.orders[session.orders.length - 1];
+    const paymentRequest = session.serviceRequests[0] ?? null;
+    const customerName = normalizeCustomerName(paymentRequest?.customerName ?? latestOrder?.customerName);
+
+    return {
+      id: session.id,
+      tableName: session.table.name,
+      areaName: session.table.area.name,
+      status: session.status,
+      paymentStatus: session.paymentStatus,
+      customerName,
+      openedAtLabel: formatInTimeZone(session.openedAt, timeZone, { dateStyle: "short", timeStyle: "short" }),
+      itemCount: session.orders.reduce((total, order) => total + order.items.reduce((sum, item) => sum + item.quantity, 0), 0),
+      orderCount: session.orders.length,
+      bill,
+      orders: session.orders.map((order) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerName: customerDisplayName(order.customerName),
+        statusLabel: orderStatusLabel(order.status),
+        createdAtLabel: formatInTimeZone(order.createdAt, timeZone, { timeStyle: "short" }),
+        items: order.items.map((item) => ({
+          id: item.id,
+          name: item.productNameViSnapshot,
+          quantity: item.quantity,
+          unitPrice: item.unitPriceSnapshot,
+          subtotal: item.subtotal,
+          note: item.note,
+          statusLabel: orderItemStatusLabel(item.status)
+        }))
+      })),
+      paymentRequest: paymentRequest ? {
+        id: paymentRequest.id,
+        status: paymentRequest.status,
+        customerName: customerDisplayName(paymentRequest.customerName),
+        createdAtLabel: formatInTimeZone(paymentRequest.createdAt, timeZone, { timeStyle: "short" })
+      } : null
+    };
+  }).sort((left, right) => Number(Boolean(right.paymentRequest)) - Number(Boolean(left.paymentRequest)));
+
+  const paymentRequestCount = cashierSessions.filter((session) => session.paymentRequest).length;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -89,126 +127,60 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
           </>
         }
       />
-      <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 lg:grid-cols-3">
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold">Bàn đang có khách</h2>
-          {sessions.length ? (
-            sessions.map((session) => (
-              <article key={session.id} className="rounded-lg border bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">Bàn {session.table.name}</p>
-                    <p className="text-sm text-slate-600">{getSessionCustomerName(session)}</p>
-                  </div>
-                  <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium">{diningSessionStatusLabel(session.status)}</span>
-                </div>
-                <BillSummaryBlock session={session} settings={settings} />
-                <p className="mt-1 text-xs text-slate-500">Mở lúc {new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", dateStyle: "short" }).format(session.openedAt)}</p>
-                <PaymentActions slug={access.restaurant.slug} session={session} settings={settings} restaurantName={access.restaurant.name} cashierName={access.user.name} />
-              </article>
-            ))
-          ) : (
-            <EmptyState title="Bàn đang có khách" description="Chưa có phiên phục vụ đang mở." />
-          )}
+
+      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6">
+        <section className="grid gap-3 sm:grid-cols-3">
+          <QuickStat label="Bàn đang phục vụ" value={String(cashierSessions.length)} tone="teal" />
+          <QuickStat label="Yêu cầu thanh toán" value={String(paymentRequestCount)} tone={paymentRequestCount ? "amber" : "slate"} />
+          <QuickStat label="Bill đã thanh toán hôm nay" value={`${paidToday._count._all} · ${formatVnd(paidToday._sum.amount ?? 0)}`} tone="slate" />
         </section>
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold">Bàn yêu cầu thanh toán</h2>
-          {paymentRequests.length ? (
-            paymentRequests.map((request) => (
-              <article key={request.id} className="rounded-lg border bg-white p-4 shadow-sm">
-                <p className="font-semibold">Bàn {request.table.name}</p>
-                <p className="text-sm text-slate-600">{customerDisplayName(request.customerName)}</p>
-                <p className="mt-3 text-lg font-bold text-teal-700">{formatVnd(calculateBillSummary([], settings).taxRate ? request.diningSession.totalAmount : request.diningSession.totalAmount)}</p>
-                <p className="mt-1 text-xs text-slate-500">Phương thức: tiền mặt</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {request.status === "NEW" ? (
-                    <form action={updateServiceRequestStatusAction.bind(null, access.restaurant.slug, request.id, "ACKNOWLEDGED")}>
-                      <PendingSubmitButton className="rounded-md border px-3 py-2 text-sm font-semibold" pendingLabel="Đang nhận...">Đã nhận</PendingSubmitButton>
-                    </form>
-                  ) : null}
-                  <form className="flex flex-wrap gap-2" action={markDiningSessionPaidAction.bind(null, access.restaurant.slug, request.diningSessionId)}>
-                    <input name="paymentMethod" type="hidden" value="CASH" />
-                    <ConfirmSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" message={`Xác nhận bàn ${request.table.name} đã thanh toán?`}>
-                      Đã thanh toán
-                    </ConfirmSubmitButton>
-                  </form>
-                </div>
-              </article>
-            ))
-          ) : (
-            <EmptyState title="Bàn yêu cầu thanh toán" description="Chưa có yêu cầu thanh toán." />
-          )}
+
+        <CashierWorkspace
+          slug={access.restaurant.slug}
+          cashierName={access.user.name ?? null}
+          sessions={cashierSessions}
+          settings={{
+            restaurantName: access.restaurant.name,
+            invoiceBusinessName: settings?.invoiceBusinessName ?? null,
+            invoiceTaxCode: settings?.invoiceTaxCode ?? null,
+            invoiceAddress: settings?.invoiceAddress ?? settings?.address ?? null,
+            invoicePhone: settings?.invoicePhone ?? settings?.phone ?? null,
+            invoiceEmail: settings?.invoiceEmail ?? null,
+            cashEnabled: settings?.cashEnabled ?? true,
+            qrPaymentEnabled: settings?.qrPaymentEnabled ?? false,
+            paymentQrImage: servedUploadUrl(settings?.paymentQrImage) ?? null,
+            bankName: settings?.bankName ?? null,
+            accountNumber: settings?.accountNumber ?? null,
+            accountHolder: settings?.accountHolder ?? null,
+            paymentTransferContent: settings?.paymentTransferContent ?? null
+          }}
+        />
+
+        <section className="flex flex-col gap-3 rounded-lg border bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase text-teal-700">Tra cứu</p>
+            <h2 className="mt-1 text-lg font-semibold">Bill thanh toán gần đây</h2>
+            <p className="mt-1 text-sm text-slate-500">Lịch sử mặc định được thu gọn; mở khi cần xem chi tiết hoặc in lại.</p>
+          </div>
+          <BillHistoryButton slug={access.restaurant.slug} tables={tables} />
         </section>
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold">Bill hiện tại</h2>
-          {latestBillSession ? (
-            <article className="rounded-lg border bg-white p-4 shadow-sm">
-              <p className="font-semibold">Bàn {latestBillSession.table.name} · {getSessionCustomerName(latestBillSession)}</p>
-              <div className="mt-3 space-y-3">
-                {latestBillSession.orders.length ? latestBillSession.orders.map((order) => (
-                  <div key={order.id} className="rounded-md bg-slate-50 p-3">
-                    <p className="text-sm font-semibold">Lượt gọi #{order.orderNumber} · {orderStatusLabel(order.status)}</p>
-                    <ul className="mt-2 divide-y text-sm">
-                      {order.items.map((item) => (
-                        <li key={item.id} className="flex justify-between gap-3 py-1.5">
-                          <span>{item.quantity} x {item.productNameViSnapshot}</span>
-                          <span>{formatVnd(item.subtotal)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )) : <p className="text-sm text-slate-500">Chưa có order.</p>}
-              </div>
-              <BillSummaryBlock session={latestBillSession} settings={settings} />
-              <PaymentActions slug={access.restaurant.slug} session={latestBillSession} settings={settings} restaurantName={access.restaurant.name} cashierName={access.user.name} />
-            </article>
-          ) : (
-            <EmptyState title="Bill hiện tại" description="Chọn bàn để xem bill khi có dữ liệu." />
-          )}
-        </section>
-        {recentPaidPayments.length ? (
-          <section className="space-y-3 lg:col-span-3">
-            <h2 className="text-base font-semibold">Bill thanh toán gần đây</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {recentPaidPayments.map((payment) => (
-                <article key={payment.id} className="rounded-lg border bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold">Bàn {payment.tableName}</p>
-                      <p className="text-xs text-slate-500">{payment.invoiceNumber ?? payment.id.slice(0, 8)}</p>
-                    </div>
-                    <p className="font-bold text-teal-700">{formatVnd(payment.amount)}</p>
-                  </div>
-                  <p className="mt-2 text-xs text-slate-500">{payment.paidAtLabel}</p>
-                  <div className="mt-3">
-                    <PaidBillButton slug={access.restaurant.slug} paymentId={payment.id} />
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        ) : null}
-      </section>
+      </div>
     </main>
   );
 }
 
-function BillSummaryBlock({ session, settings }: { session: any; settings: any }) {
-  const bill = calculateBillSummary(session.orders ?? [], settings);
+function QuickStat({ label, value, tone }: { label: string; value: string; tone: "teal" | "amber" | "slate" }) {
+  const toneClass = tone === "teal"
+    ? "border-teal-100 bg-teal-50 text-teal-800"
+    : tone === "amber"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-slate-200 bg-white text-slate-800";
   return (
-    <div className="mt-3 space-y-1 rounded-md bg-slate-50 p-3 text-sm">
-      <div className="flex justify-between gap-3"><span>Tạm tính</span><span className="font-semibold">{formatVnd(bill.subtotal)}</span></div>
-      <div className="flex justify-between gap-3"><span>Thuế {bill.taxRate}%</span><span className="font-semibold">{formatVnd(bill.taxAmount)}</span></div>
-      <div className="flex justify-between gap-3 border-t pt-2 text-base"><span className="font-semibold">Tổng</span><span className="font-bold text-teal-700">{formatVnd(bill.grandTotal)}</span></div>
+    <div className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-sm font-medium opacity-80">{label}</p>
+      <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>
   );
-}
-
-function diningSessionStatusLabel(status: string) {
-  if (status === "OPEN") return "Đang phục vụ";
-  if (status === "AWAITING_PAYMENT") return "Chờ thanh toán";
-  if (status === "CLOSED") return "Đã đóng";
-  return "Đang cập nhật";
 }
 
 function orderStatusLabel(status: string) {
@@ -217,55 +189,13 @@ function orderStatusLabel(status: string) {
   if (status === "PREPARING") return "Đang làm";
   if (status === "READY") return "Sẵn sàng";
   if (status === "SERVED") return "Đã phục vụ";
-  if (status === "CANCELLED") return "Đã hủy";
   return "Đang cập nhật";
 }
 
-function PaymentActions({ slug, session, settings, restaurantName, cashierName }: { slug: string; session: any; settings: any; restaurantName: string; cashierName?: string | null }) {
-  const bill = calculateBillSummary(session.orders ?? [], settings);
-  const invoice = {
-    restaurantName,
-    businessName: settings?.invoiceBusinessName ?? restaurantName,
-    taxCode: settings?.invoiceTaxCode ?? null,
-    address: settings?.invoiceAddress ?? settings?.address ?? null,
-    phone: settings?.invoicePhone ?? settings?.phone ?? null,
-    email: settings?.invoiceEmail ?? null,
-    invoiceNumber: null,
-    tableName: session.table.name,
-    cashierName,
-    paidAt: null,
-    status: session.paymentStatus === "PENDING" ? "PENDING" as const : "UNPAID" as const,
-    paymentMethod: null,
-    subtotal: bill.subtotal,
-    taxRate: bill.taxRate,
-    taxAmount: bill.taxAmount,
-    grandTotal: bill.grandTotal,
-    paymentQr: {
-      enabled: settings?.qrPaymentEnabled ?? false,
-      imageUrl: servedUploadUrl(settings?.paymentQrImage),
-      bankName: settings?.bankName ?? null,
-      accountNumber: settings?.accountNumber ?? null,
-      accountHolder: settings?.accountHolder ?? null,
-      transferContent: settings?.paymentTransferContent || `Bàn ${session.table.name}`
-    },
-    items: session.orders.flatMap((order: any) => order.items.map((item: any) => ({
-      id: item.id,
-      name: item.productNameViSnapshot,
-      quantity: item.quantity,
-      unitPrice: item.unitPriceSnapshot,
-      subtotal: item.subtotal
-    })))
-  };
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      <InvoicePrintButton label="In phiếu tạm tính" invoice={invoice} />
-      <form className="flex flex-wrap gap-2" action={markDiningSessionPaidAction.bind(null, slug, session.id)}>
-        <input name="paymentMethod" type="hidden" value="CASH" />
-        <ConfirmSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white" message={`Xác nhận bàn ${session.table.name} đã thanh toán ${formatVnd(bill.grandTotal)}?`}>
-          Xác nhận đã thanh toán
-        </ConfirmSubmitButton>
-      </form>
-    </div>
-  );
+function orderItemStatusLabel(status: string) {
+  if (status === "NEW") return "Chờ làm";
+  if (status === "COOKING") return "Đang làm";
+  if (status === "READY") return "Sẵn sàng";
+  if (status === "SERVED") return "Đã phục vụ";
+  return "Đang cập nhật";
 }

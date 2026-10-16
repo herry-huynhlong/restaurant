@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { PaymentMethod, RestaurantSetting } from "@prisma/client";
 import { paymentMethodLabels } from "@/lib/payment-method";
 
@@ -35,8 +36,9 @@ export function generateInvoiceNumber(date = new Date()) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0")
   ].join("");
-  const suffix = `${date.getTime()}`.slice(-6);
-  return `INV-${stamp}-${suffix}`;
+  const timePart = date.getTime().toString(36).toUpperCase();
+  const randomPart = crypto.randomBytes(4).toString("hex").toUpperCase();
+  return `INV-${stamp}-${timePart}-${randomPart}`;
 }
 
 export function readPaymentMethod(value: FormDataEntryValue | null): PaymentMethod {

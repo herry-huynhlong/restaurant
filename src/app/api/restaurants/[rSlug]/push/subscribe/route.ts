@@ -26,7 +26,10 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
 
   const userAgent = request.headers.get("user-agent");
   let shiftSession = null;
-  if (isStaffDeviceRole(access.membership.role) && parsed.data.deviceId) {
+  if (isStaffDeviceRole(access.membership.role)) {
+    if (!parsed.data.deviceId) {
+      return NextResponse.json({ ok: false, code: "DEVICE_NEEDS_OPERATOR", error: "Thiết bị nhân viên chưa được xác thực." }, { status: 403 });
+    }
     shiftSession = await prisma.staffDeviceSession.findUnique({
         where: {
           restaurantId_userId_deviceId: {

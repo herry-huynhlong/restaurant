@@ -1,139 +1,111 @@
-# Restaurant SaaS
+# QuánPilot
 
-Multi-tenant restaurant ordering SaaS built with Next.js, TypeScript, Tailwind CSS, Prisma, PostgreSQL, and Auth.js.
+QuánPilot là nền tảng SaaS quản lý nhiều nhà hàng/quán nước, gồm luồng gọi món QR cho khách, vận hành Phục vụ - Bếp - Thu ngân, quản trị cửa hàng và quản trị nền tảng. Ứng dụng dùng chung một codebase Next.js, cô lập dữ liệu theo `restaurantId` và nhận diện cửa hàng bằng `slug`.
 
-This repository is currently implemented through Phase 1:
+## Chức năng chính
 
-- Project initialization.
-- Auth.js credentials login for staff/admin users.
-- PostgreSQL Prisma schema for the full MVP domain.
-- Server-side tenant and role guards.
-- Platform admin dashboard shell.
-- Restaurant admin dashboard shell.
-- Demo seed data for `Quán ABC`.
+- Khách quét QR, nhập tên, xem menu, gọi món, xem món đã gọi và yêu cầu thanh toán.
+- Chủ quán/Quản lý quản lý menu, khu vực, bàn, QR, order, nhân viên, báo cáo và cài đặt.
+- Phục vụ nhận món, xử lý yêu cầu khách, xem bàn/order và thêm món tại bàn.
+- Bếp nhận món, chuyển trạng thái chế biến và hoàn thành món.
+- Thu ngân xác nhận thanh toán, in phiếu tạm tính, in/in lại bill.
+- Platform Admin quản lý nhà hàng, chủ quán, bảng giá, yêu cầu gói, audit log, dung lượng, backup và restore.
+- PWA riêng theo cửa hàng và vai trò; push notification qua Web Push/VAPID.
 
-Later phases will add menu management, QR flows, customer ordering, realtime staff/kitchen notifications, payments, bills, reports, and platform subscription polish.
+## Công nghệ
 
-## Local Setup
+- Node.js 22, Next.js 14 App Router, React 18, TypeScript.
+- Tailwind CSS, Lucide Icons.
+- PostgreSQL 16, Prisma ORM 6.
+- Auth.js/NextAuth Credentials và JWT session.
+- Docker Compose gồm `postgres`, `app`, `maintenance-worker`.
 
-1. Copy environment variables:
+> `pnpm audit` ngày 16/10/2026 báo các advisory nghiêm trọng đối với Next.js 14.2.35. Xem [Báo cáo audit](docs/AUDIT_REPORT.md) trước khi đưa hệ thống ra Internet; nâng lên Next.js 15.5.24+ cần một đợt kiểm thử tương thích riêng.
 
-```bash
-cp .env.example .env
-```
-
-2. Update `DATABASE_URL` to point at a PostgreSQL database.
-
-3. Install dependencies:
-
-```bash
-pnpm install
-```
-
-4. Generate Prisma client and create the database schema:
-
-```bash
-pnpm prisma:generate
-pnpm prisma:migrate --name init
-```
-
-5. Seed demo data:
-
-```bash
-pnpm prisma:seed
-```
-
-6. Start the app:
-
-```bash
-pnpm dev
-```
-
-Open `http://localhost:3000`.
-
-## Docker Deploy
-
-Copy the Docker environment file:
+## Chạy nhanh bằng Docker
 
 ```bash
 cp .env.docker.example .env
+# Điền mật khẩu, URL, secret và VAPID keys trong .env
+mkdir -p public/uploads backups runtime host-metrics
+docker compose build app maintenance-worker
+docker compose up -d postgres
+docker compose run --rm app pnpm prisma:deploy
+docker compose up -d app maintenance-worker
+docker compose ps
 ```
 
-Edit `.env`, then run:
+Ứng dụng lắng nghe tại `127.0.0.1:3000`; production cần reverse proxy HTTPS.
+
+## Chạy local
+
+Yêu cầu Node.js 22, pnpm 11.19 và PostgreSQL 16.
 
 ```bash
-docker compose up -d --build postgres
-docker compose run --rm app pnpm prisma:migrate --name init
-docker compose run --rm app pnpm prisma:seed
-docker compose up -d --build app
+cp .env.example .env
+pnpm install --frozen-lockfile
+pnpm prisma:generate
+pnpm prisma:deploy
+pnpm prisma:seed       # chỉ dùng cho môi trường phát triển mới
+pnpm dev
 ```
 
-The app listens on `127.0.0.1:3000`, ready for Nginx reverse proxy.
+Mở `http://localhost:3000`. Không chạy seed hoặc `prisma migrate dev` trên production.
 
-## Demo Accounts
-
-All demo accounts use password:
-
-```text
-Password123!
-```
-
-| Role | Email |
-| --- | --- |
-| Platform admin | `platform@demo.local` |
-| Owner | `owner@abc.local` |
-| Waiter | `waiter@abc.local` |
-| Kitchen | `kitchen@abc.local` |
-| Cashier | `cashier@abc.local` |
-
-## Important Routes
-
-- `/login`
-- `/platform`
-- `/abc/admin`
-
-Full route plan: [docs/routes.md](docs/routes.md).
-
-## Documentation
-
-- Architecture: [docs/architecture.md](docs/architecture.md)
-- Permission matrix: [docs/permissions.md](docs/permissions.md)
-- Realtime events: [docs/realtime-events.md](docs/realtime-events.md)
-- ERD: [docs/erd.md](docs/erd.md)
-
-## Tenant Security Rules
-
-- Restaurant-owned data is scoped by `restaurantId`.
-- Restaurant route access is derived from route slug plus authenticated membership.
-- Client-provided `restaurantId` is never trusted for authorization.
-- Platform access requires `PLATFORM_ADMIN`.
-- No cancellation and no split bill states exist in the order model.
-
-## Deploy Notes
-
-Use Vercel for the Next.js app and a production PostgreSQL database. Set these environment variables in the hosting provider:
-
-- `DATABASE_URL`
-- `NEXTAUTH_URL`
-- `NEXTAUTH_SECRET`
-
-Run Prisma migrations during deployment setup. Use managed object storage such as Supabase Storage or Cloudflare R2 for uploads in later phases.
-
-## QR Table Guidance
-
-Tables store a random, hard-to-guess `qrToken`. Future QR URLs should use:
-
-```text
-https://domain.com/abc/welcome?table=A05&token=xxxxx
-```
-
-The server must validate `slug + table + token + table active` before opening or attaching a customer dining session.
-
-## Phase 1 Verification
-
-Run these checks after installing dependencies:
+## Kiểm tra trước khi deploy
 
 ```bash
 pnpm typecheck
 pnpm lint
+pnpm test:hardening
+pnpm test:backup-restore
+pnpm test:form-ux
+pnpm test:customer-name
+pnpm test:paid-bill
+pnpm test:invoice-print
+pnpm build
+pnpm audit --prod
 ```
+
+Các script test hiện tại chủ yếu là kiểm tra hồi quy tĩnh và logic trọng yếu, chưa thay thế integration/E2E test với PostgreSQL và thiết bị Android thật.
+
+## Tài liệu
+
+- [Kiến trúc](docs/architecture.md)
+- [Bản đồ file](docs/FILE_MAP.md)
+- [Chức năng và luồng nghiệp vụ](docs/FEATURES.md)
+- [API và Server Actions](docs/API.md)
+- [Database](docs/DATABASE.md)
+- [Cấu hình môi trường](docs/CONFIGURATION.md)
+- [Phân quyền](docs/permissions.md)
+- [Bảo mật](docs/SECURITY.md)
+- [Triển khai production](docs/DEPLOYMENT.md)
+- [Bảo trì và phát triển](docs/MAINTENANCE.md)
+- [Backup và vòng đời dữ liệu](docs/BACKUP_AND_DATA_LIFECYCLE.md)
+- [Restore theo cửa hàng](docs/RESTAURANT_BACKUP_RESTORE.md)
+- [Quy chuẩn nội dung UI](docs/UX_WRITING_GUIDELINES.md)
+- [Báo cáo audit](docs/AUDIT_REPORT.md)
+
+## Nguyên tắc dữ liệu
+
+- Tiền lưu dạng số nguyên VND.
+- Thời gian lưu UTC, hiển thị theo timezone cửa hàng (mặc định `Asia/Ho_Chi_Minh`).
+- Giá và tên món trong order được snapshot tại thời điểm gọi.
+- Payment đã thanh toán và bill lịch sử không tính lại từ menu hiện tại.
+- Mọi truy vấn dữ liệu cửa hàng phải có `restaurantId`; không tin `restaurantId` từ client.
+- Backup/restore production chỉ chạy qua worker và phải có bản dự phòng trước restore.
+
+## Cập nhật production
+
+```bash
+cd /opt/websites/restaurant
+git pull
+docker compose build app maintenance-worker
+docker compose up -d postgres
+docker compose run --rm app pnpm prisma:deploy
+docker compose up -d app maintenance-worker
+docker compose ps
+docker compose logs app maintenance-worker --tail=150
+```
+
+Luôn tạo và kiểm tra backup trước migration; không dùng `git reset --hard`, `prisma migrate reset` hoặc restore trực tiếp lên production.

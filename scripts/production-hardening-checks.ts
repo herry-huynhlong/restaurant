@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { hasPlanFeature } from "../src/lib/plan/features";
+import { generateInvoiceNumber } from "../src/server/services/billing-service";
 
 const root = process.cwd();
 
@@ -40,17 +41,27 @@ function checkIdempotencyAndLocks() {
   assertIncludes("src/app/api/restaurants/[rSlug]/customer/order/route.ts", "FOR UPDATE", "Customer order creation must lock the active dining session.");
   assertIncludes("src/app/api/restaurants/[rSlug]/customer/order/route.ts", "P2002", "Customer order creation must handle duplicate idempotency keys.");
   assertIncludes("src/app/api/restaurants/[rSlug]/admin/tables/[tableId]/order/route.ts", "P2002", "Staff order creation must handle duplicate idempotency keys.");
+  assertIncludes("src/app/[rSlug]/welcome/actions.ts", "FOR UPDATE", "Customer session creation must lock the table before opening a dining session.");
 
   assertIncludes("src/server/services/subscription-service.ts", "FROM \"RestaurantSubscriptionRequest\"", "Subscription confirmation must lock the request row.");
   assertIncludes("src/server/services/subscription-service.ts", "FOR UPDATE", "Subscription confirmation must prevent double confirmation races.");
+
+  const invoiceDate = new Date("2026-10-16T02:30:00.000Z");
+  assert.notEqual(generateInvoiceNumber(invoiceDate), generateInvoiceNumber(invoiceDate), "Invoice numbers created in the same millisecond must remain unique.");
 }
 
 function checkTenantGuards() {
   assertIncludes("src/app/api/restaurants/[rSlug]/admin/tables/[tableId]/order/route.ts", "requireRestaurantAccess(params.rSlug, [\"OWNER\", \"MANAGER\", \"WAITER\"])", "Staff add-order API must use the shared restaurant guard.");
   assertIncludes("src/app/api/restaurants/[rSlug]/admin/tables/[tableId]/order/route.ts", "assertActiveStaffDeviceForAction", "Staff add-order API must enforce staff device state for staff roles.");
+  assertRegex("src/app/api/restaurants/[rSlug]/notifications/state/route.ts", /isStaffDeviceRole\(access\.membership\.role\)[\s\S]*if \(!deviceId\)/, "Notification state API must reject missing staff device identity.");
+  assertRegex("src/app/api/restaurants/[rSlug]/notifications/stream/route.ts", /isStaffDeviceRole\(access\.membership\.role\)[\s\S]*if \(!deviceId\)/, "Notification stream API must reject missing staff device identity.");
+  assertRegex("src/app/api/restaurants/[rSlug]/push/subscribe/route.ts", /isStaffDeviceRole\(access\.membership\.role\)[\s\S]*if \(!parsed\.data\.deviceId\)/, "Push subscription API must reject missing staff device identity.");
+  assertIncludes("src/components/admin/orders-by-table-board.tsx", "deviceId=${encodeURIComponent(getStaffDeviceId())}", "The shared order board must send staff device identity to its notification stream.");
   assertIncludes("src/app/[rSlug]/admin/top-items/page.tsx", "requireRestaurantFeature(access, \"REPORTS\")", "Top items must be guarded by the unified REPORTS feature.");
   assertIncludes("src/app/platform/plans/actions.ts", "requirePlatformOwner", "Plan price changes must require platform owner access.");
   assertIncludes("src/app/platform/restaurants/actions.ts", "requirePlatformOwner", "Platform owner-only restaurant lifecycle actions must keep owner guard available.");
+  assertRegex("src/app/platform/restaurants/actions.ts", /resetOwnerPasswordAction[\s\S]*?requirePlatformOwner\(\)/, "Owner password resets must require platform owner access.");
+  assertIncludes("src/app/platform/restaurants/page.tsx", "showResetPasswordAction={canManageSensitive}", "Restaurant list must hide owner password reset from platform sub-admins.");
 }
 
 function checkBackupAndRestoreSafety() {

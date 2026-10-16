@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import type { PaymentMethod, PaymentStatus } from "@prisma/client";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { formatVnd } from "@/lib/money";
 import { paymentMethodLabels } from "@/lib/payment-method";
@@ -96,6 +96,7 @@ const emptyHistoryFilters: BillHistoryFilters = { query: "", tableId: "", from: 
 
 export function BillHistoryButton({ slug, tables }: { slug: string; tables: Array<{ id: string; name: string }> }) {
   const [open, setOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [history, setHistory] = useState<BillHistoryPage | null>(null);
   const [filters, setFilters] = useState<BillHistoryFilters>(emptyHistoryFilters);
   const [loading, setLoading] = useState(false);
@@ -130,11 +131,15 @@ export function BillHistoryButton({ slug, tables }: { slug: string; tables: Arra
   }, [open]);
 
   const groups = useMemo(() => {
-    const result: Array<{ key: string; heading: string; items: BillHistoryItem[] }> = [];
+    const result: Array<{ key: string; heading: string; items: BillHistoryItem[]; total: number }> = [];
     for (const item of history?.items ?? []) {
       const current = result[result.length - 1];
-      if (current?.key === item.dateKey) current.items.push(item);
-      else result.push({ key: item.dateKey, heading: item.dayHeading, items: [item] });
+      if (current?.key === item.dateKey) {
+        current.items.push(item);
+        current.total += item.amount;
+      } else {
+        result.push({ key: item.dateKey, heading: item.dayHeading, items: [item], total: item.amount });
+      }
     }
     return result;
   }, [history]);
@@ -143,9 +148,10 @@ export function BillHistoryButton({ slug, tables }: { slug: string; tables: Arra
     <>
       <button className="rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={() => {
         setOpen(true);
+        setOpenGroups({});
         if (!history) void loadHistory(1);
       }}>
-        Lịch sử bill
+        Mở lịch sử hóa đơn
       </button>
       {open ? (
         <div className="fixed inset-0 z-50 bg-black/40 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label="Lịch sử bill" onMouseDown={(event) => {
@@ -154,8 +160,8 @@ export function BillHistoryButton({ slug, tables }: { slug: string; tables: Arra
           <div className="mx-auto flex max-h-[calc(100vh-16px)] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl sm:max-h-[calc(100vh-48px)]">
             <div className="flex items-start justify-between gap-3 border-b p-4">
               <div>
-                <h2 className="text-lg font-semibold">Lịch sử bill</h2>
-                <p className="text-sm text-slate-500">Bill đã thanh toán, sắp xếp mới nhất trước.</p>
+                <h2 className="text-lg font-semibold">Bill thanh toán gần đây</h2>
+                <p className="text-sm text-slate-500">Chia theo ngày thanh toán của cửa hàng, mới nhất trước.</p>
               </div>
               <button className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border hover:bg-slate-50" type="button" aria-label="Đóng lịch sử bill" onClick={() => setOpen(false)}>
                 <X className="h-4 w-4" />
@@ -185,25 +191,34 @@ export function BillHistoryButton({ slug, tables }: { slug: string; tables: Arra
               {loading && !history ? <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-500">Đang tải lịch sử...</p> : null}
               {!loading && history && history.items.length === 0 ? <p className="rounded-md bg-slate-50 p-4 text-sm text-slate-500">Không tìm thấy bill phù hợp.</p> : null}
               <div className="space-y-5">
-                {groups.map((group) => (
-                  <section key={group.key}>
-                    <h3 className="sticky top-0 z-10 bg-white py-2 text-sm font-bold text-slate-800">{group.heading}</h3>
-                    <div className="divide-y rounded-md border">
-                      {group.items.map((item) => (
-                        <article key={item.id} className="grid gap-3 p-3 sm:grid-cols-[70px_1fr_auto_auto] sm:items-center">
-                          <p className="font-semibold">{item.timeLabel}</p>
-                          <div className="min-w-0">
-                            <p className="font-semibold">Bàn {item.tableName}</p>
-                            <p className="truncate text-xs text-slate-500">{item.invoiceNumber ?? item.id}</p>
-                            <p className="text-xs text-slate-500">{paymentMethodLabels[item.paymentMethod]}</p>
-                          </div>
-                          <p className="font-bold text-teal-700 sm:text-right">{formatVnd(item.amount)}</p>
-                          <PaidBillButton slug={slug} paymentId={item.id} label="In bill" />
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+                {groups.map((group) => {
+                  const expanded = openGroups[group.key] ?? false;
+                  return (
+                    <section key={group.key} className="overflow-hidden rounded-md border">
+                      <button className="flex w-full items-center justify-between gap-3 bg-slate-50 px-4 py-3 text-left hover:bg-slate-100" type="button" aria-expanded={expanded} onClick={() => setOpenGroups((current) => ({ ...current, [group.key]: !expanded }))}>
+                        <span>
+                          <span className="block text-sm font-bold text-slate-800">{group.heading}</span>
+                          <span className="mt-0.5 block text-xs text-slate-500">{group.items.length} hóa đơn đang hiển thị · {formatVnd(group.total)}</span>
+                        </span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                      </button>
+                      {expanded ? <div className="divide-y">
+                        {group.items.map((item) => (
+                          <article key={item.id} className="grid gap-3 p-3 sm:grid-cols-[70px_1fr_auto_auto] sm:items-center">
+                            <p className="font-semibold">{item.timeLabel}</p>
+                            <div className="min-w-0">
+                              <p className="font-semibold">Bàn {item.tableName}</p>
+                              <p className="truncate text-xs text-slate-500">{item.invoiceNumber ?? item.id}</p>
+                              <p className="text-xs text-slate-500">{paymentMethodLabels[item.paymentMethod]}</p>
+                            </div>
+                            <p className="font-bold text-teal-700 sm:text-right">{formatVnd(item.amount)}</p>
+                            <PaidBillButton slug={slug} paymentId={item.id} label="Xem / In lại" />
+                          </article>
+                        ))}
+                      </div> : null}
+                    </section>
+                  );
+                })}
               </div>
             </div>
             {history ? (

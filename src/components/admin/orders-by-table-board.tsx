@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { StaffAddOrderModal, type LiveTable, type MenuProduct } from "@/components/admin/tables-live-panel";
 import { FoodItemDisplayCard } from "@/components/ops/food-item-display-card";
+import { getStaffDeviceId } from "@/lib/staff-device";
 import type { ActiveTableOrder } from "@/server/services/order-board-service";
 
 const requestLabels: Record<string, { label: string; tone: string }> = {
@@ -77,7 +78,7 @@ export function OrdersByTableBoard({
 
     let eventSource: EventSource | null = null;
     try {
-      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream`);
+      eventSource = new EventSource(`/api/restaurants/${slug}/notifications/stream?deviceId=${encodeURIComponent(getStaffDeviceId())}`);
       eventSource.addEventListener("notification", () => void loadState());
     } catch {
       // Polling below is the fallback.

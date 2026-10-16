@@ -992,7 +992,7 @@ export async function changePlanAction(formData: FormData) {
 }
 
 export async function resetOwnerPasswordAction(formData: FormData) {
-  const actor = await requirePlatformAdmin();
+  const actor = await requirePlatformOwner();
   const returnTo = readPlatformReturnPath(formData);
   const parsed = resetAdminPasswordSchema.safeParse({
     restaurantId: readString(formData, "restaurantId"),

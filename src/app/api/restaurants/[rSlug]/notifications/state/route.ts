@@ -6,7 +6,10 @@ import { isStaffDeviceRole } from "@/server/services/staff-device-session-servic
 export async function GET(request: NextRequest, { params }: { params: { rSlug: string } }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER", "MANAGER", "WAITER", "CASHIER", "KITCHEN"]);
   const deviceId = request.nextUrl.searchParams.get("deviceId");
-  if (isStaffDeviceRole(access.membership.role) && deviceId) {
+  if (isStaffDeviceRole(access.membership.role)) {
+    if (!deviceId) {
+      return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này chưa được xác thực." }, { status: 403 });
+    }
     const deviceSession = await prisma.staffDeviceSession.findUnique({
       where: {
         restaurantId_userId_deviceId: {

@@ -328,6 +328,7 @@ export default async function RestaurantDetailPage({
             returnTo={platformRoutes.restaurantDetail(restaurant.id)}
             showStatusAction={false}
             showPlanAction={false}
+            showResetPasswordAction={canManageSensitive}
             showDeleteAction={false}
           />
         </div>

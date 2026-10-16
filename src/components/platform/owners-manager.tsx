@@ -127,9 +127,11 @@ function OwnerActions({ owner, returnTo, canEditOwnerName }: { owner: OwnerRow; 
           Sửa
         </button>
       ) : null}
-      <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => resetDialogRef.current?.showModal()}>
-        Đặt lại mật khẩu
-      </button>
+      {canEditOwnerName ? (
+        <button className="rounded-md border px-2 py-1 text-sm" type="button" onClick={() => resetDialogRef.current?.showModal()}>
+          Đặt lại mật khẩu
+        </button>
+      ) : null}
 
       {canEditOwnerName ? (
         <dialog ref={editDialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
@@ -155,7 +157,7 @@ function OwnerActions({ owner, returnTo, canEditOwnerName }: { owner: OwnerRow; 
         </dialog>
       ) : null}
 
-      <dialog ref={resetDialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
+      {canEditOwnerName ? <dialog ref={resetDialogRef} className="w-full max-w-md rounded-lg border bg-white p-0 shadow-xl backdrop:bg-black/30">
         <form className="space-y-4 p-5" action={resetOwnerPasswordAction}>
           <input name="restaurantId" type="hidden" value={owner.restaurantId} />
           <input name="ownerUserId" type="hidden" value={owner.ownerUserId} />
@@ -199,7 +201,7 @@ function OwnerActions({ owner, returnTo, canEditOwnerName }: { owner: OwnerRow; 
             setConfirmPassword("");
           }} submitLabel="Lưu mật khẩu mới" />
         </form>
-      </dialog>
+      </dialog> : null}
     </div>
   );
 }

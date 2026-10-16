@@ -54,6 +54,19 @@ export async function startCustomerSessionAction(slug: string, formData: FormDat
   }
 
   const diningSession = await prisma.$transaction(async (tx) => {
+    const lockedTable = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "RestaurantTable"
+      WHERE id = ${table.id}
+        AND "restaurantId" = ${restaurant.id}
+        AND "isActive" = true
+      FOR UPDATE
+    `;
+
+    if (lockedTable.length === 0) {
+      return null;
+    }
+
     const activeSession = await tx.diningSession.findFirst({
       where: {
         restaurantId: restaurant.id,
@@ -81,6 +94,10 @@ export async function startCustomerSessionAction(slug: string, formData: FormDat
 
     return createdSession;
   });
+
+  if (!diningSession) {
+    redirect(`${restaurantRoutes.welcome(slug)}?t=${encodeURIComponent(parsed.data.qrToken)}&error=${encodeURIComponent("Bàn này hiện không hoạt động.")}`);
+  }
 
   setCustomerSessionCookie({
     restaurantId: restaurant.id,

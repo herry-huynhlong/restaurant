@@ -23,6 +23,7 @@ const tablePanel = "src/components/admin/tables-live-panel.tsx";
 const paymentTable = "src/components/admin/payment-report-table.tsx";
 const reportPage = "src/app/[rSlug]/admin/reports/page.tsx";
 const cashierPage = "src/app/[rSlug]/cashier/page.tsx";
+const cashierWorkspace = "src/components/cashier/cashier-workspace.tsx";
 const printButton = "src/components/billing/invoice-print-button.tsx";
 
 includes(detailService, "restaurantId,", "Paid bill lookup must stay scoped to the current restaurant.");
@@ -52,7 +53,12 @@ includes(historyRoute, '"BILL_PRINT"', "Paid bill history must enforce the bill-
 includes(detailService, 'dayHeading: dateKey === todayKey ? `Hôm nay', "Paid bill history must group recent bills by local day.");
 includes(paymentTable, 'aria-label="Đóng lịch sử bill"', "Paid bill history must provide an accessible close control.");
 includes(reportPage, "PaymentReportTable", "Payment history must keep the paid bill detail and reprint flow.");
-includes(cashierPage, "getRecentPaidPaymentSummaries", "Cashiers must be able to find recently paid bills.");
+includes(cashierPage, "activeDiningSessionWhere", "Cashiers must receive every active dining session, not only payment requests.");
+includes(cashierPage, "BillHistoryButton", "Cashiers must retain paginated access to paid bill history.");
+includes(cashierWorkspace, "expectedGrandTotal", "Cashier payment must reject a bill that changed after it was displayed.");
+includes(cashierWorkspace, "Chưa có món", "Cashiers must see an active table before its first order.");
+includes(cashierWorkspace, "/ops/pay-session", "Cashier workspace must reuse the guarded payment endpoint.");
+includes(cashierWorkspace, "getStaffDeviceId", "Cashier payment must keep the current device identity available to the backend guard.");
 includes(printButton, 'paperSize?: "58mm" | "80mm"', "Thermal printing must support 58 mm and 80 mm paper.");
 includes("src/server/services/billing-service.ts", "unitPriceSnapshot", "Payment must be based on order item price snapshots.");
 includes("src/server/services/payment-service.ts", "invoiceBusinessName", "Payment must preserve invoice identity snapshots.");

@@ -1,37 +1,23 @@
-# Route Map
+# Route map
 
-## Public Customer Routes
+## Chung
 
-- `/[rSlug]`
-- `/[rSlug]/welcome?table=A05&token=xxxxx`
-- `/[rSlug]/menu`
-- `/[rSlug]/cart`
-- `/[rSlug]/orders`
-- `/[rSlug]/payment`
+`/`, `/login`, `/post-login`, `/select-restaurant`, `/unauthorized`.
 
-## Restaurant Staff Routes
+## Platform
 
-- `/[rSlug]/staff`
-- `/[rSlug]/kitchen`
-- `/[rSlug]/cashier`
-- `/[rSlug]/admin`
+`/platform`, `/platform/restaurants`, `/platform/restaurants/new`, `/platform/restaurants/[restaurantId]`, `/platform/restaurants/[restaurantId]/edit`, `/platform/owners`, `/platform/admins`, `/platform/plans`, `/platform/activity`, `/platform/settings`, `/platform/storage`.
 
-## Platform Routes
+## Cửa hàng và khách
 
-- `/platform`
-- `/platform/restaurants`
-- `/platform/restaurants/new`
-- `/platform/restaurants/[restaurantId]`
-- `/platform/restaurants/[restaurantId]/edit`
-- `/platform/plans`
-- `/platform/owners`
-- `/platform/activity`
-- `/platform/settings`
+`/[rSlug]`, `/welcome`, `/menu`, `/cart`, `/orders`, `/payment`, `/login`, `/locked`, `/device-setup`.
 
-## Auth Routes
+## Quản trị/vận hành
 
-- `/login`
-- `/api/auth/[...nextauth]`
-- `/post-login`
-- `/select-restaurant`
-- `/unauthorized`
+`/[rSlug]/admin`, `/admin/menu`, `/admin/categories`, `/admin/tables`, `/admin/orders`, `/admin/staff`, `/admin/top-items`, `/admin/reports`, `/admin/settings`, `/admin/subscription`, cùng `/staff`, `/kitchen`, `/cashier`.
+
+## PWA
+
+Manifest động: `/[rSlug]/manifest.webmanifest` và các context `/admin`, `/staff`, `/kitchen`, `/cashier`; icon động tại `/[rSlug]/icons/[icon]`.
+
+API chi tiết: [API.md](API.md).

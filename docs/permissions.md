@@ -1,26 +1,31 @@
-# Permission Matrix
+# Ma trận phân quyền
 
-Server authorization is enforced through `requirePlatformAdmin`, `requireRestaurantAccess`, and role checks. UI hiding is never considered sufficient.
+Authorization được kiểm tra phía server. Quyền còn phụ thuộc trạng thái nhà hàng, subscription, feature gói và thiết bị nhân viên.
 
-| Area | PLATFORM_ADMIN | OWNER | MANAGER | CASHIER | WAITER | KITCHEN |
-| --- | --- | --- | --- | --- | --- | --- |
-| Platform dashboard | Yes | No | No | No | No | No |
-| Create restaurant + owner | Yes | No | No | No | No | No |
-| Edit restaurant | Yes | No | No | No | No | No |
-| Activate/suspend restaurant | Yes | No | No | No | No | No |
-| Extend subscription/change plan | Yes | No | No | No | No | No |
-| Reset owner password | Yes | No | No | No | No | No |
-| Restaurant dashboard | No | Yes | Yes | Limited | Limited | Limited |
-| Settings | No | Yes | Yes | No | No | No |
-| Staff management | No | Yes | Yes | No | No | No |
-| Menu/category/product management | No | Yes | Yes | No | No | No |
-| Area/table/QR management | No | Yes | Yes | No | No | No |
-| View orders | No | Yes | Yes | Yes | Yes | Yes |
-| Confirm order | No | Yes | Yes | No | Yes | No |
-| Kitchen preparation state | No | Yes | Yes | No | No | Yes |
-| Serve ready order | No | Yes | Yes | No | Yes | No |
-| View bill | No | Yes | Yes | Yes | No | No |
-| Confirm payment | No | Yes | Yes | Yes | No | No |
-| Reports | No | Yes | Yes | No | No | No |
+| Khu vực | Platform Owner | Sub Admin | Owner | Manager | Waiter | Kitchen | Cashier |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Platform dashboard/danh sách | Có | Có | Không | Không | Không | Không | Không |
+| Giá, gói, trạng thái, xóa/restore | Có | Không | Không | Không | Không | Không | Không |
+| Reset mật khẩu chủ quán | Có | Không | Không | Không | Không | Không | Không |
+| Thông tin không nhạy cảm nhà hàng | Có | Có | Không | Không | Không | Không | Không |
+| Admin cửa hàng | Không | Không | Có | Có | Không | Không | Không |
+| Menu, khu vực, bàn, nhân viên | Không | Không | Có | Có | Không | Không | Không |
+| Xem bàn/order | Không | Không | Có | Có | Có | Theo màn bếp | Có |
+| Thêm món tại bàn | Không | Không | Có | Có | Có | Không | Không |
+| Luồng bếp | Không | Không | Có | Có | Không | Có nếu gói cho phép | Không |
+| Xác nhận thanh toán | Không | Không | Có | Có | Không | Không | Có nếu gói cho phép |
+| Báo cáo | Không | Không | Có | Có | Không | Không | Chỉ lịch sử bill được cấp |
 
-No role has permission to cancel orders, cancel order items, or split bills.
+## Quyền gói
+
+- BASIC: Phục vụ, yêu cầu/xác nhận thanh toán, in bill, báo cáo.
+- PRO: BASIC + Quản lý, Bếp, Thu ngân và màn hình nghiệp vụ tương ứng.
+- TRAIN: dùng `planEntitlement` BASIC hoặc PRO.
+- Quán nước (`DRINK_SHOP`) được chuẩn hóa về quyền BASIC theo logic hiện tại.
+
+## Nguyên tắc
+
+- Platform Sub Admin không được nâng quyền qua form/API.
+- Manager không được quản lý OWNER hoặc tự nâng thành OWNER.
+- Staff cần membership active; WAITER/KITCHEN/CASHIER cần thiết bị hợp lệ cho luồng làm việc.
+- Tenant A không được đọc/ghi ID của tenant B; mọi query phải scope `restaurantId`.

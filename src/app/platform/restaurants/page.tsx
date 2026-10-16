@@ -128,6 +128,7 @@ export default async function PlatformRestaurantsPage({
                         priceOptions={priceOptions}
                         showStatusAction={canManageSensitive}
                         showPlanAction={canManageSensitive}
+                        showResetPasswordAction={canManageSensitive}
                         showDeleteAction={canManageSensitive}
                         compact
                       />
