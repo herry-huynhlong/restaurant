@@ -44,6 +44,7 @@ export type BillDetail = {
     quantity: number;
     unitPrice: number;
     subtotal: number;
+    note: string | null;
   }>;
   orders: Array<{
     id: string;
@@ -57,6 +58,7 @@ export type BillDetail = {
       quantity: number;
       unitPrice: number;
       subtotal: number;
+      note: string | null;
     }>;
   }>;
 };
@@ -382,7 +384,15 @@ export function PaymentReportTable({
   );
 }
 
-export function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: () => void }) {
+export function BillDetailModal({
+  bill,
+  onClose,
+  printCopyType = "REPRINT"
+}: {
+  bill: BillDetail;
+  onClose: () => void;
+  printCopyType?: "ORIGINAL" | "REPRINT";
+}) {
   const [paperSize, setPaperSize] = useState<"58mm" | "80mm">("80mm");
   const invoice = {
     restaurantName: bill.restaurantName,
@@ -436,6 +446,7 @@ export function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: 
                   <div>
                     <p className="font-medium">{item.name}</p>
                     <p className="text-sm text-slate-600">{item.quantity} x {formatVnd(item.unitPrice)}</p>
+                    {item.note ? <p className="mt-1 text-xs text-slate-500">Ghi chú: {item.note}</p> : null}
                   </div>
                   <p className="font-semibold">{formatVnd(item.subtotal)}</p>
                 </div>
@@ -478,7 +489,12 @@ export function BillDetailModal({ bill, onClose }: { bill: BillDetail; onClose: 
             <button className={`rounded px-3 py-1.5 ${paperSize === "58mm" ? "bg-teal-700 text-white" : "text-slate-600"}`} type="button" onClick={() => setPaperSize("58mm")}>58 mm</button>
             <button className={`rounded px-3 py-1.5 ${paperSize === "80mm" ? "bg-teal-700 text-white" : "text-slate-600"}`} type="button" onClick={() => setPaperSize("80mm")}>80 mm</button>
           </div>
-          <InvoicePrintButton label="In bill thanh toán" paperSize={paperSize} invoice={invoice} />
+          <InvoicePrintButton
+            label={printCopyType === "REPRINT" ? "In lại bill thanh toán" : "In bill thanh toán"}
+            paperSize={paperSize}
+            invoice={invoice}
+            copyType={printCopyType}
+          />
           <button className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onClose}>
             Đóng
           </button>

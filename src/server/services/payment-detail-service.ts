@@ -44,11 +44,12 @@ export async function getPaymentBillDetail({
     quantity: number;
     unitPrice: number;
     subtotal: number;
+    note: string | null;
   }>();
 
   for (const order of payment.diningSession.orders) {
     for (const item of order.items) {
-      const key = `${item.productNameViSnapshot}:${item.unitPriceSnapshot}`;
+      const key = `${item.productNameViSnapshot}:${item.unitPriceSnapshot}:${item.note ?? ""}`;
       const existing = itemMap.get(key);
       if (existing) {
         existing.quantity += item.quantity;
@@ -59,7 +60,8 @@ export async function getPaymentBillDetail({
           name: item.productNameViSnapshot,
           quantity: item.quantity,
           unitPrice: item.unitPriceSnapshot,
-          subtotal: item.subtotal
+          subtotal: item.subtotal,
+          note: item.note
         });
       }
     }
@@ -100,7 +102,8 @@ export async function getPaymentBillDetail({
         name: item.productNameViSnapshot,
         quantity: item.quantity,
         unitPrice: item.unitPriceSnapshot,
-        subtotal: item.subtotal
+        subtotal: item.subtotal,
+        note: item.note
       }))
     })),
     items: Array.from(itemMap.values())

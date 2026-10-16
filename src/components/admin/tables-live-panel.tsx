@@ -32,6 +32,7 @@ export type TableState = {
     qrPaymentEnabled: boolean;
     paymentQrImage: string | null;
     bankName: string | null;
+    bankCode: string | null;
     accountNumber: string | null;
     accountHolder: string | null;
     paymentTransferContent: string | null;
@@ -71,6 +72,7 @@ export type LiveTable = {
       quantity: number;
       unitPrice: number;
       subtotal: number;
+      note: string | null;
     }>;
     serviceRequests: Array<{
       id: string;
@@ -408,7 +410,7 @@ export function TablesLivePanel({
           onConfirm={() => void confirmPaymentAndPrint()}
         />
       ) : null}
-      {paidBill ? <BillDetailModal bill={paidBill} onClose={() => setPaidBill(null)} /> : null}
+      {paidBill ? <BillDetailModal bill={paidBill} onClose={() => setPaidBill(null)} printCopyType="ORIGINAL" /> : null}
     </section>
   );
 }
@@ -565,6 +567,7 @@ function TableDetail({
               enabled: settings.qrPaymentEnabled,
               imageUrl: settings.paymentQrImage,
               bankName: settings.bankName,
+              bankCode: settings.bankCode,
               accountNumber: settings.accountNumber,
               accountHolder: settings.accountHolder,
               transferContent: settings.paymentTransferContent || `Bàn ${table.name}`

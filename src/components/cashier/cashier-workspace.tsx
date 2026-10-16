@@ -64,6 +64,7 @@ export type CashierSettings = {
   qrPaymentEnabled: boolean;
   paymentQrImage: string | null;
   bankName: string | null;
+  bankCode: string | null;
   accountNumber: string | null;
   accountHolder: string | null;
   paymentTransferContent: string | null;
@@ -450,6 +451,7 @@ function buildPreliminaryInvoice(session: CashierSession, settings: CashierSetti
       enabled: settings.qrPaymentEnabled,
       imageUrl: settings.paymentQrImage,
       bankName: settings.bankName,
+      bankCode: settings.bankCode,
       accountNumber: settings.accountNumber,
       accountHolder: settings.accountHolder,
       transferContent: settings.paymentTransferContent || `Bàn ${session.tableName}`
@@ -459,7 +461,8 @@ function buildPreliminaryInvoice(session: CashierSession, settings: CashierSetti
       name: item.name,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      subtotal: item.subtotal
+      subtotal: item.subtotal,
+      note: item.note
     })))
   };
 }

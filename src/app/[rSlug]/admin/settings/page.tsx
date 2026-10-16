@@ -71,6 +71,7 @@ export default async function SettingsPage({
             <SettingsImageUpload name="paymentQrFile" label="Ảnh mã QR thanh toán" currentUrl={paymentQrUrl} previewClassName="h-32 w-32" />
           </div>
           <Text name="bankName" label="Tên ngân hàng" defaultValue={settings?.bankName} />
+          <Text name="bankCode" label="Mã ngân hàng VietQR" defaultValue={settings?.bankCode} />
           <Text name="accountNumber" label="Số tài khoản" defaultValue={settings?.accountNumber} />
           <Text name="accountHolder" label="Chủ tài khoản" defaultValue={settings?.accountHolder} />
           <Text name="paymentTransferContent" label="Nội dung chuyển khoản mặc định" defaultValue={settings?.paymentTransferContent} />

@@ -17,6 +17,7 @@ export type ActiveTableOrder = {
     unitPrice: number;
     subtotal: number;
     imageUrl: string | null;
+    note: string | null;
   }>;
   orders: Array<{
     id: string;
@@ -82,11 +83,12 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
       unitPrice: number;
       subtotal: number;
       imageUrl: string | null;
+      note: string | null;
     }>();
 
     for (const order of session.orders) {
       for (const item of order.items) {
-        const key = `${item.productNameViSnapshot}:${item.unitPriceSnapshot}`;
+        const key = `${item.productNameViSnapshot}:${item.unitPriceSnapshot}:${item.note ?? ""}`;
         const existing = itemMap.get(key);
         if (existing) {
           existing.quantity += item.quantity;
@@ -97,7 +99,8 @@ export async function getActiveTableOrders(restaurantId: string): Promise<Active
             quantity: item.quantity,
             unitPrice: item.unitPriceSnapshot,
             subtotal: item.subtotal,
-            imageUrl: item.product.imageUrl
+            imageUrl: item.product.imageUrl,
+            note: item.note
           });
         }
       }

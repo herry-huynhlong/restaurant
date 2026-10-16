@@ -51,6 +51,7 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
       qrPaymentEnabled: settings?.qrPaymentEnabled ?? false,
       paymentQrImage: servedUploadUrl(settings?.paymentQrImage),
       bankName: settings?.bankName ?? null,
+      bankCode: settings?.bankCode ?? null,
       accountNumber: settings?.accountNumber ?? null,
       accountHolder: settings?.accountHolder ?? null,
       paymentTransferContent: settings?.paymentTransferContent ?? null
@@ -69,11 +70,12 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
           quantity: number;
           unitPrice: number;
           subtotal: number;
+          note: string | null;
         }>();
         if (activeSession) {
           for (const order of activeSession.orders) {
             for (const item of order.items) {
-              const key = `${item.productNameViSnapshot}:${item.unitPriceSnapshot}`;
+              const key = `${item.productNameViSnapshot}:${item.unitPriceSnapshot}:${item.note ?? ""}`;
               const existing = aggregatedItems.get(key);
               if (existing) {
                 existing.quantity += item.quantity;
@@ -84,7 +86,8 @@ export async function getAdminTablesState(restaurantId: string, slug: string, ba
                   name: item.productNameViSnapshot,
                   quantity: item.quantity,
                   unitPrice: item.unitPriceSnapshot,
-                  subtotal: item.subtotal
+                  subtotal: item.subtotal,
+                  note: item.note
                 });
               }
             }

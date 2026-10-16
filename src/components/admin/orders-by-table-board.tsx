@@ -219,7 +219,8 @@ export function OrdersByTableBoard({
                             name: item.productName,
                             quantity: item.quantity,
                             unitPrice: item.unitPrice,
-                            subtotal: item.subtotal
+                            subtotal: item.subtotal,
+                            note: item.note
                           }))
                         }}
                       />
@@ -370,7 +371,8 @@ function activeTableOrderToLiveTable(table: ActiveTableOrder): LiveTable {
         name: item.productName,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        subtotal: item.subtotal
+        subtotal: item.subtotal,
+        note: item.note
       })),
       serviceRequests: table.requests.map((request) => ({
         id: request.id,

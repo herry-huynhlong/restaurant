@@ -150,6 +150,7 @@ export default async function CashierPage({ params }: { params: { rSlug: string 
             qrPaymentEnabled: settings?.qrPaymentEnabled ?? false,
             paymentQrImage: servedUploadUrl(settings?.paymentQrImage) ?? null,
             bankName: settings?.bankName ?? null,
+            bankCode: settings?.bankCode ?? null,
             accountNumber: settings?.accountNumber ?? null,
             accountHolder: settings?.accountHolder ?? null,
             paymentTransferContent: settings?.paymentTransferContent ?? null
