@@ -52,9 +52,10 @@ type InvoicePrintButtonProps = {
   paperSize?: "58mm" | "80mm";
   invoice: InvoicePrintData;
   copyType?: "ORIGINAL" | "REPRINT";
+  className?: string;
 };
 
-export function InvoicePrintButton({ label = "In hóa đơn", paperSize = "80mm", invoice, copyType = "ORIGINAL" }: InvoicePrintButtonProps) {
+export function InvoicePrintButton({ label = "In hóa đơn", paperSize = "80mm", invoice, copyType = "ORIGINAL", className = "" }: InvoicePrintButtonProps) {
   function printInvoice() {
     const is58mm = paperSize === "58mm";
     const popup = window.open("", "_blank", `width=${is58mm ? 300 : 380},height=720`);
@@ -64,7 +65,7 @@ export function InvoicePrintButton({ label = "In hóa đơn", paperSize = "80mm"
   }
 
   return (
-    <button className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={printInvoice}>
+    <button className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50 ${className}`} type="button" onClick={printInvoice}>
       <Printer className="h-4 w-4" />
       {label}
     </button>

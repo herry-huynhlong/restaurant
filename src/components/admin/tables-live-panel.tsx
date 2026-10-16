@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PaymentMethod } from "@prisma/client";
 import Link from "next/link";
 import { AlertTriangle, Clock, Plus, Search, X } from "lucide-react";
@@ -107,6 +107,8 @@ type PaymentTarget = {
   grandTotal: number;
 };
 
+type StaffTableFilter = "ALL" | "ATTENTION" | "SERVING" | "AVAILABLE";
+
 const tableStatusLabels: Record<string, string> = {
   AVAILABLE: "Đang trống",
   OCCUPIED: "Đang phục vụ",
@@ -131,7 +133,8 @@ export function TablesLivePanel({
   products,
   initialState,
   initialSelectedTableId,
-  initialPaidPayments = []
+  initialPaidPayments = [],
+  compactForStaff = false
 }: {
   slug: string;
   restaurantName: string;
@@ -142,6 +145,7 @@ export function TablesLivePanel({
   initialState: TableState;
   initialSelectedTableId?: string | null;
   initialPaidPayments?: PaymentSummary[];
+  compactForStaff?: boolean;
 }) {
   const [state, setState] = useState(initialState);
   const [selectedTableId, setSelectedTableId] = useState(initialSelectedTableId ?? initialState.areas[0]?.tables[0]?.id ?? null);
@@ -154,10 +158,38 @@ export function TablesLivePanel({
   const [paymentDialogError, setPaymentDialogError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
   const [paidBill, setPaidBill] = useState<BillDetail | null>(null);
+  const [tableQuery, setTableQuery] = useState("");
+  const [tableFilter, setTableFilter] = useState<StaffTableFilter>("ALL");
   const tables = useMemo(() => state.areas.flatMap((area) => area.tables), [state.areas]);
-  const selectedTable = tables.find((table) => table.id === selectedTableId) ?? tables[0] ?? null;
+  const displayedAreas = useMemo(() => {
+    const keyword = tableQuery.trim().toLocaleLowerCase("vi");
+    return state.areas.map((area) => ({
+      ...area,
+      tables: area.tables
+        .filter((table) => {
+          const hasAttention = (table.activeSession?.serviceRequests.length ?? 0) > 0;
+          const matchesFilter = tableFilter === "ALL"
+            || (tableFilter === "ATTENTION" && hasAttention)
+            || (tableFilter === "SERVING" && Boolean(table.activeSession))
+            || (tableFilter === "AVAILABLE" && table.isActive && !table.activeSession);
+          const matchesQuery = !keyword || table.name.toLocaleLowerCase("vi").includes(keyword);
+          return matchesFilter && matchesQuery;
+        })
+        .sort((left, right) => tablePriority(left) - tablePriority(right) || left.name.localeCompare(right.name, "vi"))
+    })).filter((area) => area.tables.length > 0);
+  }, [state.areas, tableFilter, tableQuery]);
+  const selectedTable = compactForStaff
+    ? displayedAreas.flatMap((area) => area.tables).find((table) => table.id === selectedTableId) ?? displayedAreas[0]?.tables[0] ?? null
+    : tables.find((table) => table.id === selectedTableId) ?? tables[0] ?? null;
   const selectedTableIdForBill = selectedTable?.id ?? null;
   const selectedSessionIdForBill = selectedTable?.activeSession?.id ?? null;
+
+  useEffect(() => {
+    if (!compactForStaff) return;
+    const visibleTables = displayedAreas.flatMap((area) => area.tables);
+    if (visibleTables.some((table) => table.id === selectedTableId)) return;
+    setSelectedTableId(visibleTables[0]?.id ?? null);
+  }, [compactForStaff, displayedAreas, selectedTableId]);
 
   const refreshTables = useCallback(async () => {
     try {
@@ -330,10 +362,30 @@ export function TablesLivePanel({
       <div className="flex flex-wrap items-center justify-between gap-3 xl:col-span-2">
         <div>
           <h2 className="font-semibold">Sơ đồ bàn</h2>
-          <p className="text-sm text-slate-500">Chọn bàn để thao tác nhanh hoặc in bill.</p>
+          <p className="text-sm text-slate-500">Bàn cần hỗ trợ được ưu tiên hiển thị trước.</p>
         </div>
         {canUsePayment ? <BillHistoryButton slug={slug} tables={tables.map((table) => ({ id: table.id, name: table.name }))} /> : null}
       </div>
+      {compactForStaff ? (
+        <div className="grid gap-2 rounded-lg border bg-white p-3 shadow-sm sm:grid-cols-[minmax(220px,1fr)_auto] xl:col-span-2">
+          <label className="relative block min-w-0">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-10 w-full rounded-md border bg-white pl-9 pr-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              value={tableQuery}
+              onChange={(event) => setTableQuery(event.target.value)}
+              placeholder="Tìm số bàn"
+              aria-label="Tìm số bàn"
+            />
+          </label>
+          <div className="flex flex-wrap gap-1 rounded-md bg-slate-100 p-1" aria-label="Lọc trạng thái bàn">
+            <TableFilterButton active={tableFilter === "ALL"} onClick={() => setTableFilter("ALL")}>Tất cả</TableFilterButton>
+            <TableFilterButton active={tableFilter === "ATTENTION"} onClick={() => setTableFilter("ATTENTION")}>Cần hỗ trợ</TableFilterButton>
+            <TableFilterButton active={tableFilter === "SERVING"} onClick={() => setTableFilter("SERVING")}>Đang phục vụ</TableFilterButton>
+            <TableFilterButton active={tableFilter === "AVAILABLE"} onClick={() => setTableFilter("AVAILABLE")}>Bàn trống</TableFilterButton>
+          </div>
+        </div>
+      ) : null}
       <div className="space-y-5">
         {status === "reconnecting" ? (
           <div className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
@@ -341,7 +393,7 @@ export function TablesLivePanel({
           </div>
         ) : null}
         {message ? <p className="rounded-md border bg-white px-3 py-2 text-sm text-slate-700">{message}</p> : null}
-        {state.areas.map((area) => (
+        {displayedAreas.map((area) => (
           <section key={area.id} className="space-y-3">
             <h2 className="text-base font-semibold">{area.name}</h2>
             {area.tables.length ? (
@@ -356,6 +408,7 @@ export function TablesLivePanel({
                       setSelectedTableId(table.id);
                       setOrderingTableId(table.id);
                     }}
+                    compact={compactForStaff}
                   />
                 ))}
               </div>
@@ -364,6 +417,9 @@ export function TablesLivePanel({
             )}
           </section>
         ))}
+        {compactForStaff && displayedAreas.length === 0 ? (
+          <p className="rounded-lg border border-dashed bg-white p-6 text-center text-sm text-slate-500">Không tìm thấy bàn phù hợp.</p>
+        ) : null}
       </div>
       <TableDetail
         slug={slug}
@@ -419,12 +475,14 @@ function TableSummaryCard({
   table,
   selected,
   onSelect,
-  onAddOrder
+  onAddOrder,
+  compact
 }: {
   table: LiveTable;
   selected: boolean;
   onSelect: () => void;
   onAddOrder: () => void;
+  compact: boolean;
 }) {
   const label = !table.isActive ? "Ngừng sử dụng" : tableStatusLabels[table.status] ?? table.status;
   const itemCount = table.activeSession?.itemCount ?? 0;
@@ -438,7 +496,7 @@ function TableSummaryCard({
       : `${itemCount} món · ${formatVnd(table.activeSession.grandTotal)}`;
 
   return (
-    <article className={`flex min-h-44 flex-col rounded-xl border p-4 transition hover:-translate-y-0.5 hover:shadow-sm ${cardClass} ${selected ? "ring-2 ring-teal-400" : ""}`}>
+    <article className={`flex flex-col rounded-lg border transition hover:shadow-sm ${compact && !table.activeSession ? "min-h-32 p-3" : "min-h-40 p-4"} ${cardClass} ${selected ? "ring-2 ring-teal-400" : ""}`}>
       <div className="flex flex-wrap items-start gap-2">
         <h3 className="min-w-0 max-w-full truncate text-lg font-semibold leading-tight">Bàn {table.name}</h3>
         <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
@@ -948,6 +1006,34 @@ function statusCardClass(table: LiveTable) {
   if (table.status === "PAYMENT_REQUESTED") return "border-amber-200 bg-amber-50/70";
   if (table.status === "AVAILABLE") return "border-emerald-200 bg-emerald-50/60";
   return "border-sky-200 bg-sky-50/60";
+}
+
+function tablePriority(table: LiveTable) {
+  if ((table.activeSession?.serviceRequests.length ?? 0) > 0) return 0;
+  if (table.status === "PAYMENT_REQUESTED") return 1;
+  if (table.activeSession) return 2;
+  return 3;
+}
+
+function TableFilterButton({
+  active,
+  onClick,
+  children
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      className={`h-8 rounded px-2.5 text-xs font-semibold transition ${active ? "bg-white text-teal-800 shadow-sm" : "text-slate-600 hover:text-slate-950"}`}
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+    >
+      {children}
+    </button>
+  );
 }
 
 function formatTime(value: string) {

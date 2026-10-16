@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertCircle, ChevronRight, Clock3, CreditCard, Eye, ReceiptText, Utensils, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, Clock3, CreditCard, Eye, MapPin, ReceiptText, Search, Utensils, WalletCards, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { PaidBillButton } from "@/components/admin/payment-report-table";
@@ -12,6 +12,7 @@ import { getStaffDeviceId } from "@/lib/staff-device";
 import type { CashierSession, CashierSummary } from "@/server/services/cashier-state-service";
 
 type PaymentMethod = "CASH" | "QR" | "BANK_TRANSFER" | "CARD" | "OTHER";
+type SessionFilter = "ALL" | "PAYMENT" | "SERVING" | "NO_ITEMS";
 
 export type CashierSettings = {
   restaurantName: string;
@@ -49,14 +50,26 @@ export function CashierWorkspace({
   const [paymentSessionId, setPaymentSessionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [paidPaymentId, setPaidPaymentId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sessionFilter, setSessionFilter] = useState<SessionFilter>("ALL");
   const latestRefreshRef = useRef(0);
 
   const selectedSession = liveSessions.find((session) => session.id === selectedSessionId) ?? null;
   const paymentSession = liveSessions.find((session) => session.id === paymentSessionId) ?? null;
-  const paymentRequests = useMemo(
-    () => liveSessions.filter((session) => session.paymentRequest),
-    [liveSessions]
-  );
+  const filteredSessions = useMemo(() => {
+    const keyword = query.trim().toLocaleLowerCase("vi");
+    return liveSessions.filter((session) => {
+      const waitingForPayment = isWaitingForPayment(session);
+      const matchesFilter = sessionFilter === "ALL"
+        || (sessionFilter === "PAYMENT" && waitingForPayment)
+        || (sessionFilter === "SERVING" && session.itemCount > 0 && !waitingForPayment)
+        || (sessionFilter === "NO_ITEMS" && session.itemCount === 0);
+      if (!matchesFilter) return false;
+      if (!keyword) return true;
+      return [session.tableName, session.areaName, session.customerName ?? ""]
+        .some((value) => value.toLocaleLowerCase("vi").includes(keyword));
+    });
+  }, [liveSessions, query, sessionFilter]);
 
   const refreshState = useCallback(async () => {
     const refreshId = ++latestRefreshRef.current;
@@ -137,9 +150,9 @@ export function CashierWorkspace({
   return (
     <div className="space-y-6">
       <section className="grid gap-3 sm:grid-cols-3">
-        <QuickStat label="Bàn đang phục vụ" value={String(summary.activeSessionCount)} tone="teal" />
-        <QuickStat label="Yêu cầu thanh toán" value={String(summary.paymentRequestCount)} tone={summary.paymentRequestCount ? "amber" : "slate"} />
-        <QuickStat label="Bill đã thanh toán hôm nay" value={`${summary.paidBillCount} · ${formatVnd(summary.paidRevenue)}`} tone="slate" />
+        <QuickStat icon={Utensils} label="Bàn đang phục vụ" value={String(summary.activeSessionCount)} unit="bàn" tone="teal" />
+        <QuickStat icon={AlertCircle} label="Yêu cầu thanh toán" value={String(summary.paymentRequestCount)} unit="yêu cầu" tone={summary.paymentRequestCount ? "amber" : "slate"} />
+        <QuickStat icon={WalletCards} label="Bill hôm nay" value={String(summary.paidBillCount)} unit="hóa đơn" detail={`Doanh thu ${formatVnd(summary.paidRevenue)}`} tone="slate" />
       </section>
 
       {message ? (
@@ -149,100 +162,63 @@ export function CashierWorkspace({
         </div>
       ) : null}
 
-      <section className="overflow-hidden rounded-lg border bg-white shadow-sm">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b px-4 py-4 sm:px-5">
+      <section className="rounded-lg border bg-white shadow-sm">
+        <div className="border-b px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase text-teal-700">Vận hành hiện tại</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-950">Bàn đang phục vụ</h2>
-            <p className="mt-1 text-sm text-slate-500">Mọi phiên đang mở đều xuất hiện tại đây, kể cả bàn chưa gọi món.</p>
+              <p className="text-xs font-semibold uppercase text-teal-700">Vận hành hiện tại</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-950">Bàn đang phục vụ</h2>
+              <p className="mt-1 text-sm text-slate-500">Ưu tiên bàn chờ thanh toán và thao tác trực tiếp tại từng bàn.</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{filteredSessions.length}/{liveSessions.length} bàn</span>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{liveSessions.length} bàn</span>
+
+          <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <label className="relative block w-full lg:max-w-sm">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                className="h-10 w-full rounded-md border bg-white pl-9 pr-9 text-sm outline-none transition focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Tìm theo bàn, khu vực hoặc tên khách"
+                aria-label="Tìm bàn"
+              />
+              {query ? (
+                <button className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded hover:bg-slate-100" type="button" onClick={() => setQuery("")} aria-label="Xóa tìm kiếm">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+            </label>
+            <div className="flex max-w-full flex-wrap gap-1 rounded-md bg-slate-100 p-1" aria-label="Lọc trạng thái bàn">
+              <FilterButton active={sessionFilter === "ALL"} onClick={() => setSessionFilter("ALL")}>Tất cả</FilterButton>
+              <FilterButton active={sessionFilter === "PAYMENT"} onClick={() => setSessionFilter("PAYMENT")}>Chờ thanh toán</FilterButton>
+              <FilterButton active={sessionFilter === "SERVING"} onClick={() => setSessionFilter("SERVING")}>Đang phục vụ</FilterButton>
+              <FilterButton active={sessionFilter === "NO_ITEMS"} onClick={() => setSessionFilter("NO_ITEMS")}>Chưa có món</FilterButton>
+            </div>
+          </div>
         </div>
 
-        {liveSessions.length ? (
-          <div className="divide-y">
-            {liveSessions.map((session) => (
-              <article key={session.id} className="grid gap-4 px-4 py-4 transition-colors hover:bg-slate-50 sm:px-5 lg:grid-cols-[minmax(180px,1.2fr)_minmax(160px,0.8fr)_minmax(140px,0.7fr)_auto] lg:items-center">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-bold text-slate-950">Bàn {session.tableName}</p>
-                    <SessionStatusBadge session={session} />
-                  </div>
-                  <p className="mt-1 truncate text-sm text-slate-600">{session.areaName} · {session.customerName ?? "Chưa có tên khách"}</p>
-                  <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-500"><Clock3 className="h-3.5 w-3.5" /> Mở lúc {session.openedAtLabel}</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                  <div>
-                    <p className="text-xs text-slate-500">Số món</p>
-                    <p className="mt-0.5 font-semibold">{session.itemCount ? `${session.itemCount} món` : "Chưa có món"}</p>
-                  </div>
-                  <div className="lg:mt-2">
-                    <p className="text-xs text-slate-500">Lượt gọi</p>
-                    <p className="mt-0.5 font-semibold">{session.orderCount}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">Tổng tạm tính</p>
-                  <p className="mt-0.5 text-lg font-bold text-teal-700">{formatVnd(session.bill.grandTotal)}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <button className="inline-flex h-10 items-center gap-2 rounded-md border bg-white px-3 text-sm font-semibold hover:bg-slate-50" type="button" onClick={() => openDetails(session.id)}>
-                    <Eye className="h-4 w-4" /> Xem Order
-                  </button>
-                  <InvoicePrintButton label="In tạm tính" invoice={buildPreliminaryInvoice(session, settings, cashierName)} />
-                  <button className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800" type="button" onClick={() => openPayment(session.id)}>
-                    <CreditCard className="h-4 w-4" /> Thanh toán
-                  </button>
-                </div>
-              </article>
+        {filteredSessions.length ? (
+          <div className="grid gap-3 p-3 sm:p-4 md:grid-cols-2 xl:grid-cols-3">
+            {filteredSessions.map((session) => (
+              <CashierTableCard
+                key={session.id}
+                session={session}
+                slug={slug}
+                settings={settings}
+                cashierName={cashierName}
+                onDetails={() => openDetails(session.id)}
+                onPayment={() => openPayment(session.id)}
+              />
             ))}
           </div>
         ) : (
           <div className="px-5 py-8 text-center">
             <Utensils className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="mt-3 font-semibold text-slate-800">Chưa có bàn đang phục vụ</p>
-            <p className="mt-1 text-sm text-slate-500">Bàn sẽ xuất hiện ngay khi một phiên phục vụ được mở.</p>
+            <p className="mt-3 font-semibold text-slate-800">Không tìm thấy bàn phù hợp</p>
+            <p className="mt-1 text-sm text-slate-500">Thử đổi từ khóa hoặc chọn trạng thái khác.</p>
           </div>
         )}
-      </section>
-
-      <section className="overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3 sm:px-5">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-700" />
-            <div>
-              <h2 className="font-semibold text-amber-950">Yêu cầu thanh toán</h2>
-              <p className="text-sm text-amber-800">{paymentRequests.length} bàn đang chờ</p>
-            </div>
-          </div>
-        </div>
-        {paymentRequests.length ? (
-          <div className="divide-y">
-            {paymentRequests.map((session) => {
-              const request = session.paymentRequest!;
-              return (
-                <div key={request.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-                  <div>
-                    <p className="font-semibold">Bàn {session.tableName} · {formatVnd(session.bill.grandTotal)}</p>
-                    <p className="text-sm text-slate-500">{request.customerName} · gửi lúc {request.createdAtLabel}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {request.status === "NEW" ? (
-                      <form action={updateServiceRequestStatusAction.bind(null, slug, request.id, "ACKNOWLEDGED")}>
-                        <PendingSubmitButton className="h-9 rounded-md border bg-white px-3 text-sm font-semibold" pendingLabel="Đang nhận...">Đã nhận</PendingSubmitButton>
-                      </form>
-                    ) : <span className="inline-flex h-9 items-center rounded-md bg-amber-100 px-3 text-sm font-semibold text-amber-800">Đã tiếp nhận</span>}
-                    <button className="inline-flex h-9 items-center gap-1 rounded-md border bg-white px-3 text-sm font-semibold" type="button" onClick={() => openDetails(session.id)}>Xem bàn <ChevronRight className="h-4 w-4" /></button>
-                    <button className="h-9 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white" type="button" onClick={() => openPayment(session.id)}>Thanh toán</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : <p className="px-5 py-4 text-sm text-slate-500">Chưa có yêu cầu thanh toán cần xử lý.</p>}
       </section>
 
       {selectedSession ? (
@@ -275,18 +251,133 @@ export function CashierWorkspace({
   );
 }
 
-function QuickStat({ label, value, tone }: { label: string; value: string; tone: "teal" | "amber" | "slate" }) {
-  const toneClass = tone === "teal"
-    ? "border-teal-100 bg-teal-50 text-teal-800"
-    : tone === "amber"
-      ? "border-amber-200 bg-amber-50 text-amber-800"
-      : "border-slate-200 bg-white text-slate-800";
+function CashierTableCard({
+  session,
+  slug,
+  settings,
+  cashierName,
+  onDetails,
+  onPayment
+}: {
+  session: CashierSession;
+  slug: string;
+  settings: CashierSettings;
+  cashierName: string | null;
+  onDetails: () => void;
+  onPayment: () => void;
+}) {
+  const request = session.paymentRequest;
+  const waitingForPayment = isWaitingForPayment(session);
+
   return (
-    <div className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
-      <p className="text-sm font-medium opacity-80">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+    <article className={`flex min-w-0 flex-col rounded-lg border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${waitingForPayment ? "border-amber-300" : "border-slate-200"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="break-words text-lg font-bold text-slate-950">Bàn {session.tableName}</h3>
+            <SessionStatusBadge session={session} />
+          </div>
+          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-slate-500">
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{session.areaName}</span>
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-xs text-slate-500">Tạm tính</p>
+          <p className="mt-0.5 max-w-40 break-words text-right text-base font-bold text-teal-700 tabular-nums sm:text-lg">
+            {formatVnd(session.bill.grandTotal)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 divide-x rounded-md border bg-slate-50 py-2.5 text-center">
+        <div className="px-2">
+          <p className="text-[11px] text-slate-500">Mở bàn</p>
+          <p className="mt-0.5 truncate text-xs font-semibold text-slate-800" title={session.openedAtLabel}>
+            {session.openedAtLabel}
+          </p>
+        </div>
+        <div className="px-2">
+          <p className="text-[11px] text-slate-500">Số món</p>
+          <p className="mt-0.5 text-sm font-bold text-slate-900">{session.itemCount}</p>
+        </div>
+        <div className="px-2">
+          <p className="text-[11px] text-slate-500">Lượt gọi</p>
+          <p className="mt-0.5 text-sm font-bold text-slate-900">{session.orderCount}</p>
+        </div>
+      </div>
+
+      <p className="mt-3 truncate text-sm text-slate-600">
+        <span className="text-slate-400">Khách:</span> {session.customerName ?? "Chưa cập nhật"}
+      </p>
+
+      {request ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-amber-900">Yêu cầu thanh toán · {request.createdAtLabel}</p>
+            <p className="truncate text-xs text-amber-700">{request.customerName}</p>
+          </div>
+          {request.status === "NEW" ? (
+            <form action={updateServiceRequestStatusAction.bind(null, slug, request.id, "ACKNOWLEDGED")}>
+              <PendingSubmitButton className="h-8 shrink-0 rounded-md border border-amber-300 bg-white px-2.5 text-xs font-semibold text-amber-900" pendingLabel="Đang nhận...">Đã nhận</PendingSubmitButton>
+            </form>
+          ) : <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Đã nhận</span>}
+        </div>
+      ) : null}
+
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
+        <button className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md border bg-white px-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onDetails}>
+          <Eye className="h-4 w-4" /> Xem order
+        </button>
+        <InvoicePrintButton className="h-10 w-full justify-center px-2" label="In tạm tính" invoice={buildPreliminaryInvoice(session, settings, cashierName)} />
+        <button className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800" type="button" onClick={onPayment}>
+          <CreditCard className="h-4 w-4" /> Thanh toán {formatVnd(session.bill.grandTotal)}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      className={`h-8 shrink-0 rounded px-3 text-xs font-semibold transition ${active ? "bg-white text-teal-800 shadow-sm" : "text-slate-600 hover:text-slate-950"}`}
+      type="button"
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function QuickStat({ icon: Icon, label, value, unit, detail, tone }: {
+  icon: typeof Utensils;
+  label: string;
+  value: string;
+  unit: string;
+  detail?: string;
+  tone: "teal" | "amber" | "slate";
+}) {
+  const toneClass = tone === "teal"
+    ? "border-teal-100 bg-white text-teal-800"
+    : tone === "amber"
+      ? "border-amber-200 bg-white text-amber-800"
+      : "border-slate-200 bg-white text-slate-800";
+  const iconClass = tone === "teal" ? "bg-teal-50 text-teal-700" : tone === "amber" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600";
+  return (
+    <div className={`flex min-w-0 items-center gap-3 rounded-lg border p-3.5 shadow-sm ${toneClass}`}>
+      <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${iconClass}`}><Icon className="h-5 w-5" /></span>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium text-slate-500">{label}</p>
+        <p className="mt-0.5 flex items-baseline gap-1"><span className="text-xl font-bold tabular-nums">{value}</span><span className="text-xs font-medium text-slate-500">{unit}</span></p>
+        {detail ? <p className="mt-0.5 truncate text-xs font-semibold text-teal-700">{detail}</p> : null}
+      </div>
     </div>
   );
+}
+
+function isWaitingForPayment(session: CashierSession) {
+  return Boolean(session.paymentRequest) || session.status === "AWAITING_PAYMENT" || session.paymentStatus === "PENDING";
 }
 
 function SessionStatusBadge({ session }: { session: CashierSession }) {

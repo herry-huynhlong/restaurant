@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Search } from "lucide-react";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
 import { StaffAddOrderModal, type LiveTable, type MenuProduct } from "@/components/admin/tables-live-panel";
 import { FoodItemDisplayCard } from "@/components/ops/food-item-display-card";
@@ -30,13 +31,16 @@ const itemStatusLabels: Record<string, string> = {
   SERVED: "Đã phục vụ"
 };
 
+type StaffOrderFilter = "ALL" | "ATTENTION" | "PAYMENT";
+
 export function OrdersByTableBoard({
   slug,
   restaurantName,
   initialTables,
   initialExpandedSessionId,
   products = [],
-  enableAddOrder = false
+  enableAddOrder = false,
+  compactForStaff = false
 }: {
   slug: string;
   restaurantName: string;
@@ -44,6 +48,7 @@ export function OrdersByTableBoard({
   initialExpandedSessionId?: string;
   products?: MenuProduct[];
   enableAddOrder?: boolean;
+  compactForStaff?: boolean;
 }) {
   const [tables, setTables] = useState(initialTables);
   const [expandedSessionIds, setExpandedSessionIds] = useState<Record<string, boolean>>(
@@ -53,6 +58,19 @@ export function OrdersByTableBoard({
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [orderingTable, setOrderingTable] = useState<LiveTable | null>(null);
+  const [syncStatus, setSyncStatus] = useState<"live" | "reconnecting">("live");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<StaffOrderFilter>("ALL");
+  const filteredTables = useMemo(() => {
+    const keyword = query.trim().toLocaleLowerCase("vi");
+    return tables.filter((table) => {
+      const waitingForPayment = table.status === "AWAITING_PAYMENT" || table.paymentStatus === "PENDING";
+      const matchesFilter = filter === "ALL"
+        || (filter === "ATTENTION" && table.requests.length > 0)
+        || (filter === "PAYMENT" && waitingForPayment);
+      return matchesFilter && (!keyword || table.tableName.toLocaleLowerCase("vi").includes(keyword) || table.areaName.toLocaleLowerCase("vi").includes(keyword));
+    });
+  }, [filter, query, tables]);
 
   useEffect(() => {
     const liveSessionIds = new Set(tables.map((table) => table.diningSessionId));
@@ -66,13 +84,14 @@ export function OrdersByTableBoard({
     async function loadState() {
       try {
         const response = await fetch(`/api/restaurants/${slug}/admin/orders/state`, { cache: "no-store" });
-        if (!response.ok) return;
+        if (!response.ok) throw new Error("orders_state_failed");
         const data = await response.json() as { tables: ActiveTableOrder[] };
         if (isMounted) {
           setTables(data.tables);
+          setSyncStatus("live");
         }
       } catch {
-        // Keep the last good state on transient network errors.
+        if (isMounted) setSyncStatus("reconnecting");
       }
     }
 
@@ -131,16 +150,39 @@ export function OrdersByTableBoard({
           {message.text}
         </p>
       ) : null}
+      {syncStatus === "reconnecting" ? (
+        <p className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Đang kết nối lại</p>
+      ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {tables.map((table) => {
+      {compactForStaff ? (
+        <div className="grid gap-2 rounded-lg border bg-white p-3 shadow-sm sm:grid-cols-[minmax(220px,1fr)_auto]">
+          <label className="relative block min-w-0">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-10 w-full rounded-md border bg-white pl-9 pr-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Tìm bàn hoặc khu vực"
+              aria-label="Tìm order theo bàn"
+            />
+          </label>
+          <div className="flex flex-wrap gap-1 rounded-md bg-slate-100 p-1" aria-label="Lọc order theo bàn">
+            <OrderFilterButton active={filter === "ALL"} onClick={() => setFilter("ALL")}>Tất cả</OrderFilterButton>
+            <OrderFilterButton active={filter === "ATTENTION"} onClick={() => setFilter("ATTENTION")}>Có yêu cầu</OrderFilterButton>
+            <OrderFilterButton active={filter === "PAYMENT"} onClick={() => setFilter("PAYMENT")}>Chờ thanh toán</OrderFilterButton>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        {filteredTables.map((table) => {
           const isExpanded = expandedSessionIds[table.diningSessionId] ?? false;
           const isHistoryExpanded = expandedHistorySessionIds[table.diningSessionId] ?? false;
-          const shownItems = table.items.slice(0, 5);
+          const shownItems = table.items.slice(0, compactForStaff ? 3 : 5);
           const hiddenItemCount = Math.max(0, table.items.length - shownItems.length);
 
           return (
-            <article id={`session-${table.diningSessionId}`} key={table.diningSessionId} className={`rounded-xl border bg-white p-4 shadow-sm transition hover:border-slate-300 ${initialExpandedSessionId === table.diningSessionId ? "border-teal-300 ring-2 ring-teal-100" : ""}`}>
+            <article id={`session-${table.diningSessionId}`} key={table.diningSessionId} className={`rounded-lg border bg-white p-4 shadow-sm transition hover:border-slate-300 ${table.requests.length ? "border-red-200" : ""} ${initialExpandedSessionId === table.diningSessionId ? "border-teal-300 ring-2 ring-teal-100" : ""}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -167,8 +209,8 @@ export function OrdersByTableBoard({
                 {hiddenItemCount > 0 ? <p className="text-sm text-slate-500">+ {hiddenItemCount} món khác</p> : null}
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t pt-3">
+                <div className="col-span-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
                   <span>{table.items.length} món</span>
                   {table.requests.length > 0 ? (
                     <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
@@ -177,7 +219,7 @@ export function OrdersByTableBoard({
                   ) : null}
                 </div>
                 <button
-                  className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+                  className={`${enableAddOrder ? "" : "col-span-2"} min-h-10 rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50`}
                   type="button"
                   onClick={() => setExpandedSessionIds((current) => ({
                     ...current,
@@ -188,7 +230,7 @@ export function OrdersByTableBoard({
                 </button>
                 {enableAddOrder ? (
                   <button
-                    className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+                    className="min-h-10 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800"
                     type="button"
                     onClick={() => setOrderingTable(activeTableOrderToLiveTable(table))}
                   >
@@ -323,6 +365,9 @@ export function OrdersByTableBoard({
           );
         })}
       </div>
+      {filteredTables.length === 0 ? (
+        <p className="rounded-lg border border-dashed bg-white p-6 text-center text-sm text-slate-500">Không tìm thấy order phù hợp.</p>
+      ) : null}
       {orderingTable ? (
         <StaffAddOrderModal
           slug={slug}
@@ -405,6 +450,23 @@ function pruneMissingSessionIds(current: Record<string, boolean>, liveSessionIds
     }
   }
   return next;
+}
+
+function OrderFilterButton({ active, onClick, children }: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      className={`h-8 rounded px-2.5 text-xs font-semibold transition ${active ? "bg-white text-teal-800 shadow-sm" : "text-slate-600 hover:text-slate-950"}`}
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+    >
+      {children}
+    </button>
+  );
 }
 
 function formatMoney(value: number) {

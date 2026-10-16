@@ -103,6 +103,12 @@ export function NotificationBell({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!foregroundPopup) return;
+    const timer = window.setTimeout(() => setForegroundPopup(null), 6500);
+    return () => window.clearTimeout(timer);
+  }, [foregroundPopup]);
+
   function playSound() {
     if (localStorage.getItem("notificationSoundEnabled") !== "true") return;
     const now = Date.now();
@@ -325,12 +331,12 @@ export function NotificationBell({
         </div>
       ) : null}
       {foregroundPopup ? (
-        <div className="fixed left-3 right-3 top-4 z-[60] rounded-2xl border border-teal-200 bg-white p-4 shadow-2xl sm:left-auto sm:right-5 sm:w-96">
+        <div className="fixed left-3 right-3 top-20 z-[60] rounded-lg border border-teal-200 bg-white p-3 shadow-xl sm:left-auto sm:right-5 sm:w-80" role="status" aria-live="polite">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Thông báo mới</p>
-              <p className="mt-1 break-words text-base font-semibold text-slate-950">{foregroundPopup.title}</p>
-              <p className="mt-1 break-words text-sm text-slate-600">{foregroundPopup.message}</p>
+              <p className="mt-1 break-words text-sm font-semibold text-slate-950">{foregroundPopup.title}</p>
+              <p className="mt-1 line-clamp-2 break-words text-xs leading-relaxed text-slate-600">{foregroundPopup.message}</p>
               {foregroundPopup.type === "SUBSCRIPTION_EXPIRING" ? (
                 <Link className="mt-3 inline-flex rounded-md border bg-white px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50" href={restaurantRoutes.adminSubscription(slug)} onClick={() => setForegroundPopup(null)}>
                   Xem gói dịch vụ
@@ -346,9 +352,9 @@ export function NotificationBell({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2 flex gap-2">
             <button
-              className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800"
+              className="rounded-md bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800"
               type="button"
               onClick={() => {
                 setOpen(true);
@@ -358,7 +364,7 @@ export function NotificationBell({
               Xem thông báo
             </button>
             <button
-              className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+              className="rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-slate-50"
               type="button"
               onClick={() => setForegroundPopup(null)}
             >
