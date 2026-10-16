@@ -91,10 +91,12 @@ export function StaffDirectoryFilters() {
       card.hidden = !(matchesQuery && matchesStatus);
     });
 
-    document.querySelectorAll<HTMLElement>("[data-staff-group]").forEach((group) => {
+    const hasActiveFilter = normalizedQuery.length > 0 || status !== "ALL";
+    document.querySelectorAll<HTMLDetailsElement>("[data-staff-group]").forEach((group) => {
       const visibleCards = group.querySelectorAll<HTMLElement>("[data-staff-card]:not([hidden])");
       const emptyState = group.querySelector<HTMLElement>("[data-staff-group-empty]");
       if (emptyState) emptyState.hidden = visibleCards.length > 0;
+      if (hasActiveFilter && visibleCards.length > 0) group.open = true;
     });
   }, [query, status]);
 

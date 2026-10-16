@@ -2,7 +2,7 @@ import type { RestaurantRole } from "@prisma/client";
 import QRCode from "qrcode";
 import Image from "next/image";
 import { headers } from "next/headers";
-import { ChefHat, Clock3, Receipt, Smartphone, UserCog, Users, type LucideIcon } from "lucide-react";
+import { ChefHat, ChevronDown, Clock3, MonitorSmartphone, Pencil, Receipt, Smartphone, UserCog, Users, type LucideIcon } from "lucide-react";
 import { RestaurantAdminShell } from "@/components/app-shell/restaurant-admin-shell";
 import { CopyLoginLinkButton, StaffDirectoryFilters, StaffPageInteractions, StaffSubmitButton } from "@/components/admin/staff-page-interactions";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
@@ -35,36 +35,36 @@ const staffGroupTitles: Record<RestaurantRole, string> = {
   CASHIER: "Thu ngân",
   MANAGER: "Quản lý"
 };
-const staffRoleStyles: Record<RestaurantRole, { Icon: LucideIcon; shell: string; icon: string; accent: string }> = {
+const staffRoleStyles: Record<RestaurantRole, { Icon: LucideIcon; icon: string; accent: string; marker: string }> = {
   OWNER: {
     Icon: UserCog,
-    shell: "border-teal-100 bg-teal-50/70",
-    icon: "bg-teal-700 text-white",
-    accent: "text-teal-800"
+    icon: "border-teal-100 bg-teal-50 text-teal-700",
+    accent: "text-teal-800",
+    marker: "border-l-teal-600"
   },
   MANAGER: {
     Icon: UserCog,
-    shell: "border-teal-100 bg-teal-50/70",
-    icon: "bg-teal-700 text-white",
-    accent: "text-teal-800"
+    icon: "border-teal-100 bg-teal-50 text-teal-700",
+    accent: "text-teal-800",
+    marker: "border-l-teal-600"
   },
   WAITER: {
     Icon: Users,
-    shell: "border-sky-100 bg-sky-50/70",
-    icon: "bg-sky-600 text-white",
-    accent: "text-sky-800"
+    icon: "border-sky-100 bg-sky-50 text-sky-700",
+    accent: "text-sky-800",
+    marker: "border-l-sky-500"
   },
   KITCHEN: {
     Icon: ChefHat,
-    shell: "border-amber-100 bg-amber-50/70",
-    icon: "bg-amber-600 text-white",
-    accent: "text-amber-800"
+    icon: "border-amber-100 bg-amber-50 text-amber-700",
+    accent: "text-amber-800",
+    marker: "border-l-amber-500"
   },
   CASHIER: {
     Icon: Receipt,
-    shell: "border-emerald-100 bg-emerald-50/70",
-    icon: "bg-emerald-600 text-white",
-    accent: "text-emerald-800"
+    icon: "border-emerald-100 bg-emerald-50 text-emerald-700",
+    accent: "text-emerald-800",
+    marker: "border-l-emerald-500"
   }
 };
 const staffStatusRank = { WORKING: 0, OFF_SHIFT: 1, LOCKED: 2 };
@@ -270,41 +270,60 @@ export default async function AdminStaffPage({
 
         <StaffDirectoryFilters />
 
-        {staffRows.length ? groupedStaff.map((group) => (
-          <section key={group.role} className={`space-y-3 rounded-2xl border p-4 ${staffRoleStyles[group.role].shell}`} data-staff-group>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${staffRoleStyles[group.role].icon}`}>
-                  {(() => {
-                    const Icon = staffRoleStyles[group.role].Icon;
-                    return <Icon className="h-5 w-5" />;
-                  })()}
-                </span>
-                <div>
-                  <h3 className={`text-sm font-bold uppercase tracking-wide ${staffRoleStyles[group.role].accent}`}>{group.title}</h3>
-                  <p className="text-xs text-slate-500">{restaurantRoleLabels[group.role]}</p>
+        {staffRows.length ? groupedStaff.map((group) => {
+          const roleStyle = staffRoleStyles[group.role];
+          const DepartmentIcon = roleStyle.Icon;
+          const workingCount = group.rows.filter((row) => row.status === "WORKING").length;
+          return (
+            <details key={group.role} className={`group rounded-lg border border-l-4 bg-white shadow-sm ${roleStyle.marker}`} data-staff-group open>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border ${roleStyle.icon}`}>
+                    <DepartmentIcon className="h-[18px] w-[18px]" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className={`truncate text-sm font-bold uppercase tracking-wide ${roleStyle.accent}`}>{group.title}</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {group.rows.length} nhân viên
+                      {workingCount > 0 ? ` · ${workingCount} đang trong ca` : " · Không có ai trong ca"}
+                    </p>
+                  </div>
                 </div>
+                <ChevronDown className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+              </summary>
+
+              <div className="border-t">
+                <div className="hidden grid-cols-[minmax(220px,1.5fr)_120px_120px_minmax(150px,0.9fr)_auto] items-center gap-4 bg-slate-50/80 px-4 py-2 text-xs font-semibold uppercase text-slate-500 xl:grid">
+                  <span>Nhân viên</span>
+                  <span>Trạng thái</span>
+                  <span>Thiết bị</span>
+                  <span>Hoạt động gần nhất</span>
+                  <span className="text-right">Thao tác</span>
+                </div>
+                {group.rows.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {group.rows.map((staff) => (
+                      <StaffRow
+                        key={staff.id}
+                        staff={staff}
+                        slug={access.restaurant.slug}
+                        assignableRoles={assignableRoles}
+                        isSelf={staff.userId === access.user.id}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                <p
+                  data-staff-group-empty
+                  hidden={group.rows.length > 0}
+                  className="m-4 rounded-md border border-dashed bg-slate-50 px-4 py-5 text-center text-sm text-slate-500"
+                >
+                  {group.rows.length ? "Không có nhân sự phù hợp bộ lọc." : "Chưa có nhân sự trong bộ phận này."}
+                </p>
               </div>
-              <span className="rounded-full border bg-white/80 px-3 py-1 text-xs font-semibold text-slate-700">{group.rows.length} nhân viên</span>
-            </div>
-            {group.rows.length ? (
-              <div className="space-y-3">
-                {group.rows.map((staff) => (
-                  <StaffRow
-                    key={staff.id}
-                    staff={staff}
-                    slug={access.restaurant.slug}
-                    assignableRoles={assignableRoles}
-                    isSelf={staff.userId === access.user.id}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-lg border border-dashed bg-white p-4 text-sm text-slate-500">Chưa có nhân sự trong bộ phận này.</p>
-            )}
-            <p data-staff-group-empty hidden className="rounded-lg border border-dashed bg-white p-4 text-sm text-slate-500">Không có nhân sự phù hợp bộ lọc.</p>
-          </section>
-        )) : (
+            </details>
+          );
+        }) : (
           <section className="rounded-lg border bg-white p-8 text-center shadow-sm">
             <h2 className="text-lg font-semibold">Chưa có nhân viên</h2>
             <p className="mt-2 text-sm text-slate-600">Tạo tài khoản đầu tiên để nhân viên đăng nhập đúng giao diện theo vai trò.</p>
@@ -329,49 +348,68 @@ function StaffRow({
   const canEditRole = !isSelf;
   const activeDevices = staff.devices.filter((device) => device.isActive && !device.revokedAt);
   const roleStyle = staffRoleStyles[staff.role];
-  const RoleIcon = roleStyle.Icon;
 
   return (
     <article
-      className="rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-100 hover:shadow-md"
+      className="relative grid gap-3 px-4 py-3.5 transition-colors hover:bg-slate-50/80 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1.5fr)_120px_120px_minmax(150px,0.9fr)_auto] xl:items-center xl:gap-4"
       data-staff-card
       data-staff-name={normalizeForFilter(staff.name)}
       data-staff-username={normalizeForFilter(staff.username)}
       data-staff-status={staff.status}
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${roleStyle.icon}`}>
-            <RoleIcon className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="truncate text-base font-semibold text-slate-950">{staff.name}</h4>
-              <StatusBadge status={staff.status} />
-            </div>
-            <p className="mt-1 text-sm font-medium text-slate-700">{restaurantRoleLabels[staff.role]}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-600">
-              <span className="rounded-full bg-slate-100 px-2.5 py-1">@{staff.username}</span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1">{activeDevices.length} thiết bị hoạt động</span>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1">Gần nhất: {lastSeenSummary(staff.devices)}</span>
-            </div>
-          </div>
+      <div className="flex min-w-0 items-center gap-3 sm:col-span-2 xl:col-span-1">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-sm font-bold ${roleStyle.icon}`}>
+          {staffInitials(staff.name)}
         </div>
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-semibold text-slate-950 sm:text-base">{staff.name}</h4>
+          <p className="mt-0.5 truncate text-xs text-slate-500">@{staff.username}</p>
+        </div>
+      </div>
 
-        <div className="flex flex-wrap gap-2 lg:justify-end">
-          <details data-staff-panel>
-            <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Chỉnh sửa</summary>
-            <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-sm lg:w-[520px]">
-              <EditStaffForms staff={staff} slug={slug} assignableRoles={assignableRoles} canEditRole={canEditRole} isSelf={isSelf} />
+      <div>
+        <p className="mb-1 text-[11px] font-semibold uppercase text-slate-400 xl:hidden">Trạng thái</p>
+        <StatusBadge status={staff.status} />
+      </div>
+
+      <div>
+        <p className="mb-1 text-[11px] font-semibold uppercase text-slate-400 xl:hidden">Thiết bị</p>
+        <p className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700">
+          <Smartphone className="h-4 w-4 text-slate-400" />
+          {activeDevices.length} hoạt động
+        </p>
+        {staff.devices.length > activeDevices.length ? <p className="mt-0.5 text-xs text-slate-400">{staff.devices.length} đã đăng nhập</p> : null}
+      </div>
+
+      <div>
+        <p className="mb-1 text-[11px] font-semibold uppercase text-slate-400 xl:hidden">Hoạt động gần nhất</p>
+        <p className="inline-flex items-center gap-1.5 text-sm text-slate-600">
+          <Clock3 className="h-4 w-4 text-slate-400" />
+          {lastSeenSummary(staff.devices)}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2 sm:col-span-2 sm:justify-end xl:col-span-1">
+        <details className="w-full sm:w-auto" data-staff-panel>
+          <summary className="inline-flex w-full cursor-pointer list-none items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-white sm:w-auto">
+            <Pencil className="h-4 w-4" />
+            Chỉnh sửa
+          </summary>
+          <div className="mt-2 w-full rounded-lg border bg-white p-3 shadow-lg sm:w-[520px] xl:absolute xl:right-4 xl:z-20">
+            <EditStaffForms staff={staff} slug={slug} assignableRoles={assignableRoles} canEditRole={canEditRole} isSelf={isSelf} />
+          </div>
+        </details>
+        {staff.devices.length > 0 ? (
+          <details className="w-full sm:w-auto" data-staff-panel>
+            <summary className="inline-flex w-full cursor-pointer list-none items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-teal-700 hover:bg-teal-50 sm:w-auto">
+              <MonitorSmartphone className="h-4 w-4" />
+              Xem thiết bị
+            </summary>
+            <div className="xl:absolute xl:right-4 xl:z-20">
+              <DeviceList slug={slug} staffName={staff.name} devices={staff.devices} />
             </div>
           </details>
-          {staff.devices.length > 0 ? (
-            <details data-staff-panel>
-              <summary className="cursor-pointer list-none rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem thiết bị</summary>
-              <DeviceList slug={slug} staffName={staff.name} devices={staff.devices} />
-            </details>
-          ) : null}
-        </div>
+        ) : null}
       </div>
     </article>
   );
@@ -572,6 +610,12 @@ function StaffMetricCard({
 function lastSeenSummary(devices: StaffDeviceViewModel[]) {
   const latest = devices[0]?.lastSeenAt;
   return latest ? formatTime(latest) : "Chưa có";
+}
+
+function staffInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const selectedParts = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : parts;
+  return selectedParts.map((part) => part[0]?.toUpperCase()).join("") || "?";
 }
 
 function formatTime(value: Date) {
