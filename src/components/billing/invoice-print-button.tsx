@@ -121,13 +121,13 @@ export function buildInvoicePrintHtml(invoice: InvoicePrintData, paperSize: "58m
           .meta { display: grid; grid-template-columns: auto 1fr; column-gap: 6px; row-gap: 2px; }
           .meta .value { min-width: 0; text-align: right; overflow-wrap: anywhere; }
           .currency-note { margin: 7px 0 2px; text-align: right; font-size: 9px; }
-          .items-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .items-table { width: 100%; border: 1px solid #555; border-collapse: collapse; table-layout: fixed; }
           .items-table col.name { width: ${is58mm ? "40%" : "44%"}; }
           .items-table col.quantity { width: ${is58mm ? "9%" : "8%"}; }
           .items-table col.price { width: ${is58mm ? "23%" : "22%"}; }
           .items-table col.amount { width: ${is58mm ? "28%" : "26%"}; }
-          .items-table th { padding: 4px 1px; border-top: 1px solid #111; border-bottom: 1px solid #111; font-size: ${is58mm ? "8.5px" : "10px"}; line-height: 1.15; vertical-align: bottom; }
-          .items-table td { padding: 5px 1px; border-bottom: 1px dotted #888; vertical-align: top; }
+          .items-table th { padding: 4px 1px; border: 1px solid #555; font-size: ${is58mm ? "8.5px" : "10px"}; line-height: 1.15; vertical-align: bottom; }
+          .items-table td { padding: 5px 1px; border: 1px dotted #777; vertical-align: top; }
           .items-table th:first-child, .item-name { text-align: left; }
           .item-name { padding-right: 3px !important; font-weight: 600; overflow-wrap: anywhere; word-break: normal; }
           .qty { text-align: center; }

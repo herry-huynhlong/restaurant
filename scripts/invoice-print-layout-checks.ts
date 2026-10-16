@@ -28,6 +28,8 @@ for (const label of ["Tên món", "SL", "Đơn giá", "Thành tiền"]) {
   assert.ok(html58.includes(label), `Missing item-table heading: ${label}`);
 }
 assert.ok(html58.includes("table-layout: fixed"), "Thermal item table must use a stable fixed layout.");
+assert.ok(html58.includes("border: 1px solid #555; border-collapse: collapse"), "The product table must have a clear outer frame.");
+assert.ok(html58.includes("border: 1px dotted #777"), "Every product cell must remain visually separated.");
 assert.ok(html58.includes("overflow-wrap: anywhere"), "Long product names must wrap safely.");
 assert.ok(html58.includes("@page { size: 58mm auto"), "58 mm print CSS must use the correct paper width.");
 assert.ok(html80.includes("@page { size: 80mm auto"), "80 mm print CSS must use the correct paper width.");
