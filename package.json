@@ -23,6 +23,7 @@
     "test:staff-device-name": "tsx scripts/staff-device-name-checks.ts",
     "test:kitchen-claim-order": "tsx scripts/kitchen-claim-order-checks.ts",
     "test:waiter-claim-order": "tsx scripts/waiter-claim-order-checks.ts",
+    "test:tables-responsive": "tsx scripts/tables-responsive-checks.ts",
     "platform:worker": "tsx scripts/platform-maintenance-worker.ts",
     "platform:worker:loop": "tsx scripts/platform-maintenance-worker.ts loop",
     "platform:backup": "tsx scripts/platform-maintenance-worker.ts backup",

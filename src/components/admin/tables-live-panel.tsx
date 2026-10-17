@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PaymentMethod } from "@prisma/client";
 import Link from "next/link";
-import { AlertTriangle, Clock, Plus, Search, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Clock, Plus, Search, X } from "lucide-react";
 import { formatVnd } from "@/lib/money";
 import { paymentMethodLabels } from "@/lib/payment-method";
 import { restaurantRoutes } from "@/lib/routes";
@@ -147,8 +147,15 @@ export function TablesLivePanel({
   initialPaidPayments?: PaymentSummary[];
   compactForStaff?: boolean;
 }) {
+  const initialTableId = initialSelectedTableId
+    && initialState.areas.some((area) => area.tables.some((table) => table.id === initialSelectedTableId))
+    ? initialSelectedTableId
+    : null;
   const [state, setState] = useState(initialState);
-  const [selectedTableId, setSelectedTableId] = useState(initialSelectedTableId ?? initialState.areas[0]?.tables[0]?.id ?? null);
+  const [selectedTableId, setSelectedTableId] = useState(initialTableId);
+  const [detailOpen, setDetailOpen] = useState(Boolean(initialTableId));
+  const detailHistoryPushed = useRef(false);
+  const tableScrollPosition = useRef(0);
   const [status, setStatus] = useState<"live" | "reconnecting">("live");
   const [payingSessionId, setPayingSessionId] = useState<string | null>(null);
   const [orderingTableId, setOrderingTableId] = useState<string | null>(null);
@@ -178,18 +185,52 @@ export function TablesLivePanel({
         .sort((left, right) => tablePriority(left) - tablePriority(right) || left.name.localeCompare(right.name, "vi"))
     })).filter((area) => area.tables.length > 0);
   }, [state.areas, tableFilter, tableQuery]);
-  const selectedTable = compactForStaff
-    ? displayedAreas.flatMap((area) => area.tables).find((table) => table.id === selectedTableId) ?? displayedAreas[0]?.tables[0] ?? null
-    : tables.find((table) => table.id === selectedTableId) ?? tables[0] ?? null;
+  const selectedTable = tables.find((table) => table.id === selectedTableId) ?? null;
   const selectedTableIdForBill = selectedTable?.id ?? null;
   const selectedSessionIdForBill = selectedTable?.activeSession?.id ?? null;
 
+  const restoreTableScroll = useCallback(() => {
+    window.requestAnimationFrame(() => window.scrollTo({ top: tableScrollPosition.current, behavior: "auto" }));
+  }, []);
+
+  const closeTableDetail = useCallback(() => {
+    if (detailHistoryPushed.current) {
+      window.history.back();
+      return;
+    }
+    setDetailOpen(false);
+    restoreTableScroll();
+  }, [restoreTableScroll]);
+
+  const openTableDetail = useCallback((tableId: string) => {
+    if (!detailOpen) {
+      tableScrollPosition.current = window.scrollY;
+      window.history.pushState({ ...window.history.state, tableDetail: tableId }, "");
+      detailHistoryPushed.current = true;
+    }
+    setSelectedTableId(tableId);
+    setDetailOpen(true);
+  }, [detailOpen]);
+
   useEffect(() => {
-    if (!compactForStaff) return;
-    const visibleTables = displayedAreas.flatMap((area) => area.tables);
-    if (visibleTables.some((table) => table.id === selectedTableId)) return;
-    setSelectedTableId(visibleTables[0]?.id ?? null);
-  }, [compactForStaff, displayedAreas, selectedTableId]);
+    function handlePopState() {
+      if (!detailOpen) return;
+      detailHistoryPushed.current = false;
+      setDetailOpen(false);
+      restoreTableScroll();
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [detailOpen, restoreTableScroll]);
+
+  useEffect(() => {
+    if (!detailOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [detailOpen]);
 
   const refreshTables = useCallback(async () => {
     try {
@@ -358,8 +399,8 @@ export function TablesLivePanel({
   }
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[1fr_420px]">
-      <div className="flex flex-wrap items-center justify-between gap-3 xl:col-span-2">
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold">Sơ đồ bàn</h2>
           <p className="text-sm text-slate-500">Bàn cần hỗ trợ được ưu tiên hiển thị trước.</p>
@@ -367,7 +408,7 @@ export function TablesLivePanel({
         {canUsePayment ? <BillHistoryButton slug={slug} tables={tables.map((table) => ({ id: table.id, name: table.name }))} /> : null}
       </div>
       {compactForStaff ? (
-        <div className="grid gap-2 rounded-lg border bg-white p-3 shadow-sm sm:grid-cols-[minmax(220px,1fr)_auto] xl:col-span-2">
+        <div className="grid gap-2 rounded-lg border bg-white p-3 shadow-sm sm:grid-cols-[minmax(220px,1fr)_auto]">
           <label className="relative block min-w-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -402,8 +443,8 @@ export function TablesLivePanel({
                   <TableSummaryCard
                     key={table.id}
                     table={table}
-                    selected={selectedTable?.id === table.id}
-                    onSelect={() => setSelectedTableId(table.id)}
+                    selected={detailOpen && selectedTable?.id === table.id}
+                    onSelect={() => openTableDetail(table.id)}
                     onAddOrder={() => {
                       setSelectedTableId(table.id);
                       setOrderingTableId(table.id);
@@ -421,21 +462,25 @@ export function TablesLivePanel({
           <p className="rounded-lg border border-dashed bg-white p-6 text-center text-sm text-slate-500">Không tìm thấy bàn phù hợp.</p>
         ) : null}
       </div>
-      <TableDetail
-        slug={slug}
-        restaurantName={restaurantName}
-        cashierName={cashierName}
-        settings={state.settings}
-        table={selectedTable}
-        canUsePayment={canUsePayment}
-        onConfirmPaid={confirmPaid}
-        onPaymentAndPrint={openPaymentAndPrint}
-        onRefresh={refreshTables}
-        onAddOrder={() => setOrderingTableId(selectedTable?.id ?? null)}
-        showQrTools={showQrTools}
-        paymentPending={payingSessionId === selectedTable?.activeSession?.id}
-        latestPaidPayment={paidPayments.find((payment) => payment.tableId === selectedTable?.id) ?? null}
-      />
+      {detailOpen && selectedTable ? (
+        <TableDetailOverlay tableName={selectedTable.name} onClose={closeTableDetail}>
+          <TableDetail
+            slug={slug}
+            restaurantName={restaurantName}
+            cashierName={cashierName}
+            settings={state.settings}
+            table={selectedTable}
+            canUsePayment={canUsePayment}
+            onConfirmPaid={confirmPaid}
+            onPaymentAndPrint={openPaymentAndPrint}
+            onRefresh={refreshTables}
+            onAddOrder={() => setOrderingTableId(selectedTable.id)}
+            showQrTools={showQrTools}
+            paymentPending={payingSessionId === selectedTable.activeSession?.id}
+            latestPaidPayment={paidPayments.find((payment) => payment.tableId === selectedTable.id) ?? null}
+          />
+        </TableDetailOverlay>
+      ) : null}
       {orderingTableId ? (
         <StaffAddOrderModal
           slug={slug}
@@ -496,9 +541,21 @@ function TableSummaryCard({
       : `${itemCount} món · ${formatVnd(table.activeSession.grandTotal)}`;
 
   return (
-    <article className={`flex flex-col rounded-lg border transition hover:shadow-sm ${compact && !table.activeSession ? "min-h-32 p-3" : "min-h-40 p-4"} ${cardClass} ${selected ? "ring-2 ring-teal-400" : ""}`}>
+    <article
+      className={`flex cursor-pointer flex-col rounded-lg border transition hover:shadow-sm focus-within:ring-2 focus-within:ring-teal-400 ${compact && !table.activeSession ? "min-h-32 p-3" : "min-h-40 p-4"} ${cardClass} ${selected ? "ring-2 ring-teal-400" : ""}`}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onSelect();
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem chi tiết Bàn ${table.name}`}
+      aria-expanded={selected}
+    >
       <div className="flex flex-wrap items-start gap-2">
-        <h3 className="min-w-0 max-w-full truncate text-lg font-semibold leading-tight">Bàn {table.name}</h3>
+        <h3 className="min-w-0 max-w-full break-words text-lg font-semibold leading-tight">Bàn {table.name}</h3>
         <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${badgeClass}`}>{label}</span>
       </div>
       <div className="mt-3 space-y-1 text-sm">
@@ -517,15 +574,74 @@ function TableSummaryCard({
         ) : null}
       </div>
       <div className="mt-auto flex flex-wrap gap-2 pt-4">
-        <button className="rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onSelect}>
+        <button className="min-h-11 rounded-md border bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={(event) => {
+          event.stopPropagation();
+          onSelect();
+        }}>
           Xem bàn
         </button>
-        <button className="inline-flex items-center gap-1 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300" type="button" onClick={onAddOrder} disabled={!table.isActive}>
+        <button className="inline-flex min-h-11 items-center gap-1 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300" type="button" onClick={(event) => {
+          event.stopPropagation();
+          onAddOrder();
+        }} disabled={!table.isActive}>
           <Plus className="h-4 w-4" />
           Thêm món
         </button>
       </div>
     </article>
+  );
+}
+
+function TableDetailOverlay({
+  tableName,
+  onClose,
+  children
+}: {
+  tableName: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      aria-label={`Chi tiết Bàn ${tableName}`}
+      aria-modal="true"
+      className="fixed inset-0 z-50 bg-slate-950/40 md:flex md:justify-end"
+      role="dialog"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <aside className="flex h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-white shadow-2xl md:h-full md:w-[min(480px,calc(100vw-48px))] md:border-l">
+        <div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b bg-white px-3 sm:px-4">
+          <button
+            ref={closeButtonRef}
+            className="inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            type="button"
+            onClick={onClose}
+          >
+            <ArrowLeft className="h-5 w-5 md:hidden" />
+            <X className="hidden h-5 w-5 md:block" />
+            <span className="md:hidden">Quay lại</span>
+            <span className="hidden md:inline">Đóng</span>
+          </button>
+          <p className="min-w-0 truncate text-sm font-semibold text-slate-600">Chi tiết Bàn {tableName}</p>
+        </div>
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-4">
+          {children}
+        </div>
+      </aside>
+    </div>
   );
 }
 
@@ -559,7 +675,7 @@ function TableDetail({
   latestPaidPayment: PaymentSummary | null;
 }) {
   if (!table) {
-    return <aside className="rounded-lg border bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">Chưa có bàn để xem chi tiết.</p></aside>;
+    return <div className="rounded-lg border bg-white p-4"><p className="text-sm text-slate-500">Chưa có bàn để xem chi tiết.</p></div>;
   }
 
   const session = table.activeSession;
@@ -570,7 +686,7 @@ function TableDetail({
   const openRequestCount = session?.serviceRequests.length ?? 0;
 
   return (
-    <aside className="rounded-lg border bg-white p-5 shadow-sm">
+    <div className="min-w-0 bg-white">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">Bàn {table.name} — {!table.isActive ? "Ngừng sử dụng" : tableStatusLabels[table.status] ?? table.status}</h2>
@@ -592,16 +708,16 @@ function TableDetail({
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button className="inline-flex items-center gap-1 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300" type="button" disabled={!table.isActive} onClick={onAddOrder}>
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+        <button className="inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:bg-slate-300" type="button" disabled={!table.isActive} onClick={onAddOrder}>
           <Plus className="h-4 w-4" />
           Thêm món
         </button>
-        <Link className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" href={session ? `${restaurantRoutes.adminOrders(slug)}?session=${session.id}` : restaurantRoutes.adminOrders(slug)}>
+        <Link className="inline-flex min-h-11 w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50" href={session ? `${restaurantRoutes.adminOrders(slug)}?session=${session.id}` : restaurantRoutes.adminOrders(slug)}>
           Xem Order
         </Link>
         {session ? (
-          <InvoicePrintButton label="In phiếu tạm tính" invoice={{
+          <InvoicePrintButton className="min-h-11 w-full justify-center" label="In phiếu tạm tính" invoice={{
             restaurantName,
             businessName: settings.invoiceBusinessName ?? restaurantName,
             taxCode: settings.invoiceTaxCode,
@@ -633,11 +749,11 @@ function TableDetail({
           }} />
         ) : null}
         {!session && latestPaidPayment ? (
-          <PaidBillButton slug={slug} paymentId={latestPaidPayment.id} label="In bill gần nhất" />
+          <PaidBillButton className="min-h-11 w-full justify-center" slug={slug} paymentId={latestPaidPayment.id} label="In bill gần nhất" />
         ) : null}
         {canUsePayment && session && session.itemCount > 0 ? (
           <button
-            className="rounded-md border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-11 w-full rounded-md border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
             type="button"
             disabled={paymentPending}
             onClick={() => onPaymentAndPrint(table)}
@@ -647,7 +763,7 @@ function TableDetail({
         ) : null}
         {canUsePayment && session ? (
           <button
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="min-h-11 w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             type="button"
             disabled={paymentPending}
             onClick={() => onConfirmPaid(table)}
@@ -663,7 +779,7 @@ function TableDetail({
 
       {showQrTools ? (
         <details className="mt-5">
-          <summary className="cursor-pointer rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem QR / Tải / In</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50">Xem QR / Tải / In</summary>
           <div className="mt-3">
             <QrCard
               restaurantName={restaurantName}
@@ -677,7 +793,7 @@ function TableDetail({
           </div>
         </details>
       ) : null}
-    </aside>
+    </div>
   );
 }
 

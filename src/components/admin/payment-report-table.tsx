@@ -242,11 +242,13 @@ export function BillHistoryButton({ slug, tables }: { slug: string; tables: Arra
 export function PaidBillButton({
   slug,
   paymentId,
-  label = "In bill thanh toán"
+  label = "In bill thanh toán",
+  className = ""
 }: {
   slug: string;
   paymentId: string;
   label?: string;
+  className?: string;
 }) {
   const [bill, setBill] = useState<BillDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -267,7 +269,7 @@ export function PaidBillButton({
   return (
     <>
       <div className="inline-flex flex-col items-start gap-1">
-        <button className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60" type="button" disabled={isPending} onClick={openBill}>
+        <button className={`rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60 ${className}`} type="button" disabled={isPending} onClick={openBill}>
           {isPending ? "Đang mở..." : label}
         </button>
         {error ? <span className="text-xs text-red-700">{error}</span> : null}
