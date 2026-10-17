@@ -33,6 +33,7 @@ async function getKitchenItems(restaurantId: string) {
       restaurant: false
     },
     orderBy: [
+      { kitchenClaimedAt: "desc" },
       { order: { createdAt: "asc" } },
       { createdAt: "asc" }
     ],
@@ -71,9 +72,9 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
   const operatorNameMap = new Map(assignedSessions.map((session) => [session.id, session.operatorName ?? "Nhân viên"]));
   const waitingItems = items.filter((item) => item.status === "NEW");
   const cookingItems = items.filter((item) => item.status === "COOKING").sort((a, b) => {
-    const mineA = a.kitchenAssignedToUserId === access.user.id ? 0 : 1;
-    const mineB = b.kitchenAssignedToUserId === access.user.id ? 0 : 1;
-    return mineA - mineB || (a.kitchenClaimedAt?.getTime() ?? 0) - (b.kitchenClaimedAt?.getTime() ?? 0);
+    const claimedAtDifference = (b.kitchenClaimedAt?.getTime() ?? 0) - (a.kitchenClaimedAt?.getTime() ?? 0);
+    if (claimedAtDifference !== 0) return claimedAtDifference;
+    return b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id);
   });
 
   return (
