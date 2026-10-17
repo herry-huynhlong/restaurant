@@ -20,6 +20,7 @@
     "test:invoice-print": "tsx scripts/invoice-print-layout-checks.ts",
     "test:cashier-realtime": "tsx scripts/cashier-realtime-checks.ts",
     "test:staff-pos": "tsx scripts/staff-pos-layout-checks.ts",
+    "test:staff-device-name": "tsx scripts/staff-device-name-checks.ts",
     "platform:worker": "tsx scripts/platform-maintenance-worker.ts",
     "platform:worker:loop": "tsx scripts/platform-maintenance-worker.ts loop",
     "platform:backup": "tsx scripts/platform-maintenance-worker.ts backup",

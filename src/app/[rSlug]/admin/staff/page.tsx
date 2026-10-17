@@ -518,9 +518,12 @@ function DeviceLine({
     <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-3 text-sm">
       <div className="min-w-0">
         <p className="truncate font-medium text-slate-900">{device.name}</p>
+        <p className="mt-1 truncate text-xs text-slate-700">
+          Người dùng: <span className="font-semibold text-slate-900">{device.operatorName}</span>
+        </p>
         <p className="text-xs text-slate-500">{deviceStatusLabel(device)} · {formatTime(device.lastSeenAt)}</p>
       </div>
-      {canRevoke && forceAction ? <RevokeDeviceForm slug={slug} device={device} staffName={staffName} /> : null}
+      {canRevoke && forceAction ? <RevokeDeviceForm slug={slug} device={device} staffName={device.operatorName || staffName} /> : null}
     </div>
   );
 }
