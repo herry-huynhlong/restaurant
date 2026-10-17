@@ -166,27 +166,64 @@ export async function claimWaiterItemAction(slug: string, orderItemId: string) {
     role: access.membership.role
   });
   const now = new Date();
-  const result = await prisma.orderItem.updateMany({
-    where: {
-      id: orderItemId,
-      restaurantId: access.restaurant.id,
-      status: "READY",
-      waiterAssignedToUserId: null
-    },
-    data: {
-      waiterAssignedToUserId: access.user.id,
-      waiterAssignedDeviceSessionId: deviceSession?.id,
-      waiterClaimedAt: now
-    }
-  });
+  let claimed = false;
 
-  if (result.count === 0) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      claimed = await prisma.$transaction(async (tx) => {
+        const currentAssignment = await tx.orderItem.findFirst({
+          where: {
+            restaurantId: access.restaurant.id,
+            status: "READY",
+            ...(deviceSession
+              ? { waiterAssignedDeviceSessionId: deviceSession.id }
+              : {
+                  waiterAssignedToUserId: access.user.id,
+                  waiterAssignedDeviceSessionId: null
+                })
+          },
+          select: { id: true }
+        });
+
+        if (currentAssignment) return false;
+
+        const result = await tx.orderItem.updateMany({
+          where: {
+            id: orderItemId,
+            restaurantId: access.restaurant.id,
+            status: "READY",
+            waiterAssignedToUserId: null,
+            waiterAssignedDeviceSessionId: null
+          },
+          data: {
+            waiterAssignedToUserId: access.user.id,
+            waiterAssignedDeviceSessionId: deviceSession?.id,
+            waiterClaimedAt: now
+          }
+        });
+
+        return result.count === 1;
+      }, { isolationLevel: "Serializable" });
+      break;
+    } catch (error) {
+      if (!isPrismaTransactionConflict(error) || attempt === 1) throw error;
+    }
+  }
+
+  if (!claimed) {
     revalidatePath(restaurantRoutes.staff(slug));
     return;
   }
 
   publishNotificationRefresh(access.restaurant.id);
   revalidatePath(restaurantRoutes.staff(slug));
+}
+
+function isPrismaTransactionConflict(error: unknown) {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error as { code?: unknown }).code === "P2034";
 }
 
 export async function markWaiterItemServedAction(slug: string, orderItemId: string) {

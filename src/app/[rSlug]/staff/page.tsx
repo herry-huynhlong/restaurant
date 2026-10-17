@@ -121,16 +121,22 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
       })
     : [];
   const operatorNameMap = new Map(assignedSessions.map((session) => [session.id, session.operatorName ?? "Nhân viên"]));
+  const isAssignedToCurrentDevice = (item: WaiterItem) => item.waiterAssignedDeviceSessionId
+    ? item.waiterAssignedDeviceSessionId === currentDeviceSession?.id
+    : item.waiterAssignedToUserId === access.user.id;
   const sortedReadyItems = readyItems.sort((a, b) => {
-    const mineA = a.waiterAssignedToUserId === access.user.id ? 0 : a.waiterAssignedToUserId ? 1 : -1;
-    const mineB = b.waiterAssignedToUserId === access.user.id ? 0 : b.waiterAssignedToUserId ? 1 : -1;
-    return mineA - mineB || (a.readyAt?.getTime() ?? a.createdAt.getTime()) - (b.readyAt?.getTime() ?? b.createdAt.getTime());
+    const rank = (item: WaiterItem) => isAssignedToCurrentDevice(item) ? 0 : item.waiterAssignedToUserId ? 2 : 1;
+    const rankDifference = rank(a) - rank(b);
+    if (rankDifference !== 0) return rankDifference;
+    if (a.waiterAssignedToUserId && b.waiterAssignedToUserId) {
+      return (b.waiterClaimedAt?.getTime() ?? 0) - (a.waiterClaimedAt?.getTime() ?? 0);
+    }
+    return (a.readyAt?.getTime() ?? a.createdAt.getTime()) - (b.readyAt?.getTime() ?? b.createdAt.getTime());
   });
-  const readyActionCount = sortedReadyItems.filter((item) => {
-    if (!item.waiterAssignedToUserId) return true;
-    if (item.waiterAssignedDeviceSessionId) return item.waiterAssignedDeviceSessionId === currentDeviceSession?.id;
-    return item.waiterAssignedToUserId === access.user.id;
-  }).length;
+  const hasCurrentAssignment = sortedReadyItems.some(isAssignedToCurrentDevice);
+  const readyActionCount = hasCurrentAssignment
+    ? sortedReadyItems.filter(isAssignedToCurrentDevice).length
+    : sortedReadyItems.filter((item) => !item.waiterAssignedToUserId).length;
   const tableCount = tableState.areas.reduce((sum, area) => sum + area.tables.length, 0);
   const tableAttentionCount = tableState.areas.reduce(
     (sum, area) => sum + area.tables.filter((table) => (table.activeSession?.serviceRequests.length ?? 0) > 0).length,
@@ -166,7 +172,7 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
                 <p className="text-xs font-semibold uppercase text-teal-700">Ưu tiên phục vụ</p>
                 <h2 className="mt-1 text-lg font-bold text-slate-950">Món chờ đi</h2>
               </div>
-              <p className="text-sm text-slate-500">Món chờ lâu được xếp trước</p>
+              <p className="text-sm text-slate-500">Món đã nhận ở trên cùng; phục vụ xong trước khi nhận món khác</p>
             </div>
             {sortedReadyItems.length ? (
               <div className="grid gap-3 lg:grid-cols-2">
@@ -177,6 +183,7 @@ export default async function StaffPage({ params }: { params: { rSlug: string } 
                     slug={access.restaurant.slug}
                     currentUserId={access.user.id}
                     currentDeviceSessionId={currentDeviceSession?.id ?? null}
+                    canClaimNewItem={!hasCurrentAssignment}
                     userNameMap={userNameMap}
                     operatorNameMap={operatorNameMap}
                   />
@@ -274,6 +281,7 @@ function WaiterItemCard({
   slug,
   currentUserId,
   currentDeviceSessionId,
+  canClaimNewItem,
   userNameMap,
   operatorNameMap
 }: {
@@ -281,6 +289,7 @@ function WaiterItemCard({
   slug: string;
   currentUserId: string;
   currentDeviceSessionId: string | null;
+  canClaimNewItem: boolean;
   userNameMap: Map<string, string>;
   operatorNameMap: Map<string, string>;
 }) {
@@ -328,10 +337,14 @@ function WaiterItemCard({
       ) : null}
 
       <div className="mt-auto pt-3">
-        {!item.waiterAssignedToUserId ? (
+        {!item.waiterAssignedToUserId && canClaimNewItem ? (
           <form action={claimWaiterItemAction.bind(null, slug, item.id)}>
             <PendingSubmitButton className="min-h-11 w-full rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang nhận...">Nhận đi món</PendingSubmitButton>
           </form>
+        ) : !item.waiterAssignedToUserId ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-semibold text-amber-800">
+            Hoàn thành món đã nhận trước
+          </p>
         ) : isMine ? (
           <form action={markWaiterItemServedAction.bind(null, slug, item.id)}>
             <PendingSubmitButton className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang lưu...">
