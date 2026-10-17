@@ -93,18 +93,6 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
       />
       <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6 lg:grid-cols-2">
         <QueueSection
-          title="Chờ làm"
-          emptyTitle="Không có món chờ làm"
-          emptyDescription="Món chính và món thêm mới sẽ xếp hàng tại đây theo thời gian khách gọi."
-          items={waitingItems}
-          slug={access.restaurant.slug}
-          currentUserId={access.user.id}
-          currentDeviceSessionId={currentDeviceSession?.id ?? null}
-          userNameMap={userNameMap}
-          operatorNameMap={operatorNameMap}
-          mode="waiting"
-        />
-        <QueueSection
           title="Đang làm"
           emptyTitle="Chưa có món đang làm"
           emptyDescription="Món bạn hoặc bếp khác đã nhận sẽ nằm ở đây."
@@ -115,6 +103,18 @@ export default async function KitchenPage({ params }: { params: { rSlug: string 
           userNameMap={userNameMap}
           operatorNameMap={operatorNameMap}
           mode="cooking"
+        />
+        <QueueSection
+          title="Chờ làm"
+          emptyTitle="Không có món chờ làm"
+          emptyDescription="Món chính và món thêm mới sẽ xếp hàng tại đây theo thời gian khách gọi."
+          items={waitingItems}
+          slug={access.restaurant.slug}
+          currentUserId={access.user.id}
+          currentDeviceSessionId={currentDeviceSession?.id ?? null}
+          userNameMap={userNameMap}
+          operatorNameMap={operatorNameMap}
+          mode="waiting"
         />
       </section>
     </main>

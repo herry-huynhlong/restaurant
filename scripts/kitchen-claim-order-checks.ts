@@ -12,5 +12,6 @@ assert.ok(actions.includes("publishNotificationRefresh(access.restaurant.id)"), 
 assert.ok(kitchenPage.includes('{ kitchenClaimedAt: "desc" }'), "The server query must return recently claimed items first.");
 assert.ok(kitchenPage.includes("(b.kitchenClaimedAt?.getTime() ?? 0) - (a.kitchenClaimedAt?.getTime() ?? 0)"), "The cooking list must keep recently claimed items first after rendering.");
 assert.ok(!kitchenPage.includes("mineA - mineB"), "Per-user grouping must not override the global claim order.");
+assert.ok(kitchenPage.indexOf('title="Đang làm"') < kitchenPage.indexOf('title="Chờ làm"'), "The cooking queue must render before the waiting queue on every viewport.");
 
 console.log("Kitchen claim order checks passed.");
