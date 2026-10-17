@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Clock3, CreditCard, Eye, MapPin, ReceiptText, Search, Utensils, WalletCards, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, Clock3, CreditCard, Eye, MapPin, ReceiptText, Search, Utensils, WalletCards, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { updateServiceRequestStatusAction } from "@/app/[rSlug]/ops/actions";
 import { InvoicePrintButton } from "@/components/billing/invoice-print-button";
@@ -53,6 +53,8 @@ export function CashierWorkspace({
   const [query, setQuery] = useState("");
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("ALL");
   const latestRefreshRef = useRef(0);
+  const detailHistoryPushed = useRef(false);
+  const sessionScrollPosition = useRef(0);
 
   const selectedSession = liveSessions.find((session) => session.id === selectedSessionId) ?? null;
   const paymentSession = liveSessions.find((session) => session.id === paymentSessionId) ?? null;
@@ -70,6 +72,29 @@ export function CashierWorkspace({
         .some((value) => value.toLocaleLowerCase("vi").includes(keyword));
     });
   }, [liveSessions, query, sessionFilter]);
+
+  const restoreSessionScroll = useCallback(() => {
+    window.requestAnimationFrame(() => window.scrollTo({ top: sessionScrollPosition.current, behavior: "auto" }));
+  }, []);
+
+  const closeDetails = useCallback(() => {
+    if (detailHistoryPushed.current) {
+      window.history.back();
+      return;
+    }
+    setSelectedSessionId(null);
+    restoreSessionScroll();
+  }, [restoreSessionScroll]);
+
+  const openDetails = useCallback((sessionId: string) => {
+    if (!selectedSessionId) {
+      sessionScrollPosition.current = window.scrollY;
+      window.history.pushState({ ...window.history.state, cashierSessionDetail: sessionId }, "");
+      detailHistoryPushed.current = true;
+    }
+    setSelectedSessionId(sessionId);
+    setMessage(null);
+  }, [selectedSessionId]);
 
   const refreshState = useCallback(async () => {
     const refreshId = ++latestRefreshRef.current;
@@ -130,17 +155,32 @@ export function CashierWorkspace({
 
   useEffect(() => {
     if (selectedSessionId && !liveSessions.some((session) => session.id === selectedSessionId)) {
-      setSelectedSessionId(null);
+      closeDetails();
     }
     if (paymentSessionId && !liveSessions.some((session) => session.id === paymentSessionId)) {
       setPaymentSessionId(null);
     }
-  }, [liveSessions, paymentSessionId, selectedSessionId]);
+  }, [closeDetails, liveSessions, paymentSessionId, selectedSessionId]);
 
-  function openDetails(sessionId: string) {
-    setSelectedSessionId(sessionId);
-    setMessage(null);
-  }
+  useEffect(() => {
+    function handlePopState() {
+      if (!selectedSessionId) return;
+      detailHistoryPushed.current = false;
+      setSelectedSessionId(null);
+      restoreSessionScroll();
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [restoreSessionScroll, selectedSessionId]);
+
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedSessionId]);
 
   function openPayment(sessionId: string) {
     setPaymentSessionId(sessionId);
@@ -226,7 +266,7 @@ export function CashierWorkspace({
           session={selectedSession}
           settings={settings}
           cashierName={cashierName}
-          onClose={() => setSelectedSessionId(null)}
+          onClose={closeDetails}
           onPay={() => openPayment(selectedSession.id)}
         />
       ) : null}
@@ -239,7 +279,7 @@ export function CashierWorkspace({
           onClose={() => setPaymentSessionId(null)}
           onSuccess={(paymentId) => {
             setPaymentSessionId(null);
-            setSelectedSessionId(null);
+            if (selectedSessionId) closeDetails();
             setPaidPaymentId(paymentId);
             setMessage(`Đã thanh toán bàn ${paymentSession.tableName} thành công.`);
             void refreshState();
@@ -270,7 +310,19 @@ function CashierTableCard({
   const waitingForPayment = isWaitingForPayment(session);
 
   return (
-    <article className={`flex min-w-0 flex-col rounded-lg border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${waitingForPayment ? "border-amber-300" : "border-slate-200"}`}>
+    <article
+      className={`flex min-w-0 cursor-pointer flex-col rounded-lg border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-within:ring-2 focus-within:ring-teal-400 ${waitingForPayment ? "border-amber-300" : "border-slate-200"}`}
+      onClick={onDetails}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onDetails();
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem chi tiết Bàn ${session.tableName}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -318,19 +370,27 @@ function CashierTableCard({
             <p className="truncate text-xs text-amber-700">{request.customerName}</p>
           </div>
           {request.status === "NEW" ? (
-            <form action={updateServiceRequestStatusAction.bind(null, slug, request.id, "ACKNOWLEDGED")}>
-              <PendingSubmitButton className="h-8 shrink-0 rounded-md border border-amber-300 bg-white px-2.5 text-xs font-semibold text-amber-900" pendingLabel="Đang nhận...">Đã nhận</PendingSubmitButton>
+            <form action={updateServiceRequestStatusAction.bind(null, slug, request.id, "ACKNOWLEDGED")} onClick={(event) => event.stopPropagation()}>
+              <PendingSubmitButton className="min-h-11 shrink-0 rounded-md border border-amber-300 bg-white px-3 text-xs font-semibold text-amber-900" pendingLabel="Đang nhận...">Đã nhận</PendingSubmitButton>
             </form>
           ) : <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Đã nhận</span>}
         </div>
       ) : null}
 
       <div className="mt-auto grid grid-cols-2 gap-2 pt-4">
-        <button className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md border bg-white px-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={onDetails}>
+        <button className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border bg-white px-2 text-sm font-semibold hover:bg-slate-50" type="button" onClick={(event) => {
+          event.stopPropagation();
+          onDetails();
+        }}>
           <Eye className="h-4 w-4" /> Xem order
         </button>
-        <InvoicePrintButton className="h-10 w-full justify-center px-2" label="In tạm tính" invoice={buildPreliminaryInvoice(session, settings, cashierName)} />
-        <button className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800" type="button" onClick={onPayment}>
+        <div className="min-w-0" onClick={(event) => event.stopPropagation()}>
+          <InvoicePrintButton className="min-h-11 w-full justify-center px-2" label="In tạm tính" invoice={buildPreliminaryInvoice(session, settings, cashierName)} />
+        </div>
+        <button className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800" type="button" onClick={(event) => {
+          event.stopPropagation();
+          onPayment();
+        }}>
           <CreditCard className="h-4 w-4" /> Thanh toán {formatVnd(session.bill.grandTotal)}
         </button>
       </div>
@@ -397,22 +457,38 @@ function SessionDetailDialog({ session, settings, cashierName, onClose, onPay }:
   onClose: () => void;
   onPay: () => void;
 }) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-[70] bg-black/40 p-2 sm:p-6" role="dialog" aria-modal="true" aria-label={`Chi tiết bàn ${session.tableName}`} onMouseDown={(event) => {
+    <div className="fixed inset-0 z-[70] bg-black/40 md:flex md:justify-end" role="dialog" aria-modal="true" aria-label={`Chi tiết bàn ${session.tableName}`} onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <div className="mx-auto flex max-h-[calc(100vh-16px)] w-full max-w-3xl flex-col overflow-hidden rounded-lg bg-white shadow-xl sm:max-h-[calc(100vh-48px)]">
-        <div className="flex items-start justify-between gap-3 border-b p-4 sm:p-5">
+      <div className="flex h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-white shadow-xl md:h-full md:w-[min(560px,calc(100vw-48px))] md:border-l">
+        <div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b px-3 sm:px-4">
+          <button ref={closeButtonRef} className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-md px-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500" type="button" onClick={onClose}>
+            <ArrowLeft className="h-5 w-5 md:hidden" />
+            <X className="hidden h-5 w-5 md:block" />
+            <span className="md:hidden">Quay lại</span>
+            <span className="hidden md:inline">Đóng</span>
+          </button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold">Bàn {session.tableName}</h2>
+              <h2 className="text-lg font-bold sm:text-xl">Bàn {session.tableName}</h2>
               <SessionStatusBadge session={session} />
             </div>
-            <p className="mt-1 text-sm text-slate-500">{session.areaName} · {session.customerName ?? "Chưa có tên khách"} · mở lúc {session.openedAtLabel}</p>
+            <p className="mt-1 line-clamp-1 text-xs text-slate-500 sm:text-sm">{session.areaName} · {session.customerName ?? "Chưa có tên khách"} · mở lúc {session.openedAtLabel}</p>
           </div>
-          <button className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border" type="button" onClick={onClose} aria-label="Đóng"><X className="h-4 w-4" /></button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-5">
           {session.orders.length ? (
             <div className="space-y-3">
               {session.orders.map((order) => (
@@ -457,10 +533,9 @@ function SessionDetailDialog({ session, settings, cashierName, onClose, onPay }:
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t p-4 sm:p-5">
-          <InvoicePrintButton label="In phiếu tạm tính" invoice={buildPreliminaryInvoice(session, settings, cashierName)} />
-          <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="button" onClick={onPay}>Thanh toán</button>
-          <button className="rounded-md border px-4 py-2 text-sm font-semibold" type="button" onClick={onClose}>Đóng</button>
+        <div className="grid shrink-0 grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2 sm:p-4">
+          <InvoicePrintButton className="min-h-11 w-full justify-center" label="In phiếu tạm tính" invoice={buildPreliminaryInvoice(session, settings, cashierName)} />
+          <button className="min-h-11 w-full rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" type="button" onClick={onPay}>Thanh toán</button>
         </div>
       </div>
     </div>
@@ -520,7 +595,7 @@ function PaymentDialog({ slug, session, settings, onClose, onSuccess, onRefresh 
             <h2 className="mt-1 text-xl font-bold">Bàn {session.tableName}</h2>
             <p className="mt-1 text-sm text-slate-500">{session.itemCount} món · {session.orderCount} lượt gọi</p>
           </div>
-          <button className="inline-flex h-9 w-9 items-center justify-center rounded-md border disabled:opacity-50" type="button" disabled={busy} onClick={onClose} aria-label="Đóng"><X className="h-4 w-4" /></button>
+          <button className="inline-flex h-11 w-11 items-center justify-center rounded-md border disabled:opacity-50" type="button" disabled={busy} onClick={onClose} aria-label="Đóng"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-4 p-5">
           <div className="rounded-lg bg-slate-50 p-4">
@@ -541,8 +616,8 @@ function PaymentDialog({ slug, session, settings, onClose, onSuccess, onRefresh 
           <p className="text-xs text-slate-500">Hệ thống sẽ kiểm tra lại tổng tiền trước khi ghi nhận. Nếu order vừa thay đổi, thanh toán sẽ dừng để bạn xác nhận lại.</p>
         </div>
         <div className="flex justify-end gap-2 border-t p-5">
-          <button className="rounded-md border px-4 py-2 text-sm font-semibold disabled:opacity-50" type="button" disabled={busy} onClick={onClose}>Hủy</button>
-          <button className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60" type="button" disabled={busy} onClick={() => void confirmPayment()}>
+          <button className="min-h-11 rounded-md border px-4 py-2 text-sm font-semibold disabled:opacity-50" type="button" disabled={busy} onClick={onClose}>Hủy</button>
+          <button className="min-h-11 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60" type="button" disabled={busy} onClick={() => void confirmPayment()}>
             {busy ? "Đang xử lý..." : `Xác nhận ${formatVnd(session.bill.grandTotal)}`}
           </button>
         </div>

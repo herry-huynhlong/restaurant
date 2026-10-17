@@ -545,6 +545,7 @@ function TableSummaryCard({
       className={`flex cursor-pointer flex-col rounded-lg border transition hover:shadow-sm focus-within:ring-2 focus-within:ring-teal-400 ${compact && !table.activeSession ? "min-h-32 p-3" : "min-h-40 p-4"} ${cardClass} ${selected ? "ring-2 ring-teal-400" : ""}`}
       onClick={onSelect}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
         onSelect();
