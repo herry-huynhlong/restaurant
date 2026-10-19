@@ -328,6 +328,15 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
     if (!request) throw new Error("Không tìm thấy yêu cầu đăng ký.");
     if (request.status !== "PENDING") throw new Error("Yêu cầu này đã được xử lý trước đó.");
 
+    const sePayOrder = await tx.subscriptionPaymentOrder.findFirst({
+      where: { subscriptionRequestId: request.id, provider: "SEPAY" },
+      orderBy: { createdAt: "desc" },
+      select: { status: true }
+    });
+    if (sePayOrder && sePayOrder.status !== "PAID") {
+      throw new Error("Giao dịch SePay chưa được xác minh. Không thể kích hoạt gói dịch vụ.");
+    }
+
     const restaurant = await tx.restaurant.findUnique({
       where: { id: request.restaurantId },
       select: {

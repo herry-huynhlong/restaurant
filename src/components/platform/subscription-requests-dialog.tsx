@@ -14,6 +14,12 @@ type PendingRequest = {
   status: string;
   createdAt: string;
   currentSubscriptionEnd: string | null;
+  paymentOrder: {
+    provider: "MOCK" | "SEPAY";
+    status: "PENDING" | "PAID" | "EXPIRED" | "CANCELLED" | "NEEDS_REVIEW";
+    amountVnd: number;
+    paidAt: string | null;
+  } | null;
 };
 
 export function SubscriptionRequestsDialog({
@@ -91,11 +97,18 @@ export function SubscriptionRequestsDialog({
                   : `Kỳ đăng ký/gia hạn: ${request.termMonths} tháng`}
               </p>
 
+              {request.paymentOrder ? (
+                <p className={`mt-2 text-xs font-semibold ${request.paymentOrder.status === "PAID" ? "text-emerald-800" : request.paymentOrder.status === "NEEDS_REVIEW" ? "text-red-800" : "text-amber-900"}`}>
+                  {paymentStatusLabel(request.paymentOrder.provider, request.paymentOrder.status)}
+                  {request.paymentOrder.paidAt ? ` · ${formatDateTime(request.paymentOrder.paidAt)}` : ""}
+                </p>
+              ) : null}
+
               <div className="mt-4 flex flex-wrap gap-2">
                 <form action={confirmSubscriptionRequestAction}>
                   <input name="requestId" type="hidden" value={request.id} />
                   <input name="returnTo" type="hidden" value={returnTo} />
-                  <PendingSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800" pendingLabel="Đang xác nhận...">
+                  <PendingSubmitButton className="rounded-md bg-teal-700 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-800" pendingLabel="Đang xác nhận..." disabled={request.paymentOrder?.provider === "SEPAY" && request.paymentOrder.status !== "PAID"}>
                     Xác nhận
                   </PendingSubmitButton>
                 </form>
@@ -144,4 +157,12 @@ function requestTypeLabel(type: string, currentPlan: string) {
   if (type === "UPGRADE") return "Nâng cấp";
   if (currentPlan === "FREE") return "Đăng ký";
   return "Gia hạn";
+}
+
+function paymentStatusLabel(provider: "MOCK" | "SEPAY", status: NonNullable<PendingRequest["paymentOrder"]>["status"]) {
+  if (provider !== "SEPAY") return "Chưa có xác minh SePay tự động";
+  if (status === "PAID") return "SePay đã xác minh thanh toán";
+  if (status === "NEEDS_REVIEW") return "Giao dịch SePay cần đối soát";
+  if (status === "PENDING") return "Đang chờ SePay xác minh";
+  return "Lệnh SePay đã hết hiệu lực";
 }

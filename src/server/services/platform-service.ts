@@ -117,7 +117,19 @@ export async function getPlatformRestaurants({ includeDeleted = false }: { inclu
     where: {
       ...activeSubscriptionRequestWhere(restaurants.map((restaurant) => restaurant.id))
     },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
+    include: {
+      paymentOrders: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          provider: true,
+          status: true,
+          amountVnd: true,
+          paidAt: true
+        }
+      }
+    }
   });
   const pendingByRestaurant = new Map<string, typeof pendingRequests>();
   for (const request of pendingRequests) {

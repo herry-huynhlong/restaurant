@@ -66,6 +66,7 @@ const allowedFeedbackMessages = new Set([
   "Email chủ quán đã tồn tại trong hệ thống.",
   "Email chủ quán đang là tài khoản quản trị nền tảng. Vui lòng dùng email riêng cho nhà hàng.",
   "Gói dịch vụ hiện tại đã trùng với thông tin vừa nhập.",
+  "Giao dịch SePay chưa được xác minh. Không thể kích hoạt gói dịch vụ.",
   "Hệ thống lưu trữ chưa được cập nhật cấu trúc mới. Vui lòng cập nhật hệ thống rồi thử lại.",
   "Không tìm thấy chủ quán.",
   "Không tìm thấy dữ liệu cần cập nhật.",

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { PrismaClient } from "@prisma/client";
 import { createSubscriptionPaymentOrder } from "@/server/services/subscription-payment-service";
+import { processSePaySubscriptionWebhook } from "@/server/services/subscription-sepay-webhook-service";
 import {
   confirmSubscriptionRequest,
   createSubscriptionRequest,
@@ -26,6 +27,7 @@ const email = `subscription-it-${suffix}@example.test`;
 const slug = `subscription-it-${suffix}`;
 
 async function run() {
+  process.env.SEPAY_SUBSCRIPTION_WEBHOOK_API_KEY = "subscription-integration-test";
   const previousPaymentConfig = await prisma.platformSubscriptionPaymentConfig.findUnique({
     where: { singletonKey: "default" }
   });
@@ -93,6 +95,45 @@ async function run() {
     assert.equal(concurrentOrders[0].id, concurrentOrders[1].id, "Retrying payment-order creation must return the same pending order.");
     assert.equal(concurrentOrders[0].receiverBankCode, "VCB", "Payment order must snapshot the platform bank.");
     assert.equal(concurrentOrders[0].receiverAccountNumber, "123456789", "Payment order must snapshot the platform account.");
+    assert.equal(concurrentOrders[0].provider, "SEPAY", "A configured SePay webhook must mark new orders as SePay orders.");
+
+    const verifiedResults = await Promise.all([
+      processSePaySubscriptionWebhook({
+        payload: {
+          id: `sepay-${suffix}`,
+          accountNumber: "123456789",
+          transferType: "in",
+          transferAmount: concurrentOrders[0].amountVnd,
+          code: concurrentOrders[0].transferCode
+        },
+        rawPayload: {
+          id: `sepay-${suffix}`,
+          accountNumber: "123456789",
+          transferType: "in",
+          transferAmount: concurrentOrders[0].amountVnd,
+          code: concurrentOrders[0].transferCode
+        }
+      }),
+      processSePaySubscriptionWebhook({
+        payload: {
+          id: `sepay-${suffix}`,
+          accountNumber: "123456789",
+          transferType: "in",
+          transferAmount: concurrentOrders[0].amountVnd,
+          code: concurrentOrders[0].transferCode
+        },
+        rawPayload: {
+          id: `sepay-${suffix}`,
+          accountNumber: "123456789",
+          transferType: "in",
+          transferAmount: concurrentOrders[0].amountVnd,
+          code: concurrentOrders[0].transferCode
+        }
+      })
+    ]);
+    assert.equal(verifiedResults.filter((result) => result.status === "PAID" || result.duplicate).length, 2, "Repeated SePay callbacks must be idempotent.");
+    assert.equal(await prisma.subscriptionPaymentTransaction.count({ where: { paymentOrderId: concurrentOrders[0].id } }), 1, "One provider transaction must create only one payment record.");
+    assert.equal((await prisma.subscriptionPaymentOrder.findUniqueOrThrow({ where: { id: concurrentOrders[0].id } })).status, "PAID", "A matching SePay transaction must mark the order paid.");
 
     const secondUser = await prisma.user.create({
       data: { name: "Second subscription integration test", email: `subscription-it-second-${suffix}@example.test`, passwordHash: "not-used-by-test" }
@@ -115,6 +156,23 @@ async function run() {
     assert.notEqual(secondOrder.transferCode, concurrentOrders[0].transferCode, "Each restaurant must receive a unique transfer code.");
     assert.equal(secondOrder.receiverBankCode, "VCB", "Concurrent restaurants must snapshot the configured bank.");
     assert.equal(secondOrder.receiverAccountNumber, "123456789", "Concurrent restaurants must snapshot the configured account.");
+    const reviewResult = await processSePaySubscriptionWebhook({
+      payload: {
+        id: `sepay-review-${suffix}`,
+        accountNumber: "123456789",
+        transferType: "in",
+        transferAmount: secondOrder.amountVnd - 1,
+        code: secondOrder.transferCode
+      },
+      rawPayload: {
+        id: `sepay-review-${suffix}`,
+        accountNumber: "123456789",
+        transferType: "in",
+        transferAmount: secondOrder.amountVnd - 1,
+        code: secondOrder.transferCode
+      }
+    });
+    assert.equal(reviewResult.status, "NEEDS_REVIEW", "A SePay transaction with the wrong amount must require review.");
 
     await prisma.platformSubscriptionPaymentConfig.update({
       where: { singletonKey: "default" },

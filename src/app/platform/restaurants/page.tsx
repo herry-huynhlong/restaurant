@@ -104,7 +104,15 @@ export default async function PlatformRestaurantsPage({
                           priceVnd: request.priceVnd,
                           status: request.status,
                           createdAt: request.createdAt.toISOString(),
-                          currentSubscriptionEnd: request.currentSubscriptionEnd?.toISOString() ?? null
+                          currentSubscriptionEnd: request.currentSubscriptionEnd?.toISOString() ?? null,
+                          paymentOrder: request.paymentOrders[0]
+                            ? {
+                                provider: request.paymentOrders[0].provider,
+                                status: request.paymentOrders[0].status,
+                                amountVnd: request.paymentOrders[0].amountVnd,
+                                paidAt: request.paymentOrders[0].paidAt?.toISOString() ?? null
+                              }
+                            : null
                         }))}
                       />
                     ) : null}

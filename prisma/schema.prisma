@@ -935,7 +935,7 @@ model SubscriptionPaymentTransaction {
 
 model PaymentWebhookEvent {
   id                   String                          @id @default(cuid())
-  restaurantId         String
+  restaurantId         String?
   paymentOrderId       String?
   paymentTransactionId String?
   provider             SubscriptionPaymentProvider
@@ -949,7 +949,7 @@ model PaymentWebhookEvent {
   lastError            String?
   createdAt            DateTime                        @default(now())
   updatedAt            DateTime                        @updatedAt
-  restaurant           Restaurant                      @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  restaurant           Restaurant?                     @relation(fields: [restaurantId], references: [id], onDelete: SetNull)
   paymentOrder         SubscriptionPaymentOrder?       @relation(fields: [paymentOrderId], references: [id], onDelete: SetNull)
   paymentTransaction   SubscriptionPaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
 

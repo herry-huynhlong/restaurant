@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { Prisma } from "@prisma/client";
+import { Prisma, SubscriptionPaymentProvider } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { addCalendarMonths } from "@/server/services/subscription-service";
 import { getPaymentReceiverSnapshot } from "@/server/services/platform-subscription-payment-config-service";
@@ -126,7 +126,7 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
             restaurantId: request.restaurantId,
             subscriptionRequestId: request.id,
             requestedByUserId: input.requestedByUserId,
-            provider: "MOCK",
+            provider: getSubscriptionPaymentProvider(),
             status: "PENDING",
             idempotencyKey,
             transferCode: createTransferCode(),
@@ -194,7 +194,13 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
 }
 
 function createTransferCode() {
-  return `QP${randomBytes(8).toString("hex").toUpperCase()}`;
+  // SePay payment-code rules support a short alphabetic prefix and up to ten
+  // alphanumeric suffix characters. Older, longer QP codes remain matchable.
+  return `QP${randomBytes(5).toString("hex").toUpperCase()}`;
+}
+
+function getSubscriptionPaymentProvider(): SubscriptionPaymentProvider {
+  return process.env.SEPAY_SUBSCRIPTION_WEBHOOK_API_KEY?.trim() ? "SEPAY" : "MOCK";
 }
 
 function maskAccountNumber(accountNumber: string) {
