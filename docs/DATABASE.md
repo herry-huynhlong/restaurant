@@ -14,7 +14,7 @@
 |---|---|
 | `User` | Danh tính đăng nhập, password hash, platform role; liên kết membership, device, push, audit. |
 | `Restaurant` | Tenant gốc; slug unique, trạng thái, plan, subscription, soft delete. |
-| `RestaurantUser` | Membership User-Restaurant, role và username tenant. |
+| `RestaurantUser` | Membership User-Restaurant, role, username tenant và vòng đời xóa mềm. Username chỉ duy nhất giữa các membership chưa xóa. |
 | `RestaurantSetting` | Tên/logo/liên hệ/timezone/ngôn ngữ, invoice và thuế. |
 | `PushSubscription` | Web Push endpoint/key theo user, restaurant và thiết bị. |
 | `StaffDeviceSession` | Thiết bị, người vận hành, ca làm, trạng thái thu hồi. |

@@ -121,6 +121,7 @@ export default async function AdminStaffPage({
     prisma.restaurantUser.findMany({
       where: {
         restaurantId: access.restaurant.id,
+        deletedAt: null,
         role: { in: assignableRoles }
       },
       include: { user: true },

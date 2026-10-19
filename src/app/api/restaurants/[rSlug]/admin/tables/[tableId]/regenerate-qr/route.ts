@@ -56,11 +56,12 @@ async function requireQrAccess(slug: string): Promise<AccessResult> {
     },
     select: {
       role: true,
-      isActive: true
+      isActive: true,
+      deletedAt: true
     }
   });
 
-  if (!membership?.isActive || !["OWNER", "MANAGER"].includes(membership.role) || !canRoleAccessPlan(restaurant.plan, membership.role, restaurant.businessType, restaurant.planEntitlement)) {
+  if (!membership?.isActive || membership.deletedAt || !["OWNER", "MANAGER"].includes(membership.role) || !canRoleAccessPlan(restaurant.plan, membership.role, restaurant.businessType, restaurant.planEntitlement)) {
     return { error: NextResponse.json({ success: false, message: "Bạn không có quyền đổi mã QR bàn." }, { status: 403 }) };
   }
 

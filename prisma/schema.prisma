@@ -243,16 +243,20 @@ model RestaurantUser {
   username     String?
   role         RestaurantRole
   isActive     Boolean        @default(true)
+  deletedAt    DateTime?
+  deletedByUserId String?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   restaurant   Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([restaurantId, userId])
-  @@unique([restaurantId, username])
+  // Active usernames are protected by a partial unique index created in SQL.
+  @@index([restaurantId, username])
   @@index([restaurantId, role])
   @@index([userId])
   @@index([isActive])
+  @@index([deletedAt])
 }
 
 model RestaurantSetting {

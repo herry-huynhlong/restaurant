@@ -91,11 +91,12 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
     select: {
       id: true,
       role: true,
-      isActive: true
+      isActive: true,
+      deletedAt: true
     }
   });
 
-  if (!membership?.isActive) {
+  if (!membership?.isActive || membership.deletedAt) {
     redirect("/unauthorized");
   }
 

@@ -36,6 +36,7 @@ export async function createNotificationsForRestaurantRoles({
     where: {
       restaurantId,
       isActive: true,
+      deletedAt: null,
       role: { in: roles },
       user: { isActive: true }
     },

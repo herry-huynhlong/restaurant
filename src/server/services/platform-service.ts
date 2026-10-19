@@ -55,7 +55,7 @@ export async function getPlatformOverview() {
           _count: {
             select: {
               tables: true,
-              users: true
+              users: { where: { deletedAt: null } }
             }
           }
         }
@@ -100,14 +100,14 @@ export async function getPlatformRestaurants({ includeDeleted = false }: { inclu
     orderBy: { createdAt: "desc" },
     include: {
       users: {
-        where: { role: "OWNER" },
+        where: { role: "OWNER", deletedAt: null },
         include: { user: true },
         take: 1
       },
       _count: {
         select: {
           tables: true,
-          users: true
+          users: { where: { deletedAt: null } }
         }
       }
     }
@@ -140,6 +140,7 @@ export async function getPlatformRestaurantDetail(restaurantId: string) {
     include: {
       settings: true,
       users: {
+        where: { deletedAt: null },
         include: { user: true },
         orderBy: { createdAt: "asc" }
       },
@@ -164,7 +165,7 @@ export async function getPlatformRestaurantDetail(restaurantId: string) {
       _count: {
         select: {
           tables: true,
-          users: true,
+          users: { where: { deletedAt: null } },
           orders: true,
           payments: true
         }
@@ -175,7 +176,7 @@ export async function getPlatformRestaurantDetail(restaurantId: string) {
 
 export async function getPlatformOwners() {
   return prisma.restaurantUser.findMany({
-    where: { role: "OWNER", restaurant: { status: { not: "DELETED" } } },
+    where: { role: "OWNER", deletedAt: null, restaurant: { status: { not: "DELETED" } } },
     include: {
       user: true,
       restaurant: true

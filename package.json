@@ -21,6 +21,7 @@
     "test:cashier-realtime": "tsx scripts/cashier-realtime-checks.ts",
     "test:staff-pos": "tsx scripts/staff-pos-layout-checks.ts",
     "test:staff-device-name": "tsx scripts/staff-device-name-checks.ts",
+    "test:staff-soft-delete": "tsx scripts/staff-soft-delete-checks.ts",
     "test:kitchen-claim-order": "tsx scripts/kitchen-claim-order-checks.ts",
     "test:waiter-claim-order": "tsx scripts/waiter-claim-order-checks.ts",
     "test:tables-responsive": "tsx scripts/tables-responsive-checks.ts",

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { debugLog } from "@/lib/debug-log";
 import { generateQrToken } from "@/lib/qr";
@@ -890,7 +891,8 @@ async function getManagedStaffMembership(restaurantId: string, membershipId: str
   return prisma.restaurantUser.findFirst({
     where: {
       id: membershipId,
-      restaurantId
+      restaurantId,
+      deletedAt: null
     },
     include: { user: true }
   });
@@ -957,11 +959,12 @@ export async function createStaffAction(slug: string, formData: FormData) {
     }
 
     const passwordHash = await bcrypt.hash(parsed.password, 12);
+    const accountKey = randomUUID();
     const staff = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           name: parsed.name,
-          email: makeInternalStaffEmail(access.restaurant.id, parsed.username),
+          email: makeInternalStaffEmail(access.restaurant.id, parsed.username, accountKey),
           phone: parsed.phone,
           passwordHash,
           isActive: true
@@ -1197,12 +1200,31 @@ export async function deleteStaffAccountAction(slug: string, formData: FormData)
     ensureCanMutateStaff(access, membership, undefined, false);
 
     const now = new Date();
-    await prisma.$transaction([
-      prisma.restaurantUser.update({
+    await prisma.$transaction(async (tx) => {
+      const otherActiveMemberships = await tx.restaurantUser.count({
+        where: {
+          userId: membership.userId,
+          id: { not: membership.id },
+          isActive: true,
+          deletedAt: null
+        }
+      });
+
+      await tx.restaurantUser.update({
         where: { id: membership.id },
-        data: { isActive: false }
-      }),
-      prisma.staffDeviceSession.updateMany({
+        data: {
+          isActive: false,
+          deletedAt: now,
+          deletedByUserId: access.user.id
+        }
+      });
+      if (otherActiveMemberships === 0 && membership.user.platformRole === "USER") {
+        await tx.user.update({
+          where: { id: membership.userId },
+          data: { isActive: false }
+        });
+      }
+      await tx.staffDeviceSession.updateMany({
         where: {
           restaurantId: access.restaurant.id,
           userId: membership.userId,
@@ -1215,8 +1237,8 @@ export async function deleteStaffAccountAction(slug: string, formData: FormData)
           revokedAt: now,
           revokedByUserId: access.user.id
         }
-      }),
-      prisma.pushSubscription.updateMany({
+      });
+      await tx.pushSubscription.updateMany({
         where: {
           restaurantId: access.restaurant.id,
           userId: membership.userId
@@ -1226,8 +1248,8 @@ export async function deleteStaffAccountAction(slug: string, formData: FormData)
           onShift: false,
           lastShiftEndedAt: now
         }
-      }),
-      prisma.auditLog.create({
+      });
+      await tx.auditLog.create({
         data: {
           restaurantId: access.restaurant.id,
           userId: access.user.id,
@@ -1241,8 +1263,8 @@ export async function deleteStaffAccountAction(slug: string, formData: FormData)
             softDelete: true
           }
         }
-      })
-    ]);
+      });
+    });
 
     revalidatePath(path);
     redirectWithMessage(path, "success", "Đã xóa tài khoản nhân viên.");

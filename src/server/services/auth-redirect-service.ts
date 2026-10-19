@@ -9,7 +9,7 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
   }
 
   const memberships = await prisma.restaurantUser.findMany({
-    where: { userId, isActive: true },
+    where: { userId, isActive: true, deletedAt: null },
     include: {
       restaurant: {
         select: { slug: true, status: true, plan: true, planEntitlement: true, businessType: true }

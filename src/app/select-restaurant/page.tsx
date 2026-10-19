@@ -8,7 +8,7 @@ import { canRoleAccessPlan } from "@/lib/plan/features";
 export default async function SelectRestaurantPage() {
   const user = await requireAuthenticatedUser();
   const memberships = await prisma.restaurantUser.findMany({
-    where: { userId: user.id, isActive: true },
+    where: { userId: user.id, isActive: true, deletedAt: null },
     include: { restaurant: true },
     orderBy: { createdAt: "asc" }
   });

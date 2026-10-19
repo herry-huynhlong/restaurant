@@ -126,6 +126,7 @@ export async function sendPushToRestaurantRoles({
           some: {
             restaurantId,
             isActive: true,
+            deletedAt: null,
             role: { in: effectiveRoles }
           }
         }
