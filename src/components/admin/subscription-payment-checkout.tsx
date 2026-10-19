@@ -157,7 +157,7 @@ function CheckoutStatus({ status, remaining }: { status: Checkout["status"]; rem
     return <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><CheckCircle2 className="h-5 w-5 shrink-0" /><p>Thanh toán đã được SePay xác minh. Gói dịch vụ đã được kích hoạt.</p></div>;
   }
   if (status === "EXPIRED" || status === "CANCELLED") {
-    return <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><Clock3 className="h-5 w-5 shrink-0" /><p>Lệnh thanh toán đã hết hiệu lực. Vui lòng tạo báo giá mới.</p></div>;
+    return <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><Clock3 className="h-5 w-5 shrink-0" /><p>Mã thanh toán đã hết hiệu lực. Bạn có thể tạo mã thanh toán mới.</p></div>;
   }
   if (status === "NEEDS_REVIEW") {
     return <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><TriangleAlert className="h-5 w-5 shrink-0" /><p>Giao dịch đang cần QuánPilot Admin kiểm tra.</p></div>;

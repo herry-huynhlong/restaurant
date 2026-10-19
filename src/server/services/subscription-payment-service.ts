@@ -3,6 +3,10 @@ import { Prisma, SubscriptionPaymentProvider } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { addCalendarMonths } from "@/server/services/subscription-service";
 import { getPaymentReceiverSnapshot } from "@/server/services/platform-subscription-payment-config-service";
+import {
+  getSubscriptionPaymentOrderExpiresAt,
+  getSubscriptionPaymentOrderExpiryCutoff
+} from "@/server/services/subscription-payment-order-expiry";
 
 const paymentOrderIdempotencyPrefix = "subscription-payment-order:v1:";
 
@@ -67,24 +71,44 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
 
     await tx.subscriptionPaymentOrder.updateMany({
       where: {
-        subscriptionRequestId: request.id,
         status: "PENDING",
-        expiresAt: { lte: now }
+        OR: [
+          { expiresAt: { lte: now } },
+          { createdAt: { lte: getSubscriptionPaymentOrderExpiryCutoff(now) } }
+        ]
       },
       data: { status: "EXPIRED" }
     });
 
-    const idempotencyKey = `${paymentOrderIdempotencyPrefix}${request.id}`;
+    const existingRestaurantOrder = await tx.subscriptionPaymentOrder.findFirst({
+      where: {
+        restaurantId: input.restaurantId,
+        OR: [
+          { status: "PENDING", expiresAt: { gt: now } },
+          { status: "NEEDS_REVIEW" }
+        ]
+      },
+      orderBy: { createdAt: "desc" }
+    });
+    if (existingRestaurantOrder) return existingRestaurantOrder;
+
     const existing = await tx.subscriptionPaymentOrder.findFirst({
       where: {
         subscriptionRequestId: request.id,
-        idempotencyKey,
         status: "PENDING",
         expiresAt: { gt: now }
       },
       orderBy: { createdAt: "desc" }
     });
     if (existing) return existing;
+
+    // An expired code is terminal. Each new payment attempt gets a distinct
+    // idempotency key while the row lock above keeps concurrent attempts to one code.
+    const idempotencyKey = `${paymentOrderIdempotencyPrefix}${request.id}:${randomBytes(8).toString("hex")}`;
+    const paymentOrderExpiresAt = getSubscriptionPaymentOrderExpiresAt({
+      createdAt: now,
+      expiresAt: request.quoteExpiresAt
+    });
 
     const paymentConfig = await tx.platformSubscriptionPaymentConfig.findUnique({
       where: { singletonKey: "default" }
@@ -140,7 +164,7 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
             paymentConfigVersion: receiver.configVersion,
             priceSnapshotJson: priceSnapshot,
             entitlementSnapshotJson: entitlementSnapshot,
-            expiresAt: request.quoteExpiresAt
+            expiresAt: paymentOrderExpiresAt
           }
         });
 

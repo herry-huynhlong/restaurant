@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/db/prisma";
+import {
+  getSubscriptionPaymentOrderExpiresAt,
+  getSubscriptionPaymentOrderExpiryCutoff
+} from "@/server/services/subscription-payment-order-expiry";
 
 export async function getSubscriptionCheckoutOrder({
   restaurantId,
@@ -17,6 +21,7 @@ export async function getSubscriptionCheckoutOrder({
       amountVnd: true,
       currency: true,
       transferCode: true,
+      createdAt: true,
       expiresAt: true,
       paidAt: true,
       receiverBankCode: true,
@@ -27,7 +32,8 @@ export async function getSubscriptionCheckoutOrder({
   });
   if (!order) return null;
 
-  const effectiveStatus = getEffectiveSubscriptionPaymentOrderStatus(order.status, order.expiresAt);
+  const effectiveExpiresAt = getSubscriptionPaymentOrderExpiresAt(order);
+  const effectiveStatus = getEffectiveSubscriptionPaymentOrderStatus(order.status, effectiveExpiresAt);
   const bank = order.receiverBankCode && order.receiverAccountNumber
     ? {
         ready: true as const,
@@ -40,6 +46,7 @@ export async function getSubscriptionCheckoutOrder({
 
   return {
     ...order,
+    expiresAt: effectiveExpiresAt,
     status: effectiveStatus,
     bank,
     qrImageUrl: bank.ready && effectiveStatus === "PENDING"
@@ -59,7 +66,8 @@ export async function getActiveSubscriptionPaymentOrders(restaurantId: string) {
     where: {
       restaurantId,
       status: "PENDING",
-      expiresAt: { gt: new Date() }
+      expiresAt: { gt: new Date() },
+      createdAt: { gt: getSubscriptionPaymentOrderExpiryCutoff() }
     },
     select: {
       id: true,
@@ -67,6 +75,7 @@ export async function getActiveSubscriptionPaymentOrders(restaurantId: string) {
       plan: true,
       termMonths: true,
       amountVnd: true,
+      createdAt: true,
       expiresAt: true
     },
     orderBy: { createdAt: "desc" }
@@ -75,7 +84,13 @@ export async function getActiveSubscriptionPaymentOrders(restaurantId: string) {
 
 export async function expireStaleSubscriptionPaymentOrders(now = new Date()) {
   const result = await prisma.subscriptionPaymentOrder.updateMany({
-    where: { status: "PENDING", expiresAt: { lte: now } },
+    where: {
+      status: "PENDING",
+      OR: [
+        { expiresAt: { lte: now } },
+        { createdAt: { lte: getSubscriptionPaymentOrderExpiryCutoff(now) } }
+      ]
+    },
     data: { status: "EXPIRED" }
   });
   return result.count;

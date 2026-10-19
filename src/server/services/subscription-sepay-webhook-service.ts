@@ -3,6 +3,7 @@ import { Prisma, SubscriptionPaymentProvider, SubscriptionPaymentTransactionStat
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { confirmSubscriptionRequestWithinTransaction } from "@/server/services/subscription-service";
+import { getSubscriptionPaymentOrderExpiresAt } from "@/server/services/subscription-payment-order-expiry";
 
 const provider: SubscriptionPaymentProvider = "SEPAY";
 const inboundTransferType = "in";
@@ -261,7 +262,7 @@ function getReviewReason({
   providerOccurredAt,
   receivedAt
 }: {
-  order: { status: string; amountVnd: number; receiverAccountNumber: string | null; expiresAt: Date };
+  order: { status: string; amountVnd: number; receiverAccountNumber: string | null; createdAt: Date; expiresAt: Date };
   payload: SePayWebhookPayload;
   providerOccurredAt: Date | null;
   receivedAt: Date;
@@ -273,7 +274,7 @@ function getReviewReason({
   if (!order.receiverAccountNumber || normalizeAccountNumber(payload.accountNumber) !== normalizeAccountNumber(order.receiverAccountNumber)) {
     return "RECEIVER_ACCOUNT_MISMATCH";
   }
-  if ((providerOccurredAt ?? receivedAt).getTime() > order.expiresAt.getTime()) return "PAYMENT_AFTER_EXPIRY";
+  if ((providerOccurredAt ?? receivedAt).getTime() > getSubscriptionPaymentOrderExpiresAt(order).getTime()) return "PAYMENT_AFTER_EXPIRY";
   return null;
 }
 

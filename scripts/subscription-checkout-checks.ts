@@ -5,6 +5,10 @@ import {
   createSubscriptionVietQrImageUrl,
   getEffectiveSubscriptionPaymentOrderStatus
 } from "@/server/services/subscription-checkout-service";
+import {
+  getSubscriptionPaymentOrderExpiresAt,
+  subscriptionPaymentOrderLifetimeMs
+} from "@/server/services/subscription-payment-order-expiry";
 import { getPaymentReceiverSnapshot } from "@/server/services/platform-subscription-payment-config-service";
 
 const root = process.cwd();
@@ -37,6 +41,19 @@ assert.equal(getEffectiveSubscriptionPaymentOrderStatus("PENDING", new Date("202
 assert.equal(getEffectiveSubscriptionPaymentOrderStatus("PENDING", new Date("2026-10-19T00:00:00.000Z"), new Date("2026-10-19T00:00:00.000Z")), "EXPIRED");
 assert.equal(getEffectiveSubscriptionPaymentOrderStatus("PAID", new Date("2026-10-18T00:00:00.000Z"), new Date("2026-10-19T00:00:00.000Z")), "PAID");
 
+const orderCreatedAt = new Date("2026-10-19T10:00:00.000Z");
+assert.equal(subscriptionPaymentOrderLifetimeMs, 30 * 60 * 1000, "Payment codes must be valid for 30 minutes.");
+assert.equal(
+  getSubscriptionPaymentOrderExpiresAt({ createdAt: orderCreatedAt, expiresAt: new Date("2026-10-19T12:00:00.000Z") }).toISOString(),
+  "2026-10-19T10:30:00.000Z",
+  "A payment code must expire 30 minutes after creation."
+);
+assert.equal(
+  getSubscriptionPaymentOrderExpiresAt({ createdAt: orderCreatedAt, expiresAt: new Date("2026-10-19T10:10:00.000Z") }).toISOString(),
+  "2026-10-19T10:10:00.000Z",
+  "A payment code must never outlive its quote."
+);
+
 const checkoutService = read("src/server/services/subscription-checkout-service.ts");
 const paymentOrderService = read("src/server/services/subscription-payment-service.ts");
 const route = read("src/app/api/restaurants/[rSlug]/admin/subscription/payment-orders/[paymentOrderId]/route.ts");
@@ -50,6 +67,9 @@ assert.ok(checkoutService.includes("receiverBankCode"), "Checkout must read the 
 assert.ok(!checkoutService.includes("restaurantSetting"), "Subscription checkout must not use a restaurant bill-payment bank account.");
 assert.ok(paymentOrderService.includes("getPaymentReceiverSnapshot"), "New payment orders must validate the platform payment configuration.");
 assert.ok(paymentOrderService.includes("receiverAccountNumber: receiver.accountNumber"), "New payment orders must snapshot the receiving account.");
+assert.ok(paymentOrderService.includes('status: "NEEDS_REVIEW"'), "A payment needing review must block a second code for the restaurant.");
+assert.ok(paymentOrderService.includes("existingRestaurantOrder"), "A live payment code must block a second code for the restaurant.");
+assert.ok(paymentOrderService.includes("getSubscriptionPaymentOrderExpiresAt"), "Payment-order expiry must be calculated separately from the quote expiry.");
 assert.ok(checkoutService.includes('status: "EXPIRED"'), "Stale payment orders must become expired.");
 assert.ok(route.includes('requireRestaurantAccess(params.rSlug, ["OWNER"]'), "Checkout status API must require the restaurant owner.");
 assert.ok(route.includes("restaurantId: access.restaurant.id"), "Checkout status API must scope an order to the current restaurant.");
