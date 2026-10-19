@@ -3,7 +3,6 @@ import { PrismaClient } from "@prisma/client";
 import { createSubscriptionPaymentOrder } from "@/server/services/subscription-payment-service";
 import { processSePaySubscriptionWebhook } from "@/server/services/subscription-sepay-webhook-service";
 import {
-  confirmSubscriptionRequest,
   createSubscriptionRequest,
   expireStaleSubscriptionRequests
 } from "@/server/services/subscription-service";
@@ -134,6 +133,8 @@ async function run() {
     assert.equal(verifiedResults.filter((result) => result.status === "PAID" || result.duplicate).length, 2, "Repeated SePay callbacks must be idempotent.");
     assert.equal(await prisma.subscriptionPaymentTransaction.count({ where: { paymentOrderId: concurrentOrders[0].id } }), 1, "One provider transaction must create only one payment record.");
     assert.equal((await prisma.subscriptionPaymentOrder.findUniqueOrThrow({ where: { id: concurrentOrders[0].id } })).status, "PAID", "A matching SePay transaction must mark the order paid.");
+    assert.equal((await prisma.restaurantSubscriptionRequest.findUniqueOrThrow({ where: { id: requestId } })).status, "CONFIRMED", "A matching SePay transaction must activate the subscription automatically.");
+    assert.equal(await prisma.subscriptionEntitlement.count({ where: { paymentOrderId: concurrentOrders[0].id } }), 1, "Repeated SePay callbacks must create only one entitlement.");
 
     const secondUser = await prisma.user.create({
       data: { name: "Second subscription integration test", email: `subscription-it-second-${suffix}@example.test`, passwordHash: "not-used-by-test" }
@@ -149,10 +150,11 @@ async function run() {
       plan: "BASIC",
       termMonths: 3
     });
-    const [, secondOrder] = await Promise.all([
-      createSubscriptionPaymentOrder({ restaurantId: restaurant.id, requestedByUserId: user.id, subscriptionRequestId: requestId }),
-      createSubscriptionPaymentOrder({ restaurantId: secondRestaurant.id, requestedByUserId: secondUser.id, subscriptionRequestId: secondRequest.id })
-    ]);
+    const secondOrder = await createSubscriptionPaymentOrder({
+      restaurantId: secondRestaurant.id,
+      requestedByUserId: secondUser.id,
+      subscriptionRequestId: secondRequest.id
+    });
     assert.notEqual(secondOrder.transferCode, concurrentOrders[0].transferCode, "Each restaurant must receive a unique transfer code.");
     assert.equal(secondOrder.receiverBankCode, "VCB", "Concurrent restaurants must snapshot the configured bank.");
     assert.equal(secondOrder.receiverAccountNumber, "123456789", "Concurrent restaurants must snapshot the configured account.");
@@ -208,16 +210,6 @@ async function run() {
       () => createSubscriptionPaymentOrder({ restaurantId: disabledRestaurant.id, requestedByUserId: disabledUser.id, subscriptionRequestId: disabledRequest.id }),
       /chưa sẵn sàng/i,
       "Disabled platform payment must reject new checkout attempts."
-    );
-
-    const concurrentConfirmations = await Promise.allSettled([
-      confirmSubscriptionRequest(requestId, user.id),
-      confirmSubscriptionRequest(requestId, user.id)
-    ]);
-    assert.equal(
-      concurrentConfirmations.filter((result) => result.status === "fulfilled").length,
-      1,
-      "A request must be confirmed only once under concurrent confirmation."
     );
 
     const expiringRequest = await createSubscriptionRequest({

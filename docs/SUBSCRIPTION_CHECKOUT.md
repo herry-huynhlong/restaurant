@@ -6,7 +6,7 @@ The per-restaurant `RestaurantSetting` bank account remains exclusive to restaur
 
 The checkout creates or returns one pending `SubscriptionPaymentOrder` for the server-created subscription request. It displays the exact snapshot amount, unique transfer code and expiry. The client polls only that order every 15 seconds while it remains pending.
 
-There is no browser action, mock confirmation, or QR scan action that changes a subscription. The SePay webhook can only mark a payment order as `PAID` after checking the provider event identity, inbound direction, exact amount, snapshotted receiving account and order expiry. A Platform Admin still performs the final activation, and the server rejects activation of a SePay order that is not `PAID`.
+There is no browser action, mock confirmation, or QR scan action that changes a subscription. The SePay webhook validates the provider event identity, inbound direction, exact amount, snapshotted receiving account and order expiry. A matching callback atomically marks the order `PAID`, creates one entitlement for that payment order, and activates the subscription. The database transaction rolls back in full if activation cannot be completed.
 
 After the migration is deployed to AWS staging, configure the receiving account through the Platform Admin website. No subscription bank account is required in `.env` or Docker Compose.
 

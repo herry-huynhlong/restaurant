@@ -102,7 +102,7 @@ export default async function AdminSubscriptionPage({
             {summary.pendingRequests.map((request) => (
               <div key={request.id} className="rounded-xl border border-amber-200 bg-white/70 p-3 text-sm">
                 <p className="font-semibold">{requestTypeLabel(request.requestType)} · {request.plan} · {request.termMonths} tháng · {formatVnd(request.priceVnd)}</p>
-                <p className="mt-1">Đã gửi lúc {formatDateTime(request.createdAt)}. Gói chỉ được kích hoạt sau khi QuánPilot Admin xác nhận thanh toán.</p>
+                <p className="mt-1">Đã gửi lúc {formatDateTime(request.createdAt)}. Gói sẽ được kích hoạt tự động sau khi SePay xác minh giao dịch hợp lệ.</p>
               </div>
             ))}
           </div>

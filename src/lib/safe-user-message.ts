@@ -41,7 +41,7 @@ const allowedFeedbackMessages = new Set([
   "Đã đổi mật khẩu nhân viên thành công.",
   "Đã đổi mật khẩu quản trị nền tảng.",
   "Đã ghi nhận xác nhận quyền lợi gói dịch vụ.",
-  "Đã gửi yêu cầu thành công. Chúng tôi sẽ xác nhận sau khi kiểm tra thanh toán.",
+  "Đã tạo yêu cầu thanh toán. Gói sẽ được kích hoạt tự động sau khi SePay xác minh giao dịch.",
   "Đã kích hoạt lại tài khoản nhân viên.",
   "Đã khôi phục nhà hàng. Trạng thái hiện là Chưa hoạt động.",
   "Đã kích hoạt gói dịch vụ.",

@@ -1,8 +1,14 @@
-import type { Prisma, RestaurantPlan } from "@prisma/client";
+import { Prisma, type RestaurantPlan } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 
 export const subscriptionTerms = [3, 6, 12] as const;
 export type SubscriptionTerm = (typeof subscriptionTerms)[number];
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+type SubscriptionConfirmationOptions = {
+  paymentVerifiedAt?: Date;
+  activationSource?: "PLATFORM_ADMIN" | "SEPAY_WEBHOOK";
+};
 
 function activeSubscriptionRequestWhere(restaurantId: string, now: Date): Prisma.RestaurantSubscriptionRequestWhereInput {
   return {
@@ -299,8 +305,30 @@ export async function createSubscriptionRequest({
   });
 }
 
-export async function confirmSubscriptionRequest(requestId: string, actorUserId: string) {
-  return prisma.$transaction(async (tx) => {
+export async function confirmSubscriptionRequest(
+  requestId: string,
+  actorUserId: string | null,
+  options: SubscriptionConfirmationOptions = {}
+) {
+  return prisma.$transaction((tx) => confirmSubscriptionRequestWithinTransaction(tx, {
+    requestId,
+    actorUserId,
+    ...options
+  }));
+}
+
+export async function confirmSubscriptionRequestWithinTransaction(
+  tx: TransactionClient,
+  {
+    requestId,
+    actorUserId,
+    paymentVerifiedAt,
+    activationSource = "PLATFORM_ADMIN"
+  }: {
+    requestId: string;
+    actorUserId: string | null;
+  } & SubscriptionConfirmationOptions
+) {
     const requestPreview = await tx.restaurantSubscriptionRequest.findUnique({
       where: { id: requestId }
     });
@@ -326,13 +354,17 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
       where: { id: requestId }
     });
     if (!request) throw new Error("Không tìm thấy yêu cầu đăng ký.");
+    if (request.status === "CONFIRMED" && activationSource === "SEPAY_WEBHOOK") return request;
     if (request.status !== "PENDING") throw new Error("Yêu cầu này đã được xử lý trước đó.");
 
     const sePayOrder = await tx.subscriptionPaymentOrder.findFirst({
       where: { subscriptionRequestId: request.id, provider: "SEPAY" },
       orderBy: { createdAt: "desc" },
-      select: { status: true }
+      select: { id: true, status: true, priceSnapshotJson: true }
     });
+    if (activationSource === "SEPAY_WEBHOOK" && sePayOrder?.status !== "PAID") {
+      throw new Error("Giao dịch SePay chưa được xác minh. Không thể kích hoạt gói dịch vụ.");
+    }
     if (sePayOrder && sePayOrder.status !== "PAID") {
       throw new Error("Giao dịch SePay chưa được xác minh. Không thể kích hoạt gói dịch vụ.");
     }
@@ -354,7 +386,8 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
     if (isUpgrade) {
       throw new Error("Chưa thể xác nhận nâng cấp vì lịch sử các kỳ BASIC chưa đủ để tính chính xác quyền lợi còn lại.");
     }
-    if (request.quoteExpiresAt && request.quoteExpiresAt.getTime() < activatedStart.getTime()) {
+    const quoteVerificationTime = paymentVerifiedAt ?? activatedStart;
+    if (request.quoteExpiresAt && request.quoteExpiresAt.getTime() < quoteVerificationTime.getTime()) {
       throw new Error("Báo giá đã hết hạn. Vui lòng yêu cầu cửa hàng gửi lại.");
     }
 
@@ -440,6 +473,25 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
       }
     });
 
+    if (sePayOrder?.status === "PAID") {
+      await tx.subscriptionEntitlement.upsert({
+        where: { paymentOrderId: sePayOrder.id },
+        create: {
+          restaurantId: request.restaurantId,
+          subscriptionRequestId: request.id,
+          paymentOrderId: sePayOrder.id,
+          status: "ACTIVE",
+          plan: request.plan,
+          termMonths: request.termMonths,
+          amountVnd: request.priceVnd,
+          startsAt: activatedStart,
+          endsAt: activatedEnd,
+          priceSnapshotJson: sePayOrder.priceSnapshotJson ?? Prisma.JsonNull
+        },
+        update: {}
+      });
+    }
+
     await tx.restaurantSubscriptionEvent.create({
       data: {
         restaurantId: request.restaurantId,
@@ -456,6 +508,9 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
           previousPlan: restaurant.plan,
           previousSubscriptionStart: restaurant.subscriptionStart?.toISOString() ?? null,
           previousSubscriptionEnd: restaurant.subscriptionEnd?.toISOString() ?? null,
+          activationSource,
+          paymentOrderId: sePayOrder?.status === "PAID" ? sePayOrder.id : null,
+          paymentVerifiedAt: paymentVerifiedAt?.toISOString() ?? null,
           pricingSnapshot: request.pricingSnapshotJson ?? null
         } satisfies Prisma.InputJsonObject
       }
@@ -473,13 +528,15 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
           plan: request.plan,
           termMonths: request.termMonths,
           priceVnd: request.priceVnd,
-          activatedEnd: activatedEnd.toISOString()
+          activatedEnd: activatedEnd.toISOString(),
+          activationSource,
+          paymentOrderId: sePayOrder?.status === "PAID" ? sePayOrder.id : null,
+          paymentVerifiedAt: paymentVerifiedAt?.toISOString() ?? null
         }
       }
     });
 
     return updatedRequest;
-  });
 }
 
 export async function rejectSubscriptionRequest(requestId: string, actorUserId: string, adminNote?: string) {

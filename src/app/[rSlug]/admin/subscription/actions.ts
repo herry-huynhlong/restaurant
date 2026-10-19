@@ -41,7 +41,7 @@ export async function createRestaurantSubscriptionRequestAction(slug: string, fo
   }
 
   revalidatePath(restaurantRoutes.adminSubscription(slug));
-  redirect(`${restaurantRoutes.adminSubscription(slug)}?success=${encodeURIComponent("Đã gửi yêu cầu thành công. Chúng tôi sẽ xác nhận sau khi kiểm tra thanh toán.")}`);
+  redirect(`${restaurantRoutes.adminSubscription(slug)}?success=${encodeURIComponent("Đã tạo yêu cầu thanh toán. Gói sẽ được kích hoạt tự động sau khi SePay xác minh giao dịch.")}`);
 }
 
 const paymentOrderSchema = z.object({

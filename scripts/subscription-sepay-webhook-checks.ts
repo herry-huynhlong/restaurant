@@ -48,7 +48,8 @@ assert.ok(webhookRoute.includes("maximumPayloadBytes"), "The webhook route must 
 assert.ok(webhookService.includes("transferAmount !== order.amountVnd"), "The webhook must require an exact expected amount.");
 assert.ok(webhookService.includes("RECEIVER_ACCOUNT_MISMATCH"), "The webhook must verify the snapshotted receiving account.");
 assert.ok(webhookService.includes("providerEventId"), "The webhook must retain the provider event identity for idempotency.");
-assert.ok(subscriptionService.includes("Giao dịch SePay chưa được xác minh"), "Platform confirmation must be blocked until a SePay order is paid.");
+assert.ok(subscriptionService.includes("confirmSubscriptionRequestWithinTransaction"), "A matched SePay webhook must activate within the payment transaction.");
+assert.ok(subscriptionService.includes("subscriptionEntitlement.upsert"), "A verified SePay payment must create exactly one entitlement.");
 assert.ok(composeFile.includes("SEPAY_SUBSCRIPTION_WEBHOOK_API_KEY"), "The app service must receive the webhook secret at runtime.");
 
 console.log("Subscription SePay webhook checks passed.");

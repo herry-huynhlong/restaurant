@@ -145,7 +145,7 @@ export function SubscriptionPaymentCheckout({
             </div>
           ) : null}
 
-          <p className="text-xs leading-5 text-slate-500">Việc hiển thị QR hoặc chuyển khoản không tự kích hoạt gói. Gói chỉ thay đổi sau khi giao dịch được hệ thống và QuánPilot Admin xác nhận.</p>
+          <p className="text-xs leading-5 text-slate-500">Việc hiển thị QR hoặc chuyển khoản không tự kích hoạt gói. Gói chỉ được kích hoạt khi SePay xác minh giao dịch hợp lệ.</p>
         </div>
       ) : null}
     </section>
@@ -154,7 +154,7 @@ export function SubscriptionPaymentCheckout({
 
 function CheckoutStatus({ status, remaining }: { status: Checkout["status"]; remaining: string | null }) {
   if (status === "PAID") {
-    return <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><CheckCircle2 className="h-5 w-5 shrink-0" /><p>Đã ghi nhận giao dịch. Gói chỉ được kích hoạt sau khi QuánPilot Admin xác nhận.</p></div>;
+    return <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><CheckCircle2 className="h-5 w-5 shrink-0" /><p>Thanh toán đã được SePay xác minh. Gói dịch vụ đã được kích hoạt.</p></div>;
   }
   if (status === "EXPIRED" || status === "CANCELLED") {
     return <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"><Clock3 className="h-5 w-5 shrink-0" /><p>Lệnh thanh toán đã hết hiệu lực. Vui lòng tạo báo giá mới.</p></div>;

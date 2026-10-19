@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { Prisma, SubscriptionPaymentProvider, SubscriptionPaymentTransactionStatus } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
+import { confirmSubscriptionRequestWithinTransaction } from "@/server/services/subscription-service";
 
 const provider: SubscriptionPaymentProvider = "SEPAY";
 const inboundTransferType = "in";
@@ -76,9 +77,21 @@ export async function processSePaySubscriptionWebhook({
     return await prisma.$transaction(async (tx) => {
       const priorEvent = await tx.paymentWebhookEvent.findUnique({
         where: { provider_providerEventId: { provider, providerEventId } },
-        select: { paymentOrderId: true, status: true, paymentOrder: { select: { status: true } } }
+        select: {
+          paymentOrderId: true,
+          status: true,
+          paymentOrder: { select: { status: true, subscriptionRequestId: true, paidAt: true } }
+        }
       });
       if (priorEvent) {
+        if (priorEvent.paymentOrder?.status === "PAID") {
+          await confirmSubscriptionRequestWithinTransaction(tx, {
+            requestId: priorEvent.paymentOrder.subscriptionRequestId,
+            actorUserId: null,
+            paymentVerifiedAt: priorEvent.paymentOrder.paidAt ?? receivedAt,
+            activationSource: "SEPAY_WEBHOOK"
+          });
+        }
         return {
           duplicate: true,
           paymentOrderId: priorEvent.paymentOrderId,
@@ -172,6 +185,12 @@ export async function processSePaySubscriptionWebhook({
       await tx.subscriptionPaymentOrder.update({
         where: { id: order.id },
         data: { status: "PAID", paidAt: providerOccurredAt ?? receivedAt }
+      });
+      await confirmSubscriptionRequestWithinTransaction(tx, {
+        requestId: order.subscriptionRequestId,
+        actorUserId: null,
+        paymentVerifiedAt: providerOccurredAt ?? receivedAt,
+        activationSource: "SEPAY_WEBHOOK"
       });
       await tx.paymentWebhookEvent.update({
         where: { id: event.id },
