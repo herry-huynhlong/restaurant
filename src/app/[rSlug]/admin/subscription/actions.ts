@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { safeErrorMessage } from "@/lib/safe-user-message";
+import { createSubscriptionPaymentOrder } from "@/server/services/subscription-payment-service";
 import { createSubscriptionRequest, subscriptionTerms } from "@/server/services/subscription-service";
 
 const requestSchema = z.object({
@@ -15,7 +16,7 @@ const requestSchema = z.object({
 });
 
 export async function createRestaurantSubscriptionRequestAction(slug: string, formData: FormData) {
-  const access = await requireRestaurantAccess(slug, ["OWNER"]);
+  const access = await requireRestaurantAccess(slug, ["OWNER"], { allowExpiredSubscription: true });
   const parsed = requestSchema.safeParse({
     plan: String(formData.get("plan") ?? ""),
     termMonths: String(formData.get("termMonths") ?? ""),
@@ -40,6 +41,36 @@ export async function createRestaurantSubscriptionRequestAction(slug: string, fo
 
   revalidatePath(restaurantRoutes.adminSubscription(slug));
   redirect(`${restaurantRoutes.adminSubscription(slug)}?success=${encodeURIComponent("Đã gửi yêu cầu thành công. Chúng tôi sẽ xác nhận sau khi kiểm tra thanh toán.")}`);
+}
+
+const paymentOrderSchema = z.object({
+  subscriptionRequestId: z.string().cuid()
+});
+
+// The payment screen is introduced in a later phase. Keeping the owner-scoped
+// action here establishes the server-side tenant boundary before that UI exists.
+export async function createRestaurantSubscriptionPaymentOrderAction(slug: string, formData: FormData) {
+  const access = await requireRestaurantAccess(slug, ["OWNER"], { allowExpiredSubscription: true });
+  const parsed = paymentOrderSchema.safeParse({
+    subscriptionRequestId: String(formData.get("subscriptionRequestId") ?? "")
+  });
+
+  if (!parsed.success) {
+    redirectWithError(slug, validationMessage(parsed.error));
+  }
+
+  try {
+    await createSubscriptionPaymentOrder({
+      restaurantId: access.restaurant.id,
+      requestedByUserId: access.user.id,
+      subscriptionRequestId: parsed.data.subscriptionRequestId
+    });
+  } catch (error) {
+    redirectWithError(slug, safeErrorMessage(error, "Chưa thể tạo lệnh thanh toán."));
+  }
+
+  revalidatePath(restaurantRoutes.adminSubscription(slug));
+  redirect(`${restaurantRoutes.adminSubscription(slug)}?success=${encodeURIComponent("Đã tạo lệnh thanh toán.")}`);
 }
 
 function validationMessage(error: z.ZodError) {

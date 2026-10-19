@@ -7,6 +7,7 @@ import { canRoleAccessPlan, hasPlanFeature, type PlanFeature } from "@/lib/plan/
 import { hasAnyRestaurantRole } from "@/lib/rbac/roles";
 import { restaurantRoutes } from "@/lib/routes";
 import { isRestaurantInMaintenance } from "@/lib/restaurant-maintenance";
+import { canRestaurantOperate } from "@/lib/tenant/restaurant";
 
 export async function requireAuthenticatedUser() {
   const session = await getServerSession(authOptions);
@@ -50,7 +51,11 @@ export function isPlatformAdminRole(role: PlatformRole | string | null | undefin
   return isPlatformOwnerRole(role) || isPlatformSubAdminRole(role);
 }
 
-export async function requireRestaurantAccess(rSlug: string, allowedRoles?: RestaurantRole[]) {
+export async function requireRestaurantAccess(
+  rSlug: string,
+  allowedRoles?: RestaurantRole[],
+  options: { allowExpiredSubscription?: boolean } = {}
+) {
   const user = await requireAuthenticatedUser();
 
   const restaurant = await prisma.restaurant.findUnique({
@@ -74,6 +79,14 @@ export async function requireRestaurantAccess(rSlug: string, allowedRoles?: Rest
   }
 
   if (restaurant.status !== "ACTIVE") {
+    redirect(restaurantRoutes.locked(restaurant.slug));
+  }
+
+  if (!options.allowExpiredSubscription && !(await canRestaurantOperate({
+    restaurantStatus: restaurant.status,
+    subscriptionStatus: restaurant.subscriptionStatus,
+    subscriptionEnd: restaurant.subscriptionEnd
+  }))) {
     redirect(restaurantRoutes.locked(restaurant.slug));
   }
 

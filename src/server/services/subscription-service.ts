@@ -4,6 +4,17 @@ import { prisma } from "@/lib/db/prisma";
 export const subscriptionTerms = [3, 6, 12] as const;
 export type SubscriptionTerm = (typeof subscriptionTerms)[number];
 
+function activeSubscriptionRequestWhere(restaurantId: string, now: Date): Prisma.RestaurantSubscriptionRequestWhereInput {
+  return {
+    restaurantId,
+    status: "PENDING",
+    OR: [
+      { quoteExpiresAt: null },
+      { quoteExpiresAt: { gt: now } }
+    ]
+  };
+}
+
 const defaultPlanDescriptions: Record<"BASIC" | "PRO", string> = {
   BASIC: "QR bàn, menu, gọi món, phục vụ, thanh toán cơ bản và báo cáo.",
   PRO: "Đầy đủ quyền quản lý, bếp, thu ngân, in bill và báo cáo."
@@ -70,6 +81,7 @@ export async function getPublicPlanPrices() {
 }
 
 export async function getRestaurantSubscriptionSummary(restaurantId: string) {
+  const now = new Date();
   const [restaurant, pendingRequests, currentRequest, recentRequests, events] = await Promise.all([
     prisma.restaurant.findUnique({
       where: { id: restaurantId },
@@ -86,7 +98,7 @@ export async function getRestaurantSubscriptionSummary(restaurantId: string) {
       }
     }),
     prisma.restaurantSubscriptionRequest.findMany({
-      where: { restaurantId, status: "PENDING" },
+      where: activeSubscriptionRequestWhere(restaurantId, now),
       orderBy: { createdAt: "desc" }
     }),
     prisma.restaurantSubscriptionRequest.findFirst({
@@ -124,123 +136,116 @@ export async function createSubscriptionRequest({
   await ensureDefaultPlanPrices();
   const now = new Date();
   const quoteExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const [restaurant, price, currentRequest, existingPending] = await Promise.all([
-    prisma.restaurant.findUnique({
-      where: { id: restaurantId },
-      select: {
-        id: true,
-        plan: true,
-        subscriptionStart: true,
-        subscriptionEnd: true,
-        subscriptionStatus: true,
-        status: true
-      }
-    }),
-    prisma.platformPlanPrice.findUnique({
-      where: {
-        plan_termMonths: {
-          plan,
-          termMonths
-        }
-      }
-    }),
-    prisma.restaurantSubscriptionRequest.findFirst({
-      where: { restaurantId, status: "CONFIRMED" },
-      orderBy: { confirmedAt: "desc" }
-    }),
-    prisma.restaurantSubscriptionRequest.findFirst({
-      where: {
-        restaurantId,
-        status: "PENDING",
-        OR: [
-          { plan, termMonths },
-          { requestType: "UPGRADE" }
-        ]
-      },
-      select: { id: true }
-    })
-  ]);
-
-  if (!restaurant || restaurant.status === "DELETED") {
-    throw new Error("Nhà hàng không hợp lệ.");
-  }
-  if (!price?.isActive) {
-    throw new Error("Kỳ đăng ký này hiện chưa mở bán.");
-  }
-  if (existingPending) {
-    throw new Error("Đã có yêu cầu gói dịch vụ đang chờ xác nhận.");
-  }
-
-  const isUpgrade = requestType === "UPGRADE" || (restaurant.plan === "BASIC" && plan === "PRO" && restaurant.subscriptionEnd && restaurant.subscriptionEnd.getTime() > now.getTime());
-  let finalTermMonths = termMonths;
-  let finalPriceVnd = price.priceVnd;
-  let finalMonthlyPriceVnd = price.monthlyPriceVnd;
-  let currentSubscriptionStart = restaurant.subscriptionStart;
-  let currentSubscriptionEnd = restaurant.subscriptionEnd;
-  let pricingSnapshot: Prisma.InputJsonObject = {
-    requestType: isUpgrade ? "UPGRADE" : "RENEWAL",
-    targetPrice: {
-      priceId: price.id,
-      plan: price.plan,
-      termMonths: price.termMonths,
-      priceVnd: price.priceVnd,
-      monthlyPriceVnd: price.monthlyPriceVnd
-    }
-  };
-
-  if (isUpgrade) {
-    if (restaurant.plan !== "BASIC" || plan !== "PRO") {
-      throw new Error("Chỉ hỗ trợ nâng cấp từ BASIC lên PRO.");
-    }
-    if (!restaurant.subscriptionStart || !restaurant.subscriptionEnd || restaurant.subscriptionEnd.getTime() <= now.getTime()) {
-      throw new Error("Gói hiện tại đã hết hạn hoặc chưa có thời hạn sử dụng.");
-    }
-
-    const activeTerm = subscriptionTerms.includes(currentRequest?.termMonths as SubscriptionTerm)
-      ? currentRequest!.termMonths as SubscriptionTerm
-      : termMonths;
-    finalTermMonths = activeTerm;
-
-    const [basicPrice, proPrice] = await Promise.all([
-      prisma.platformPlanPrice.findUnique({ where: { plan_termMonths: { plan: "BASIC", termMonths: activeTerm } } }),
-      prisma.platformPlanPrice.findUnique({ where: { plan_termMonths: { plan: "PRO", termMonths: activeTerm } } })
-    ]);
-    if (!basicPrice?.isActive || !proPrice?.isActive) {
-      throw new Error("Chưa có bảng giá phù hợp để tính phí nâng cấp.");
-    }
-
-    const totalMs = Math.max(restaurant.subscriptionEnd.getTime() - restaurant.subscriptionStart.getTime(), 1);
-    const remainingMs = Math.max(restaurant.subscriptionEnd.getTime() - now.getTime(), 0);
-    const priceDiff = Math.max(proPrice.priceVnd - basicPrice.priceVnd, 0);
-    finalPriceVnd = Math.max(Math.round(priceDiff * remainingMs / totalMs), 0);
-    finalMonthlyPriceVnd = Math.round(finalPriceVnd / Math.max(monthsBetween(now, restaurant.subscriptionEnd), 1));
-    currentSubscriptionStart = restaurant.subscriptionStart;
-    currentSubscriptionEnd = restaurant.subscriptionEnd;
-    pricingSnapshot = {
-      requestType: "UPGRADE",
-      currentPlan: restaurant.plan,
-      targetPlan: plan,
-      activeTermMonths: activeTerm,
-      basicPrice: {
-        priceId: basicPrice.id,
-        priceVnd: basicPrice.priceVnd,
-        monthlyPriceVnd: basicPrice.monthlyPriceVnd
-      },
-      proPrice: {
-        priceId: proPrice.id,
-        priceVnd: proPrice.priceVnd,
-        monthlyPriceVnd: proPrice.monthlyPriceVnd
-      },
-      priceDiff,
-      totalMs,
-      remainingMs,
-      calculatedAt: now.toISOString(),
-      currentSubscriptionStart: restaurant.subscriptionStart.toISOString(),
-      currentSubscriptionEnd: restaurant.subscriptionEnd.toISOString()
-    };
-  }
-
   return prisma.$transaction(async (tx) => {
+    const lockedRestaurant = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "Restaurant"
+      WHERE id = ${restaurantId}
+      FOR UPDATE
+    `;
+    if (lockedRestaurant.length === 0) throw new Error("Nhà hàng không hợp lệ.");
+
+    const [restaurant, price, currentRequest, existingPending] = await Promise.all([
+      tx.restaurant.findUnique({
+        where: { id: restaurantId },
+        select: {
+          id: true,
+          plan: true,
+          subscriptionStart: true,
+          subscriptionEnd: true,
+          subscriptionStatus: true,
+          status: true
+        }
+      }),
+      tx.platformPlanPrice.findUnique({
+        where: { plan_termMonths: { plan, termMonths } }
+      }),
+      tx.restaurantSubscriptionRequest.findFirst({
+        where: { restaurantId, status: "CONFIRMED" },
+        orderBy: { confirmedAt: "desc" }
+      }),
+      tx.restaurantSubscriptionRequest.findFirst({
+        where: activeSubscriptionRequestWhere(restaurantId, now),
+        select: { id: true }
+      })
+    ]);
+
+    if (!restaurant || restaurant.status === "DELETED") throw new Error("Nhà hàng không hợp lệ.");
+    if (!price?.isActive) throw new Error("Kỳ đăng ký này hiện chưa mở bán.");
+    if (existingPending) throw new Error("Đã có yêu cầu gói dịch vụ đang chờ xác nhận.");
+
+    const isUpgrade = requestType === "UPGRADE" || (restaurant.plan === "BASIC" && plan === "PRO" && restaurant.subscriptionEnd && restaurant.subscriptionEnd.getTime() > now.getTime());
+    if (isUpgrade) {
+      throw new Error("Chưa thể lập báo giá nâng cấp vì lịch sử các kỳ BASIC chưa đủ để tính chính xác quyền lợi còn lại.");
+    }
+    let finalTermMonths = termMonths;
+    let finalPriceVnd = price.priceVnd;
+    let finalMonthlyPriceVnd = price.monthlyPriceVnd;
+    let currentSubscriptionStart = restaurant.subscriptionStart;
+    let currentSubscriptionEnd = restaurant.subscriptionEnd;
+    let pricingSnapshot: Prisma.InputJsonObject = {
+      requestType: isUpgrade ? "UPGRADE" : "RENEWAL",
+      targetPrice: {
+        priceId: price.id,
+        plan: price.plan,
+        termMonths: price.termMonths,
+        priceVnd: price.priceVnd,
+        monthlyPriceVnd: price.monthlyPriceVnd
+      }
+    };
+
+    if (isUpgrade) {
+      if (restaurant.plan !== "BASIC" || plan !== "PRO") {
+        throw new Error("Chỉ hỗ trợ nâng cấp từ BASIC lên PRO.");
+      }
+      if (!restaurant.subscriptionStart || !restaurant.subscriptionEnd || restaurant.subscriptionEnd.getTime() <= now.getTime()) {
+        throw new Error("Gói hiện tại đã hết hạn hoặc chưa có thời hạn sử dụng.");
+      }
+
+      const activeTerm = subscriptionTerms.includes(currentRequest?.termMonths as SubscriptionTerm)
+        ? currentRequest!.termMonths as SubscriptionTerm
+        : termMonths;
+      finalTermMonths = activeTerm;
+
+      const [basicPrice, proPrice] = await Promise.all([
+        tx.platformPlanPrice.findUnique({ where: { plan_termMonths: { plan: "BASIC", termMonths: activeTerm } } }),
+        tx.platformPlanPrice.findUnique({ where: { plan_termMonths: { plan: "PRO", termMonths: activeTerm } } })
+      ]);
+      if (!basicPrice?.isActive || !proPrice?.isActive) {
+        throw new Error("Chưa có bảng giá phù hợp để tính phí nâng cấp.");
+      }
+
+      const totalMs = Math.max(restaurant.subscriptionEnd.getTime() - restaurant.subscriptionStart.getTime(), 1);
+      const remainingMs = Math.max(restaurant.subscriptionEnd.getTime() - now.getTime(), 0);
+      const priceDiff = Math.max(proPrice.priceVnd - basicPrice.priceVnd, 0);
+      finalPriceVnd = Math.max(Math.round(priceDiff * remainingMs / totalMs), 0);
+      finalMonthlyPriceVnd = Math.round(finalPriceVnd / Math.max(monthsBetween(now, restaurant.subscriptionEnd), 1));
+      currentSubscriptionStart = restaurant.subscriptionStart;
+      currentSubscriptionEnd = restaurant.subscriptionEnd;
+      pricingSnapshot = {
+        requestType: "UPGRADE",
+        currentPlan: restaurant.plan,
+        targetPlan: plan,
+        activeTermMonths: activeTerm,
+        basicPrice: {
+          priceId: basicPrice.id,
+          priceVnd: basicPrice.priceVnd,
+          monthlyPriceVnd: basicPrice.monthlyPriceVnd
+        },
+        proPrice: {
+          priceId: proPrice.id,
+          priceVnd: proPrice.priceVnd,
+          monthlyPriceVnd: proPrice.monthlyPriceVnd
+        },
+        priceDiff,
+        totalMs,
+        remainingMs,
+        calculatedAt: now.toISOString(),
+        currentSubscriptionStart: restaurant.subscriptionStart.toISOString(),
+        currentSubscriptionEnd: restaurant.subscriptionEnd.toISOString()
+      };
+    }
+
     const request = await tx.restaurantSubscriptionRequest.create({
       data: {
         restaurantId,
@@ -296,6 +301,19 @@ export async function createSubscriptionRequest({
 
 export async function confirmSubscriptionRequest(requestId: string, actorUserId: string) {
   return prisma.$transaction(async (tx) => {
+    const requestPreview = await tx.restaurantSubscriptionRequest.findUnique({
+      where: { id: requestId }
+    });
+    if (!requestPreview) throw new Error("Không tìm thấy yêu cầu đăng ký.");
+
+    const lockedRestaurant = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "Restaurant"
+      WHERE id = ${requestPreview.restaurantId}
+      FOR UPDATE
+    `;
+    if (lockedRestaurant.length === 0) throw new Error("Nhà hàng không hợp lệ.");
+
     const lockedRequest = await tx.$queryRaw<{ id: string }[]>`
       SELECT id
       FROM "RestaurantSubscriptionRequest"
@@ -324,6 +342,9 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
 
     const activatedStart = new Date();
     const isUpgrade = request.requestType === "UPGRADE";
+    if (isUpgrade) {
+      throw new Error("Chưa thể xác nhận nâng cấp vì lịch sử các kỳ BASIC chưa đủ để tính chính xác quyền lợi còn lại.");
+    }
     if (request.quoteExpiresAt && request.quoteExpiresAt.getTime() < activatedStart.getTime()) {
       throw new Error("Báo giá đã hết hạn. Vui lòng yêu cầu cửa hàng gửi lại.");
     }
@@ -357,6 +378,48 @@ export async function confirmSubscriptionRequest(requestId: string, actorUserId:
         activatedEnd
       }
     });
+
+    const supersededRequests = await tx.restaurantSubscriptionRequest.findMany({
+      where: {
+        ...activeSubscriptionRequestWhere(request.restaurantId, activatedStart),
+        id: { not: request.id }
+      },
+      select: {
+        id: true,
+        plan: true,
+        termMonths: true,
+        priceVnd: true
+      }
+    });
+    if (supersededRequests.length > 0) {
+      const supersededIds = supersededRequests.map((item) => item.id);
+      await tx.restaurantSubscriptionRequest.updateMany({
+        where: { id: { in: supersededIds }, status: "PENDING" },
+        data: { status: "SUPERSEDED" }
+      });
+      await tx.restaurantSubscriptionEvent.createMany({
+        data: supersededRequests.map((item) => ({
+          restaurantId: request.restaurantId,
+          requestId: item.id,
+          actorUserId,
+          action: "REQUEST_SUPERSEDED",
+          plan: item.plan,
+          termMonths: item.termMonths,
+          priceVnd: item.priceVnd,
+          metadataJson: { confirmedRequestId: request.id }
+        }))
+      });
+      await tx.auditLog.createMany({
+        data: supersededRequests.map((item) => ({
+          restaurantId: request.restaurantId,
+          userId: actorUserId,
+          action: "SUBSCRIPTION_REQUEST_SUPERSEDED",
+          entityType: "RestaurantSubscriptionRequest",
+          entityId: item.id,
+          metadataJson: { confirmedRequestId: request.id }
+        }))
+      });
+    }
 
     await tx.restaurant.update({
       where: { id: request.restaurantId },
@@ -452,6 +515,57 @@ export async function rejectSubscriptionRequest(requestId: string, actorUserId: 
     });
 
     return rejected;
+  });
+}
+
+export async function expireStaleSubscriptionRequests(now = new Date()) {
+  return prisma.$transaction(async (tx) => {
+    const staleRequests = await tx.$queryRaw<Array<{
+      id: string;
+      restaurantId: string;
+      plan: RestaurantPlan;
+      termMonths: number;
+      priceVnd: number;
+    }>>`
+      SELECT id, "restaurantId", plan, "termMonths", "priceVnd"
+      FROM "RestaurantSubscriptionRequest"
+      WHERE status = 'PENDING'
+        AND "quoteExpiresAt" IS NOT NULL
+        AND "quoteExpiresAt" <= ${now}
+      FOR UPDATE SKIP LOCKED
+    `;
+
+    if (staleRequests.length === 0) return 0;
+
+    const requestIds = staleRequests.map((request) => request.id);
+    await tx.restaurantSubscriptionRequest.updateMany({
+      where: { id: { in: requestIds }, status: "PENDING" },
+      data: { status: "EXPIRED" }
+    });
+
+    await tx.restaurantSubscriptionEvent.createMany({
+      data: staleRequests.map((request) => ({
+        restaurantId: request.restaurantId,
+        requestId: request.id,
+        action: "REQUEST_EXPIRED",
+        plan: request.plan,
+        termMonths: request.termMonths,
+        priceVnd: request.priceVnd,
+        metadataJson: { reason: "QUOTE_EXPIRED" }
+      }))
+    });
+
+    await tx.auditLog.createMany({
+      data: staleRequests.map((request) => ({
+        restaurantId: request.restaurantId,
+        action: "SUBSCRIPTION_REQUEST_EXPIRED",
+        entityType: "RestaurantSubscriptionRequest",
+        entityId: request.id,
+        metadataJson: { reason: "QUOTE_EXPIRED" }
+      }))
+    });
+
+    return staleRequests.length;
   });
 }
 

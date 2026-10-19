@@ -14,7 +14,7 @@ export default async function WelcomePage({
 }) {
   const restaurant = await getRestaurantBySlug(params.rSlug);
   const qrToken = searchParams?.t?.trim() ?? "";
-  const canOperate = canRestaurantOperate({
+  const canOperate = await canRestaurantOperate({
     restaurantStatus: restaurant.status,
     subscriptionStatus: restaurant.subscriptionStatus,
     subscriptionEnd: restaurant.subscriptionEnd

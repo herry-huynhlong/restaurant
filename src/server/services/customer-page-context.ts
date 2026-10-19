@@ -10,11 +10,11 @@ export async function requireCustomerPageContext(slug: string) {
   const restaurant = await getRestaurantBySlug(slug);
   const customerSession = getCustomerSessionCookie(restaurant.slug);
 
-  if (!canRestaurantOperate({
+  if (!(await canRestaurantOperate({
     restaurantStatus: restaurant.status,
     subscriptionStatus: restaurant.subscriptionStatus,
     subscriptionEnd: restaurant.subscriptionEnd
-  })) {
+  }))) {
     redirect(`${restaurantRoutes.welcome(restaurant.slug)}?error=${encodeURIComponent("Nhà hàng hiện tạm ngừng hoạt động.")}`);
   }
 

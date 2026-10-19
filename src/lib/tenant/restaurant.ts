@@ -14,22 +14,40 @@ export async function getRestaurantBySlug(slug: string) {
   return restaurant;
 }
 
-export function getEffectiveSubscriptionStatus(subscriptionEnd: Date | null, storedStatus: string) {
-  if (subscriptionEnd && subscriptionEnd.getTime() < Date.now()) {
+export function getEffectiveSubscriptionStatus(
+  subscriptionEnd: Date | null,
+  storedStatus: string,
+  gracePeriodDays = 0,
+  now = new Date()
+) {
+  if (storedStatus !== "ACTIVE") {
+    return storedStatus;
+  }
+
+  const graceEndsAt = subscriptionEnd
+    ? subscriptionEnd.getTime() + Math.max(gracePeriodDays, 0) * 24 * 60 * 60 * 1000
+    : null;
+  if (graceEndsAt !== null && graceEndsAt < now.getTime()) {
     return "EXPIRED";
   }
 
   return storedStatus;
 }
 
-export function canRestaurantOperate(input: {
+export async function canRestaurantOperate(input: {
   restaurantStatus: string;
   subscriptionStatus: string;
   subscriptionEnd: Date | null;
 }) {
+  const policy = await prisma.platformSubscriptionPolicy.upsert({
+    where: { singletonKey: "default" },
+    create: { singletonKey: "default" },
+    update: {}
+  });
   const effectiveSubscriptionStatus = getEffectiveSubscriptionStatus(
     input.subscriptionEnd,
-    input.subscriptionStatus
+    input.subscriptionStatus,
+    policy.gracePeriodDays
   );
 
   return input.restaurantStatus === "ACTIVE" && effectiveSubscriptionStatus === "ACTIVE";

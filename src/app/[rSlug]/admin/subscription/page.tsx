@@ -18,7 +18,7 @@ export default async function AdminSubscriptionPage({
   params: { rSlug: string };
   searchParams?: { error?: string; success?: string };
 }) {
-  const access = await requireRestaurantAccess(params.rSlug, ["OWNER"]);
+  const access = await requireRestaurantAccess(params.rSlug, ["OWNER"], { allowExpiredSubscription: true });
   const [notifications, prices, summary] = await Promise.all([
     getRecentNotifications(access.restaurant.id, access.user.id),
     getPublicPlanPrices(),

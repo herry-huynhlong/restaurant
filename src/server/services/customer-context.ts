@@ -35,11 +35,11 @@ export async function getCustomerContext(request: NextRequest, slug: string) {
     return null;
   }
 
-  if (!canRestaurantOperate({
+  if (!(await canRestaurantOperate({
     restaurantStatus: diningSession.restaurant.status,
     subscriptionStatus: diningSession.restaurant.subscriptionStatus,
     subscriptionEnd: diningSession.restaurant.subscriptionEnd
-  })) {
+  }))) {
     return null;
   }
 

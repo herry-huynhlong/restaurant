@@ -30,11 +30,11 @@ export async function startCustomerSessionAction(slug: string, formData: FormDat
     include: { settings: true }
   });
 
-  if (!restaurant || !canRestaurantOperate({
+  if (!restaurant || !(await canRestaurantOperate({
     restaurantStatus: restaurant.status,
     subscriptionStatus: restaurant.subscriptionStatus,
     subscriptionEnd: restaurant.subscriptionEnd
-  })) {
+  }))) {
     redirect(`${restaurantRoutes.welcome(slug)}?t=${encodeURIComponent(parsed.data.qrToken)}&error=${encodeURIComponent("Nhà hàng hiện tạm ngừng hoạt động.")}`);
   }
 
