@@ -7,7 +7,10 @@ import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { safeErrorMessage } from "@/lib/safe-user-message";
-import { createSubscriptionPaymentOrder } from "@/server/services/subscription-payment-service";
+import {
+  cancelSubscriptionPaymentOrder,
+  createSubscriptionPaymentOrder
+} from "@/server/services/subscription-payment-service";
 import { createSubscriptionRequest, subscriptionTerms } from "@/server/services/subscription-service";
 
 const requestSchema = z.object({
@@ -55,6 +58,10 @@ const checkoutSchema = z.object({
 
 export type SubscriptionCheckoutActionResult =
   | { ok: true; paymentOrderId: string }
+  | { ok: false; message: string };
+
+export type CancelSubscriptionPaymentOrderActionResult =
+  | { ok: true }
   | { ok: false; message: string };
 
 // The payment screen is introduced in a later phase. Keeping the owner-scoped
@@ -142,6 +149,28 @@ export async function startSubscriptionCheckoutAction(
     return { ok: true, paymentOrderId: paymentOrder.id };
   } catch (error) {
     return { ok: false, message: safeErrorMessage(error, "Chưa thể tạo lệnh thanh toán.") };
+  }
+}
+
+export async function cancelSubscriptionPaymentOrderAction(
+  slug: string,
+  paymentOrderId: string
+): Promise<CancelSubscriptionPaymentOrderActionResult> {
+  const parsed = z.string().cuid().safeParse(paymentOrderId);
+  if (!parsed.success) return { ok: false, message: "Mã thanh toán không hợp lệ." };
+
+  const access = await requireRestaurantAccess(slug, ["OWNER"], { allowExpiredSubscription: true });
+  try {
+    const result = await cancelSubscriptionPaymentOrder({
+      restaurantId: access.restaurant.id,
+      cancelledByUserId: access.user.id,
+      paymentOrderId: parsed.data
+    });
+    if (!result.cancelled) return { ok: false, message: "Mã thanh toán đã hết hạn." };
+    revalidatePath(restaurantRoutes.adminSubscription(slug));
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: safeErrorMessage(error, "Không thể hủy mã thanh toán.") };
   }
 }
 

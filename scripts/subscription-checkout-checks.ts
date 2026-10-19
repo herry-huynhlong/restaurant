@@ -59,6 +59,7 @@ const paymentOrderService = read("src/server/services/subscription-payment-servi
 const route = read("src/app/api/restaurants/[rSlug]/admin/subscription/payment-orders/[paymentOrderId]/route.ts");
 const client = read("src/components/admin/subscription-pricing-client.tsx");
 const checkoutClient = read("src/components/admin/subscription-payment-checkout.tsx");
+const subscriptionActions = read("src/app/[rSlug]/admin/subscription/actions.ts");
 const platformSettingsActions = read("src/app/platform/settings/actions.ts");
 
 assert.ok(!checkoutService.includes("SUBSCRIPTION_VIETQR_"), "Checkout must not read subscription bank details from environment variables.");
@@ -70,6 +71,7 @@ assert.ok(paymentOrderService.includes("receiverAccountNumber: receiver.accountN
 assert.ok(paymentOrderService.includes('status: "NEEDS_REVIEW"'), "A payment needing review must block a second code for the restaurant.");
 assert.ok(paymentOrderService.includes("existingRestaurantOrder"), "A live payment code must block a second code for the restaurant.");
 assert.ok(paymentOrderService.includes("getSubscriptionPaymentOrderExpiresAt"), "Payment-order expiry must be calculated separately from the quote expiry.");
+assert.ok(paymentOrderService.includes("SUBSCRIPTION_PAYMENT_ORDER_CANCELLED"), "Cancelling a payment order must be audited.");
 assert.ok(checkoutService.includes('status: "EXPIRED"'), "Stale payment orders must become expired.");
 assert.ok(route.includes('requireRestaurantAccess(params.rSlug, ["OWNER"]'), "Checkout status API must require the restaurant owner.");
 assert.ok(route.includes("restaurantId: access.restaurant.id"), "Checkout status API must scope an order to the current restaurant.");
@@ -77,7 +79,9 @@ assert.ok(platformSettingsActions.includes("requirePlatformOwner()"), "Only a pl
 assert.ok(platformSettingsActions.includes("PLATFORM_SUBSCRIPTION_PAYMENT_CONFIG_UPDATED"), "Payment configuration changes require an audit log.");
 assert.ok(client.includes("startSubscriptionCheckoutAction"), "Pricing UI must create checkout through a server action.");
 assert.ok(!client.includes("calculateUpgradeQuote"), "Frontend must not calculate an upgrade price.");
+assert.ok(subscriptionActions.includes("cancelSubscriptionPaymentOrder"), "Cancelling a payment order must require the server action boundary.");
 assert.ok(checkoutClient.includes("15_000"), "Polling must use a bounded 15-second interval.");
+assert.ok(checkoutClient.includes("Hủy mã thanh toán"), "The checkout receipt must let an owner cancel a pending code.");
 assert.ok(checkoutClient.includes("Việc hiển thị QR hoặc chuyển khoản không tự kích hoạt gói"), "Checkout must not promise automatic activation.");
 
 console.log("Subscription checkout checks passed.");

@@ -1,7 +1,9 @@
 "use client";
 
 import { CheckCircle2, Clock3, Copy, QrCode, RefreshCw, TriangleAlert, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { cancelSubscriptionPaymentOrderAction } from "@/app/[rSlug]/admin/subscription/actions";
 
 type Checkout = {
   id: string;
@@ -28,11 +30,14 @@ export function SubscriptionPaymentCheckout({
   paymentOrderId: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [checkout, setCheckout] = useState<Checkout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
   const [copied, setCopied] = useState<string | null>(null);
+  const [confirmingCancellation, setConfirmingCancellation] = useState(false);
+  const [isCancelling, startCancellationTransition] = useTransition();
 
   const loadCheckout = useCallback(async () => {
     try {
@@ -75,6 +80,19 @@ export function SubscriptionPaymentCheckout({
     } catch {
       setError("Không thể sao chép. Vui lòng chọn và sao chép thủ công.");
     }
+  }
+
+  function cancelPaymentOrder() {
+    startCancellationTransition(async () => {
+      const result = await cancelSubscriptionPaymentOrderAction(slug, paymentOrderId);
+      if (!result.ok) {
+        setError(result.message);
+        return;
+      }
+      setConfirmingCancellation(false);
+      await loadCheckout();
+      router.refresh();
+    });
   }
 
   const remaining = checkout ? formatRemaining(checkout.expiresAt, now) : null;
@@ -142,6 +160,19 @@ export function SubscriptionPaymentCheckout({
                 <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" />
                 <p>Lệnh thanh toán này chưa có thông tin nhận tiền đã được lưu. Vui lòng liên hệ QuánPilot để tạo lệnh mới.</p>
               </div>
+            </div>
+          ) : null}
+
+          {isPending ? (
+            <div className="rounded-xl border border-red-200 bg-red-50/70 p-4 text-sm text-red-900">
+              {confirmingCancellation ? <>
+                <p className="font-semibold">Hủy mã thanh toán này?</p>
+                <p className="mt-1 leading-5">Mã QR và nội dung chuyển khoản sẽ mất hiệu lực ngay. Bạn có thể tạo mã mới sau đó.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="h-10 rounded-lg border border-red-200 bg-white px-3 font-semibold text-slate-700 hover:bg-slate-50" type="button" disabled={isCancelling} onClick={() => setConfirmingCancellation(false)}>Quay lại</button>
+                  <button className="h-10 rounded-lg bg-red-700 px-3 font-semibold text-white hover:bg-red-800 disabled:cursor-wait disabled:bg-red-400" type="button" disabled={isCancelling} onClick={cancelPaymentOrder}>{isCancelling ? "Đang hủy..." : "Xác nhận hủy mã"}</button>
+                </div>
+              </> : <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="leading-5">Không chuyển tiền vào mã này nữa nếu bạn muốn thay đổi lựa chọn.</p><button className="h-10 shrink-0 rounded-lg border border-red-300 bg-white px-3 font-semibold text-red-700 hover:bg-red-100" type="button" onClick={() => setConfirmingCancellation(true)}>Hủy mã thanh toán</button></div>}
             </div>
           ) : null}
 

@@ -16,6 +16,12 @@ type CreateSubscriptionPaymentOrderInput = {
   subscriptionRequestId: string;
 };
 
+type CancelSubscriptionPaymentOrderInput = {
+  restaurantId: string;
+  cancelledByUserId: string;
+  paymentOrderId: string;
+};
+
 export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPaymentOrderInput) {
   const now = new Date();
 
@@ -214,6 +220,60 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
     }
 
     throw new Error("Không thể tạo mã chuyển khoản. Vui lòng thử lại.");
+  });
+}
+
+export async function cancelSubscriptionPaymentOrder(input: CancelSubscriptionPaymentOrderInput) {
+  const now = new Date();
+
+  return prisma.$transaction(async (tx) => {
+    const lockedOrder = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id
+      FROM "SubscriptionPaymentOrder"
+      WHERE id = ${input.paymentOrderId}
+        AND "restaurantId" = ${input.restaurantId}
+      FOR UPDATE
+    `;
+    if (lockedOrder.length === 0) throw new Error("Không tìm thấy mã thanh toán của cửa hàng này.");
+
+    const order = await tx.subscriptionPaymentOrder.findUnique({ where: { id: input.paymentOrderId } });
+    if (!order) throw new Error("Không tìm thấy mã thanh toán.");
+    if (order.status !== "PENDING") throw new Error("Mã thanh toán này không còn có thể hủy.");
+    if (getSubscriptionPaymentOrderExpiresAt(order).getTime() <= now.getTime()) {
+      await tx.subscriptionPaymentOrder.update({
+        where: { id: order.id },
+        data: { status: "EXPIRED" }
+      });
+      return { cancelled: false as const };
+    }
+
+    const cancelled = await tx.subscriptionPaymentOrder.update({
+      where: { id: order.id },
+      data: { status: "CANCELLED", cancelledAt: now }
+    });
+    await tx.restaurantSubscriptionEvent.create({
+      data: {
+        restaurantId: order.restaurantId,
+        requestId: order.subscriptionRequestId,
+        actorUserId: input.cancelledByUserId,
+        action: "SUBSCRIPTION_PAYMENT_ORDER_CANCELLED",
+        plan: order.plan,
+        termMonths: order.termMonths,
+        priceVnd: order.amountVnd,
+        metadataJson: { paymentOrderId: order.id, transferCode: order.transferCode, reason: "OWNER_CANCELLED" }
+      }
+    });
+    await tx.auditLog.create({
+      data: {
+        restaurantId: order.restaurantId,
+        userId: input.cancelledByUserId,
+        action: "SUBSCRIPTION_PAYMENT_ORDER_CANCELLED",
+        entityType: "SubscriptionPaymentOrder",
+        entityId: order.id,
+        metadataJson: { subscriptionRequestId: order.subscriptionRequestId, transferCode: order.transferCode, reason: "OWNER_CANCELLED" }
+      }
+    });
+    return { cancelled: true as const, order: cancelled };
   });
 }
 
