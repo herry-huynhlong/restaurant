@@ -3,27 +3,25 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   createSubscriptionVietQrImageUrl,
-  getEffectiveSubscriptionPaymentOrderStatus,
-  getSubscriptionBankConfig
+  getEffectiveSubscriptionPaymentOrderStatus
 } from "@/server/services/subscription-checkout-service";
+import { getPaymentReceiverSnapshot } from "@/server/services/platform-subscription-payment-config-service";
 
 const root = process.cwd();
-const previousBankCode = process.env.SUBSCRIPTION_VIETQR_BANK_CODE;
-const previousAccountNumber = process.env.SUBSCRIPTION_VIETQR_ACCOUNT_NUMBER;
-const previousAccountName = process.env.SUBSCRIPTION_VIETQR_ACCOUNT_NAME;
 
-delete process.env.SUBSCRIPTION_VIETQR_BANK_CODE;
-delete process.env.SUBSCRIPTION_VIETQR_ACCOUNT_NUMBER;
-assert.deepEqual(getSubscriptionBankConfig(), { ready: false }, "Missing platform bank settings must not create a fake QR.");
-
-process.env.SUBSCRIPTION_VIETQR_BANK_CODE = "VCB";
-process.env.SUBSCRIPTION_VIETQR_ACCOUNT_NUMBER = "123 456 789";
-process.env.SUBSCRIPTION_VIETQR_ACCOUNT_NAME = "QUANPILOT";
-assert.deepEqual(getSubscriptionBankConfig(), {
-  ready: true,
+assert.equal(getPaymentReceiverSnapshot({ isEnabled: false, bankCode: "VCB", accountNumber: "123456789", accountName: "QUANPILOT", version: 1 }), null, "Disabled platform payment must not create a QR order.");
+assert.equal(getPaymentReceiverSnapshot({ isEnabled: true, bankCode: null, accountNumber: null, accountName: null, version: 1 }), null, "Missing platform bank settings must not create a fake QR.");
+assert.deepEqual(getPaymentReceiverSnapshot({
+  isEnabled: true,
+  bankCode: "VCB",
+  accountNumber: "123 456 789",
+  accountName: "QUANPILOT",
+  version: 4
+}), {
   bankCode: "VCB",
   accountNumber: "123456789",
-  accountName: "QUANPILOT"
+  accountName: "QUANPILOT",
+  configVersion: 4
 });
 
 const vietQr = new URL(createSubscriptionVietQrImageUrl({
@@ -39,20 +37,24 @@ assert.equal(getEffectiveSubscriptionPaymentOrderStatus("PENDING", new Date("202
 assert.equal(getEffectiveSubscriptionPaymentOrderStatus("PENDING", new Date("2026-10-19T00:00:00.000Z"), new Date("2026-10-19T00:00:00.000Z")), "EXPIRED");
 assert.equal(getEffectiveSubscriptionPaymentOrderStatus("PAID", new Date("2026-10-18T00:00:00.000Z"), new Date("2026-10-19T00:00:00.000Z")), "PAID");
 
-restoreEnvironment("SUBSCRIPTION_VIETQR_BANK_CODE", previousBankCode);
-restoreEnvironment("SUBSCRIPTION_VIETQR_ACCOUNT_NUMBER", previousAccountNumber);
-restoreEnvironment("SUBSCRIPTION_VIETQR_ACCOUNT_NAME", previousAccountName);
-
 const checkoutService = read("src/server/services/subscription-checkout-service.ts");
+const paymentOrderService = read("src/server/services/subscription-payment-service.ts");
 const route = read("src/app/api/restaurants/[rSlug]/admin/subscription/payment-orders/[paymentOrderId]/route.ts");
 const client = read("src/components/admin/subscription-pricing-client.tsx");
 const checkoutClient = read("src/components/admin/subscription-payment-checkout.tsx");
+const platformSettingsActions = read("src/app/platform/settings/actions.ts");
 
-assert.ok(checkoutService.includes("SUBSCRIPTION_VIETQR_BANK_CODE"), "Bank details must come from server configuration.");
+assert.ok(!checkoutService.includes("SUBSCRIPTION_VIETQR_"), "Checkout must not read subscription bank details from environment variables.");
 assert.ok(checkoutService.includes("img.vietqr.io"), "Checkout must generate a VietQR image from the server-side order.");
+assert.ok(checkoutService.includes("receiverBankCode"), "Checkout must read the payment-order bank snapshot.");
+assert.ok(!checkoutService.includes("restaurantSetting"), "Subscription checkout must not use a restaurant bill-payment bank account.");
+assert.ok(paymentOrderService.includes("getPaymentReceiverSnapshot"), "New payment orders must validate the platform payment configuration.");
+assert.ok(paymentOrderService.includes("receiverAccountNumber: receiver.accountNumber"), "New payment orders must snapshot the receiving account.");
 assert.ok(checkoutService.includes('status: "EXPIRED"'), "Stale payment orders must become expired.");
 assert.ok(route.includes('requireRestaurantAccess(params.rSlug, ["OWNER"]'), "Checkout status API must require the restaurant owner.");
 assert.ok(route.includes("restaurantId: access.restaurant.id"), "Checkout status API must scope an order to the current restaurant.");
+assert.ok(platformSettingsActions.includes("requirePlatformOwner()"), "Only a platform owner/admin may update the platform payment configuration.");
+assert.ok(platformSettingsActions.includes("PLATFORM_SUBSCRIPTION_PAYMENT_CONFIG_UPDATED"), "Payment configuration changes require an audit log.");
 assert.ok(client.includes("startSubscriptionCheckoutAction"), "Pricing UI must create checkout through a server action.");
 assert.ok(!client.includes("calculateUpgradeQuote"), "Frontend must not calculate an upgrade price.");
 assert.ok(checkoutClient.includes("15_000"), "Polling must use a bounded 15-second interval.");
@@ -62,9 +64,4 @@ console.log("Subscription checkout checks passed.");
 
 function read(relativePath: string) {
   return readFileSync(path.join(root, relativePath), "utf8");
-}
-
-function restoreEnvironment(key: string, value: string | undefined) {
-  if (value === undefined) delete process.env[key];
-  else process.env[key] = value;
 }

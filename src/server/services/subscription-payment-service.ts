@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { addCalendarMonths } from "@/server/services/subscription-service";
+import { getPaymentReceiverSnapshot } from "@/server/services/platform-subscription-payment-config-service";
 
 const paymentOrderIdempotencyPrefix = "subscription-payment-order:v1:";
 
@@ -85,6 +86,14 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
     });
     if (existing) return existing;
 
+    const paymentConfig = await tx.platformSubscriptionPaymentConfig.findUnique({
+      where: { singletonKey: "default" }
+    });
+    const receiver = paymentConfig ? getPaymentReceiverSnapshot(paymentConfig) : null;
+    if (!receiver) {
+      throw new Error("Thanh toán chuyển khoản hiện chưa sẵn sàng. Vui lòng liên hệ QuánPilot.");
+    }
+
     const entitlementStart = request.currentSubscriptionEnd && request.currentSubscriptionEnd.getTime() > now.getTime()
       ? request.currentSubscriptionEnd
       : now;
@@ -125,6 +134,10 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
             plan: request.plan,
             termMonths: request.termMonths,
             amountVnd: request.priceVnd,
+            receiverBankCode: receiver.bankCode,
+            receiverAccountNumber: receiver.accountNumber,
+            receiverAccountName: receiver.accountName,
+            paymentConfigVersion: receiver.configVersion,
             priceSnapshotJson: priceSnapshot,
             entitlementSnapshotJson: entitlementSnapshot,
             expiresAt: request.quoteExpiresAt
@@ -144,7 +157,10 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
               paymentOrderId: order.id,
               transferCode: order.transferCode,
               provider: order.provider,
-              expiresAt: order.expiresAt.toISOString()
+              expiresAt: order.expiresAt.toISOString(),
+              receiverBankCode: receiver.bankCode,
+              receiverAccountSuffix: maskAccountNumber(receiver.accountNumber),
+              paymentConfigVersion: receiver.configVersion
             }
           }
         });
@@ -159,7 +175,10 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
               subscriptionRequestId: request.id,
               transferCode: order.transferCode,
               amountVnd: order.amountVnd,
-              provider: order.provider
+              provider: order.provider,
+              receiverBankCode: receiver.bankCode,
+              receiverAccountSuffix: maskAccountNumber(receiver.accountNumber),
+              paymentConfigVersion: receiver.configVersion
             }
           }
         });
@@ -176,6 +195,10 @@ export async function createSubscriptionPaymentOrder(input: CreateSubscriptionPa
 
 function createTransferCode() {
   return `QP${randomBytes(8).toString("hex").toUpperCase()}`;
+}
+
+function maskAccountNumber(accountNumber: string) {
+  return accountNumber.length <= 4 ? "****" : `****${accountNumber.slice(-4)}`;
 }
 
 function isUniqueTransferCodeError(error: unknown) {

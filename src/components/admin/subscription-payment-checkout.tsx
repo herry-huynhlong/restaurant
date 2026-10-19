@@ -140,7 +140,7 @@ export function SubscriptionPaymentCheckout({
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <div className="flex items-start gap-2">
                 <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" />
-                <p>Tài khoản nhận thanh toán của QuánPilot chưa được cấu hình. Chưa thể tạo mã VietQR cho lệnh này.</p>
+                <p>Lệnh thanh toán này chưa có thông tin nhận tiền đã được lưu. Vui lòng liên hệ QuánPilot để tạo lệnh mới.</p>
               </div>
             </div>
           ) : null}

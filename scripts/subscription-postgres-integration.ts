@@ -26,6 +26,9 @@ const email = `subscription-it-${suffix}@example.test`;
 const slug = `subscription-it-${suffix}`;
 
 async function run() {
+  const previousPaymentConfig = await prisma.platformSubscriptionPaymentConfig.findUnique({
+    where: { singletonKey: "default" }
+  });
   const user = await prisma.user.create({
     data: {
       name: "Subscription integration test",
@@ -36,8 +39,28 @@ async function run() {
   const restaurant = await prisma.restaurant.create({
     data: { name: "Subscription integration test", slug }
   });
+  let secondUserId: string | null = null;
+  let secondRestaurantId: string | null = null;
+  let disabledUserId: string | null = null;
+  let disabledRestaurantId: string | null = null;
 
   try {
+    await prisma.platformSubscriptionPaymentConfig.upsert({
+      where: { singletonKey: "default" },
+      create: {
+        singletonKey: "default",
+        isEnabled: true,
+        bankCode: "VCB",
+        accountNumber: "123456789",
+        accountName: "QuánPilot Test"
+      },
+      update: {
+        isEnabled: true,
+        bankCode: "VCB",
+        accountNumber: "123456789",
+        accountName: "QuánPilot Test"
+      }
+    });
     await Promise.all([
       prisma.platformPlanPrice.upsert({
         where: { plan_termMonths: { plan: "BASIC", termMonths: 3 } },
@@ -68,6 +91,66 @@ async function run() {
       createSubscriptionPaymentOrder({ restaurantId: restaurant.id, requestedByUserId: user.id, subscriptionRequestId: requestId })
     ]);
     assert.equal(concurrentOrders[0].id, concurrentOrders[1].id, "Retrying payment-order creation must return the same pending order.");
+    assert.equal(concurrentOrders[0].receiverBankCode, "VCB", "Payment order must snapshot the platform bank.");
+    assert.equal(concurrentOrders[0].receiverAccountNumber, "123456789", "Payment order must snapshot the platform account.");
+
+    const secondUser = await prisma.user.create({
+      data: { name: "Second subscription integration test", email: `subscription-it-second-${suffix}@example.test`, passwordHash: "not-used-by-test" }
+    });
+    secondUserId = secondUser.id;
+    const secondRestaurant = await prisma.restaurant.create({
+      data: { name: "Second subscription integration test", slug: `subscription-second-${suffix}` }
+    });
+    secondRestaurantId = secondRestaurant.id;
+    const secondRequest = await createSubscriptionRequest({
+      restaurantId: secondRestaurant.id,
+      requestedByUserId: secondUser.id,
+      plan: "BASIC",
+      termMonths: 3
+    });
+    const [, secondOrder] = await Promise.all([
+      createSubscriptionPaymentOrder({ restaurantId: restaurant.id, requestedByUserId: user.id, subscriptionRequestId: requestId }),
+      createSubscriptionPaymentOrder({ restaurantId: secondRestaurant.id, requestedByUserId: secondUser.id, subscriptionRequestId: secondRequest.id })
+    ]);
+    assert.notEqual(secondOrder.transferCode, concurrentOrders[0].transferCode, "Each restaurant must receive a unique transfer code.");
+    assert.equal(secondOrder.receiverBankCode, "VCB", "Concurrent restaurants must snapshot the configured bank.");
+    assert.equal(secondOrder.receiverAccountNumber, "123456789", "Concurrent restaurants must snapshot the configured account.");
+
+    await prisma.platformSubscriptionPaymentConfig.update({
+      where: { singletonKey: "default" },
+      data: {
+        bankCode: "MB",
+        accountNumber: "987654321",
+        accountName: "QuánPilot Updated",
+        version: { increment: 1 }
+      }
+    });
+    const originalOrder = await prisma.subscriptionPaymentOrder.findUniqueOrThrow({ where: { id: concurrentOrders[0].id } });
+    assert.equal(originalOrder.receiverAccountNumber, "123456789", "Changing bank config must not modify an existing payment order.");
+
+    await prisma.platformSubscriptionPaymentConfig.update({
+      where: { singletonKey: "default" },
+      data: { isEnabled: false }
+    });
+    const disabledUser = await prisma.user.create({
+      data: { name: "Disabled payment test", email: `subscription-it-disabled-${suffix}@example.test`, passwordHash: "not-used-by-test" }
+    });
+    disabledUserId = disabledUser.id;
+    const disabledRestaurant = await prisma.restaurant.create({
+      data: { name: "Disabled payment test", slug: `subscription-disabled-${suffix}` }
+    });
+    disabledRestaurantId = disabledRestaurant.id;
+    const disabledRequest = await createSubscriptionRequest({
+      restaurantId: disabledRestaurant.id,
+      requestedByUserId: disabledUser.id,
+      plan: "BASIC",
+      termMonths: 3
+    });
+    await assert.rejects(
+      () => createSubscriptionPaymentOrder({ restaurantId: disabledRestaurant.id, requestedByUserId: disabledUser.id, subscriptionRequestId: disabledRequest.id }),
+      /chưa sẵn sàng/i,
+      "Disabled platform payment must reject new checkout attempts."
+    );
 
     const concurrentConfirmations = await Promise.allSettled([
       confirmSubscriptionRequest(requestId, user.id),
@@ -95,6 +178,23 @@ async function run() {
 
     console.log("Subscription PostgreSQL integration checks passed.");
   } finally {
+    if (disabledRestaurantId) {
+      await prisma.auditLog.deleteMany({ where: { restaurantId: disabledRestaurantId } });
+      await prisma.restaurantSubscriptionRequest.deleteMany({ where: { restaurantId: disabledRestaurantId } });
+      await prisma.restaurant.delete({ where: { id: disabledRestaurantId } });
+    }
+    if (disabledUserId) await prisma.user.delete({ where: { id: disabledUserId } });
+    if (secondRestaurantId) {
+      await prisma.paymentWebhookEvent.deleteMany({ where: { restaurantId: secondRestaurantId } });
+      await prisma.subscriptionPaymentTransaction.deleteMany({ where: { restaurantId: secondRestaurantId } });
+      await prisma.subscriptionEntitlement.deleteMany({ where: { restaurantId: secondRestaurantId } });
+      await prisma.subscriptionPaymentOrder.deleteMany({ where: { restaurantId: secondRestaurantId } });
+      await prisma.restaurantSubscriptionEvent.deleteMany({ where: { restaurantId: secondRestaurantId } });
+      await prisma.auditLog.deleteMany({ where: { restaurantId: secondRestaurantId } });
+      await prisma.restaurantSubscriptionRequest.deleteMany({ where: { restaurantId: secondRestaurantId } });
+      await prisma.restaurant.delete({ where: { id: secondRestaurantId } });
+    }
+    if (secondUserId) await prisma.user.delete({ where: { id: secondUserId } });
     await prisma.paymentWebhookEvent.deleteMany({ where: { restaurantId: restaurant.id } });
     await prisma.subscriptionPaymentTransaction.deleteMany({ where: { restaurantId: restaurant.id } });
     await prisma.subscriptionEntitlement.deleteMany({ where: { restaurantId: restaurant.id } });
@@ -104,6 +204,21 @@ async function run() {
     await prisma.restaurantSubscriptionRequest.deleteMany({ where: { restaurantId: restaurant.id } });
     await prisma.restaurant.delete({ where: { id: restaurant.id } });
     await prisma.user.delete({ where: { id: user.id } });
+    if (previousPaymentConfig) {
+      await prisma.platformSubscriptionPaymentConfig.update({
+        where: { id: previousPaymentConfig.id },
+        data: {
+          isEnabled: previousPaymentConfig.isEnabled,
+          bankCode: previousPaymentConfig.bankCode,
+          accountNumber: previousPaymentConfig.accountNumber,
+          accountName: previousPaymentConfig.accountName,
+          version: previousPaymentConfig.version,
+          lastChangedByUserId: previousPaymentConfig.lastChangedByUserId
+        }
+      });
+    } else {
+      await prisma.platformSubscriptionPaymentConfig.deleteMany({ where: { singletonKey: "default" } });
+    }
   }
 }
 

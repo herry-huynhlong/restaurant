@@ -1,17 +1,18 @@
-import { KeyRound, ShieldCheck, UserCog } from "lucide-react";
+import { Building2, KeyRound, ShieldCheck, UserCog } from "lucide-react";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { requirePlatformOwner } from "@/lib/rbac/guards";
-import { changePlatformAdminPasswordAction } from "@/app/platform/settings/actions";
+import { changePlatformAdminPasswordAction, updateSubscriptionPaymentConfigAction } from "@/app/platform/settings/actions";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { ActionFormEffects } from "@/components/ui/action-form-effects";
+import { getPlatformSubscriptionPaymentConfig, supportedVietQrBanks } from "@/server/services/platform-subscription-payment-config-service";
 
 export default async function PlatformSettingsPage({
   searchParams
 }: {
   searchParams: { success?: string; error?: string };
 }) {
-  const user = await requirePlatformOwner();
+  const [user, paymentConfig] = await Promise.all([requirePlatformOwner(), getPlatformSubscriptionPaymentConfig()]);
 
   return (
     <PlatformShell title="Cài đặt nền tảng">
@@ -87,6 +88,49 @@ export default async function PlatformSettingsPage({
             </PendingSubmitButton>
           </form>
         </div>
+      </section>
+
+      <section className="mt-5 rounded-2xl border bg-white p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-teal-100 bg-teal-50 text-teal-800">
+            <Building2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold">Ngân hàng nhận tiền gói dịch vụ</h2>
+            <p className="mt-1 text-sm text-slate-500">Chỉ dùng cho thanh toán đăng ký và gia hạn QuánPilot. Không ảnh hưởng tài khoản nhận tiền hóa đơn của từng cửa hàng.</p>
+          </div>
+        </div>
+
+        <form className="mt-5 max-w-2xl" action={updateSubscriptionPaymentConfigAction}>
+          <label className="flex min-h-11 items-center gap-3 rounded-lg border bg-slate-50 px-3 text-sm font-semibold text-slate-800">
+            <input className="h-4 w-4 accent-teal-700" defaultChecked={paymentConfig?.isEnabled ?? false} name="isEnabled" type="checkbox" />
+            Cho phép tạo QR thanh toán gói dịch vụ
+          </label>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-medium">
+              Ngân hàng
+              <select className="mt-2 h-11 w-full rounded-md border bg-white px-3 text-sm" defaultValue={paymentConfig?.bankCode ?? ""} name="bankCode">
+                <option value="">Chọn ngân hàng</option>
+                {supportedVietQrBanks.map((bank) => <option key={bank.code} value={bank.code}>{bank.name}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm font-medium">
+              Số tài khoản
+              <input className="mt-2 h-11 w-full rounded-md border px-3 text-sm" defaultValue={paymentConfig?.accountNumber ?? ""} inputMode="numeric" name="accountNumber" placeholder="Chỉ nhập chữ số" />
+            </label>
+            <label className="block text-sm font-medium sm:col-span-2">
+              Tên chủ tài khoản
+              <input className="mt-2 h-11 w-full rounded-md border px-3 text-sm" defaultValue={paymentConfig?.accountName ?? ""} name="accountName" placeholder="Theo thông tin ngân hàng" />
+            </label>
+          </div>
+
+          {paymentConfig?.isEnabled ? <p className="mt-3 text-sm text-teal-800">Đang hoạt động · Phiên bản cấu hình {paymentConfig.version}. Các lệnh đã tạo vẫn giữ thông tin ngân hàng tại thời điểm tạo.</p> : <p className="mt-3 text-sm text-amber-800">Đang tắt. Chủ quán sẽ không thể tạo lệnh thanh toán subscription mới.</p>}
+
+          <PendingSubmitButton className="mt-5 inline-flex h-11 items-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" pendingLabel="Đang lưu...">
+            Lưu cấu hình thanh toán
+          </PendingSubmitButton>
+        </form>
       </section>
 
       <section className="mt-5 rounded-2xl border bg-white p-5 text-sm text-slate-600 shadow-sm">

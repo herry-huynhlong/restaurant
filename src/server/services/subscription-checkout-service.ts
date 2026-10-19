@@ -1,23 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
 
-type SubscriptionBankConfig =
-  | { ready: false }
-  | {
-      ready: true;
-      bankCode: string;
-      accountNumber: string;
-      accountName: string | null;
-    };
-
-export function getSubscriptionBankConfig(): SubscriptionBankConfig {
-  const bankCode = process.env.SUBSCRIPTION_VIETQR_BANK_CODE?.trim();
-  const accountNumber = process.env.SUBSCRIPTION_VIETQR_ACCOUNT_NUMBER?.replace(/\s+/g, "");
-  const accountName = process.env.SUBSCRIPTION_VIETQR_ACCOUNT_NAME?.trim() || null;
-
-  if (!bankCode || !accountNumber) return { ready: false };
-  return { ready: true, bankCode, accountNumber, accountName };
-}
-
 export async function getSubscriptionCheckoutOrder({
   restaurantId,
   paymentOrderId
@@ -36,13 +18,25 @@ export async function getSubscriptionCheckoutOrder({
       currency: true,
       transferCode: true,
       expiresAt: true,
-      paidAt: true
+      paidAt: true,
+      receiverBankCode: true,
+      receiverAccountNumber: true,
+      receiverAccountName: true,
+      paymentConfigVersion: true
     }
   });
   if (!order) return null;
 
   const effectiveStatus = getEffectiveSubscriptionPaymentOrderStatus(order.status, order.expiresAt);
-  const bank = getSubscriptionBankConfig();
+  const bank = order.receiverBankCode && order.receiverAccountNumber
+    ? {
+        ready: true as const,
+        bankCode: order.receiverBankCode,
+        accountNumber: order.receiverAccountNumber,
+        accountName: order.receiverAccountName,
+        configVersion: order.paymentConfigVersion
+      }
+    : { ready: false as const };
 
   return {
     ...order,
