@@ -40,6 +40,8 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
+COPY --from=builder /app/tailwind.config.ts ./tailwind.config.ts
 
 EXPOSE 3000
 CMD ["pnpm", "start"]
