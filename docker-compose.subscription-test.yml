@@ -1,0 +1,5 @@
+services:
+  app:
+    environment:
+      # This override is only for the disposable integration-test database.
+      DATABASE_URL: postgresql://restaurant_user:${POSTGRES_PASSWORD}@postgres:5432/subscription_test?schema=public
