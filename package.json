@@ -28,6 +28,7 @@
     "test:subscription-lifecycle": "tsx scripts/subscription-lifecycle-checks.ts",
     "test:subscription-entitlement-credit": "tsx scripts/subscription-entitlement-credit-checks.ts",
     "test:subscription-postgres": "tsx scripts/subscription-postgres-integration.ts",
+    "test:subscription-checkout": "tsx scripts/subscription-checkout-checks.ts",
     "platform:worker": "tsx scripts/platform-maintenance-worker.ts",
     "platform:worker:loop": "tsx scripts/platform-maintenance-worker.ts loop",
     "platform:backup": "tsx scripts/platform-maintenance-worker.ts backup",

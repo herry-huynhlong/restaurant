@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { prisma } from "@/lib/db/prisma";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { restaurantRoutes } from "@/lib/routes";
 import { safeErrorMessage } from "@/lib/safe-user-message";
@@ -47,6 +48,15 @@ const paymentOrderSchema = z.object({
   subscriptionRequestId: z.string().cuid()
 });
 
+const checkoutSchema = z.object({
+  plan: z.enum(["BASIC", "PRO"]),
+  termMonths: z.number().refine((value) => subscriptionTerms.includes(value as never), "Thời hạn đăng ký không hợp lệ.")
+});
+
+export type SubscriptionCheckoutActionResult =
+  | { ok: true; paymentOrderId: string }
+  | { ok: false; message: string };
+
 // The payment screen is introduced in a later phase. Keeping the owner-scoped
 // action here establishes the server-side tenant boundary before that UI exists.
 export async function createRestaurantSubscriptionPaymentOrderAction(slug: string, formData: FormData) {
@@ -71,6 +81,68 @@ export async function createRestaurantSubscriptionPaymentOrderAction(slug: strin
 
   revalidatePath(restaurantRoutes.adminSubscription(slug));
   redirect(`${restaurantRoutes.adminSubscription(slug)}?success=${encodeURIComponent("Đã tạo lệnh thanh toán.")}`);
+}
+
+export async function startSubscriptionCheckoutAction(
+  slug: string,
+  input: { plan: "BASIC" | "PRO"; termMonths: number }
+): Promise<SubscriptionCheckoutActionResult> {
+  const parsed = checkoutSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: validationMessage(parsed.error) };
+
+  const access = await requireRestaurantAccess(slug, ["OWNER"], { allowExpiredSubscription: true });
+  const now = new Date();
+  let request = await prisma.restaurantSubscriptionRequest.findFirst({
+    where: {
+      restaurantId: access.restaurant.id,
+      status: "PENDING",
+      quoteExpiresAt: { gt: now }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (request && (request.plan !== parsed.data.plan || request.termMonths !== parsed.data.termMonths || request.requestType === "UPGRADE")) {
+    return { ok: false, message: "Bạn đang có một báo giá khác chờ thanh toán. Vui lòng hoàn tất hoặc chờ báo giá đó hết hạn." };
+  }
+
+  if (!request) {
+    try {
+      request = await createSubscriptionRequest({
+        restaurantId: access.restaurant.id,
+        requestedByUserId: access.user.id,
+        plan: parsed.data.plan,
+        termMonths: parsed.data.termMonths as 3 | 6 | 12,
+        requestType: "RENEWAL"
+      });
+    } catch (error) {
+      request = await prisma.restaurantSubscriptionRequest.findFirst({
+        where: {
+          restaurantId: access.restaurant.id,
+          status: "PENDING",
+          quoteExpiresAt: { gt: new Date() },
+          plan: parsed.data.plan,
+          termMonths: parsed.data.termMonths,
+          requestType: "RENEWAL"
+        },
+        orderBy: { createdAt: "desc" }
+      });
+      if (!request) {
+        return { ok: false, message: safeErrorMessage(error, "Chưa thể tạo báo giá thanh toán.") };
+      }
+    }
+  }
+
+  try {
+    const paymentOrder = await createSubscriptionPaymentOrder({
+      restaurantId: access.restaurant.id,
+      requestedByUserId: access.user.id,
+      subscriptionRequestId: request.id
+    });
+    revalidatePath(restaurantRoutes.adminSubscription(slug));
+    return { ok: true, paymentOrderId: paymentOrder.id };
+  } catch (error) {
+    return { ok: false, message: safeErrorMessage(error, "Chưa thể tạo lệnh thanh toán.") };
+  }
 }
 
 function validationMessage(error: z.ZodError) {

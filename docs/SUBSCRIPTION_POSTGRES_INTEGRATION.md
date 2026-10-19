@@ -5,7 +5,7 @@ This procedure is for the staging host only. It never uses `restaurant_saas`, pr
 ## Preconditions
 
 1. Work in `/opt/websites/restaurant-staging` on branch `dev`.
-2. Confirm the staging Compose `postgres` service is healthy.
+2. Confirm the `quanpilot-staging` Compose project and its `postgres` service are healthy.
 3. Use a database named exactly `subscription_test`. The test script refuses any database name without `test`.
 4. Stop if `subscription_test` already exists. Its contents may be evidence from a previous test run.
 
@@ -14,13 +14,13 @@ This procedure is for the staging host only. It never uses `restaurant_saas`, pr
 ```bash
 cd /opt/websites/restaurant-staging
 git branch --show-current
-docker compose ps postgres
+docker compose -p quanpilot-staging -f docker-compose.staging.yml ps postgres
 
-test "$(docker compose exec -T postgres psql -U restaurant_user -d postgres -tAc "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'subscription_test')")" = "f" \
+test "$(docker compose -p quanpilot-staging -f docker-compose.staging.yml exec -T postgres psql -U restaurant_user -d postgres -tAc "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'subscription_test')")" = "f" \
   || { echo "subscription_test already exists; stop without changing it."; exit 1; }
 
-docker compose exec -T postgres createdb -U restaurant_user -O restaurant_user subscription_test
-docker compose exec -T postgres psql -U restaurant_user -d subscription_test -c 'SELECT current_database(), current_user;'
+docker compose -p quanpilot-staging -f docker-compose.staging.yml exec -T postgres createdb -U restaurant_user -O restaurant_user subscription_test
+docker compose -p quanpilot-staging -f docker-compose.staging.yml exec -T postgres psql -U restaurant_user -d subscription_test -c 'SELECT current_database(), current_user;'
 ```
 
 The expected database name is `subscription_test`. Do not continue if a different name is printed.
@@ -28,10 +28,10 @@ The expected database name is `subscription_test`. Do not continue if a differen
 ## Validate the target and run migrations only on the test database
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.subscription-test.yml config --quiet
-docker compose -f docker-compose.yml -f docker-compose.subscription-test.yml build app
+docker compose -p quanpilot-staging -f docker-compose.staging.yml -f docker-compose.subscription-test.yml config --quiet
+docker compose -p quanpilot-staging -f docker-compose.staging.yml -f docker-compose.subscription-test.yml build app
 
-docker compose -f docker-compose.yml -f docker-compose.subscription-test.yml run --rm --no-deps app sh -lc '
+docker compose -p quanpilot-staging -f docker-compose.staging.yml -f docker-compose.subscription-test.yml run --rm --no-deps app sh -lc '
   case "$DATABASE_URL" in
     */subscription_test\?schema=public) ;;
     *) echo "Refusing a non-test database target." >&2; exit 1 ;;
@@ -45,7 +45,7 @@ docker compose -f docker-compose.yml -f docker-compose.subscription-test.yml run
 ## Run the integration test
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.subscription-test.yml run --rm --no-deps app sh -lc '
+docker compose -p quanpilot-staging -f docker-compose.staging.yml -f docker-compose.subscription-test.yml run --rm --no-deps app sh -lc '
   case "$DATABASE_URL" in
     */subscription_test\?schema=public) ;;
     *) echo "Refusing a non-test database target." >&2; exit 1 ;;

@@ -3,6 +3,7 @@ import { FeedbackBanner } from "@/components/admin/feedback-banner";
 import { SubscriptionPricingClient } from "@/components/admin/subscription-pricing-client";
 import { requireRestaurantAccess } from "@/lib/rbac/guards";
 import { getRecentNotifications } from "@/server/services/notification-service";
+import { getActiveSubscriptionPaymentOrders } from "@/server/services/subscription-checkout-service";
 import { daysRemaining, getPublicPlanPrices, getRestaurantSubscriptionSummary } from "@/server/services/subscription-service";
 import { basicPlanFeatures, effectiveCommercialPlan, planDisplayLabel, planFeatureLabels, planFeatureOrder, proPlanFeatures, type CommercialPlan } from "@/lib/plan/features";
 
@@ -19,10 +20,11 @@ export default async function AdminSubscriptionPage({
   searchParams?: { error?: string; success?: string };
 }) {
   const access = await requireRestaurantAccess(params.rSlug, ["OWNER"], { allowExpiredSubscription: true });
-  const [notifications, prices, summary] = await Promise.all([
+  const [notifications, prices, summary, activePaymentOrders] = await Promise.all([
     getRecentNotifications(access.restaurant.id, access.user.id),
     getPublicPlanPrices(),
-    getRestaurantSubscriptionSummary(access.restaurant.id)
+    getRestaurantSubscriptionSummary(access.restaurant.id),
+    getActiveSubscriptionPaymentOrders(access.restaurant.id)
   ]);
   const restaurant = summary.restaurant;
   if (!restaurant) return null;
@@ -111,9 +113,7 @@ export default async function AdminSubscriptionPage({
         slug={access.restaurant.slug}
         currentPlan={currentPlan}
         currentExpired={currentExpired}
-        subscriptionStart={restaurant.subscriptionStart?.toISOString() ?? null}
         subscriptionEnd={restaurant.subscriptionEnd?.toISOString() ?? null}
-        currentTerm={currentTerm}
         prices={prices.map((price) => ({
           id: price.id,
           plan: price.plan === "PRO" ? "PRO" : "BASIC",
@@ -125,9 +125,20 @@ export default async function AdminSubscriptionPage({
         }))}
         features={featureItems}
         pendingRequests={summary.pendingRequests.map((request) => ({
+          id: request.id,
           plan: request.plan === "PRO" ? "PRO" : "BASIC",
           termMonths: request.termMonths,
-          requestType: request.requestType === "UPGRADE" ? "UPGRADE" : "RENEWAL"
+          requestType: request.requestType === "UPGRADE" ? "UPGRADE" : "RENEWAL",
+          priceVnd: request.priceVnd,
+          quoteExpiresAt: request.quoteExpiresAt?.toISOString() ?? null
+        }))}
+        activePaymentOrders={activePaymentOrders.map((order) => ({
+          id: order.id,
+          subscriptionRequestId: order.subscriptionRequestId,
+          plan: order.plan === "PRO" ? "PRO" : "BASIC",
+          termMonths: order.termMonths,
+          amountVnd: order.amountVnd,
+          expiresAt: order.expiresAt.toISOString()
         }))}
       />
     </RestaurantAdminShell>

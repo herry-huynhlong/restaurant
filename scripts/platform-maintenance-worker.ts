@@ -10,6 +10,7 @@ import { isMaintenanceMode } from "@/lib/maintenance-mode";
 import { disableRestaurantMaintenance } from "@/lib/restaurant-maintenance";
 import { createRestaurantBackup, restoreRestaurantBackup } from "@/server/services/restaurant-backup-service";
 import { expireStaleSubscriptionRequests } from "@/server/services/subscription-service";
+import { expireStaleSubscriptionPaymentOrders } from "@/server/services/subscription-checkout-service";
 
 const execFileAsync = promisify(execFile);
 const prisma = new PrismaClient();
@@ -587,6 +588,7 @@ async function cleanupOldTaskHistory() {
 async function processSubscriptionLifecycle() {
   const now = new Date();
   await expireStaleSubscriptionRequests(now);
+  await expireStaleSubscriptionPaymentOrders(now);
   const subscriptionPolicy = await prisma.platformSubscriptionPolicy.upsert({
     where: { singletonKey: "default" },
     create: { singletonKey: "default" },
