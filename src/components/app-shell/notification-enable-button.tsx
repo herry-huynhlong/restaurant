@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, BellRing, CheckCircle2, Volume2, X } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { urlBase64ToUint8Array } from "@/lib/push";
 import { getStaffDeviceId, getStaffDeviceName } from "@/lib/staff-device";
@@ -195,55 +195,6 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
     }
   }
 
-  async function testSound() {
-    localStorage.setItem("notificationSoundEnabled", "true");
-    setStatus("enabled");
-    const played = await playNotificationSound(1);
-    setMessage(played
-      ? "Đã phát thử âm thanh. Nếu vẫn không nghe, hãy tăng âm lượng media và tắt chế độ im lặng/Không làm phiền."
-      : "Trình duyệt đang chặn âm thanh. Hãy chạm lại nút kiểm tra hoặc mở app đã cài trên thiết bị.");
-  }
-
-  async function testSystemNotification() {
-    setBusy(true);
-    setMessage(null);
-    try {
-      if (permissionState !== "granted") {
-        setMessage("Cần bấm Bật trên thiết bị này trước khi kiểm tra thông báo hệ thống.");
-        return;
-      }
-
-      const registration = await registerServiceWorker();
-      const subscription = await registration.pushManager.getSubscription();
-      if (!subscription || !slug) {
-        setMessage("Thiết bị chưa đăng ký thông báo hệ thống. Hãy bật lại thông báo.");
-        return;
-      }
-
-      const localShown = await showTestNotification(registration, slug);
-      const response = await fetch(`/api/restaurants/${slug}/push/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: subscription.endpoint })
-      });
-
-      if (!response.ok) {
-        setMessage(localShown
-          ? "Đã hiện thông báo trên thiết bị, nhưng chưa gửi được thông báo đẩy. Vui lòng thử lại sau."
-          : "Chưa hiện được thông báo trên thiết bị và chưa gửi được thông báo đẩy. Vui lòng kiểm tra quyền thông báo rồi thử lại.");
-        return;
-      }
-
-      setPushReady(true);
-      await response.json().catch(() => ({}));
-      setMessage(localShown
-        ? "Đã gửi thông báo thử. Nếu không thấy pop-up, mở cài đặt thông báo của app/site và bật kiểu hiển thị nổi."
-        : "Đã gửi thông báo thử, nhưng thiết bị chưa cho hiện pop-up. Kiểm tra quyền thông báo, kiểu pop-up và chế độ Không làm phiền.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const isEnabled = status === "enabled";
   const isBlocked = status === "denied";
   const label = isEnabled ? "Thông báo: Bật" : isBlocked ? "Thông báo bị chặn" : "Thông báo: Tắt";
@@ -284,23 +235,16 @@ export function NotificationEnableButton({ slug }: { slug?: string }) {
             </p>
           ) : null}
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <div className="mt-4">
             {isEnabled ? (
-              <button className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60" type="button" disabled={busy} onClick={() => void disableNotifications()}>
+              <button className="h-10 w-full rounded-md border px-3 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60" type="button" disabled={busy} onClick={() => void disableNotifications()}>
                 Tắt trên thiết bị này
               </button>
             ) : (
-              <button className="rounded-md bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60" type="button" disabled={busy} onClick={() => void enableNotifications()}>
+              <button className="h-10 w-full rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60" type="button" disabled={busy} onClick={() => void enableNotifications()}>
                 Bật trên thiết bị này
               </button>
             )}
-            <button className="inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60" type="button" disabled={busy} onClick={() => void testSound()}>
-              <Volume2 className="h-4 w-4" />
-              Kiểm tra âm thanh
-            </button>
-            <button className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60 sm:col-span-2" type="button" disabled={busy || permissionState !== "granted"} onClick={() => void testSystemNotification()}>
-              Gửi thông báo thử tới thiết bị này
-            </button>
           </div>
         </div>
       ) : null}
@@ -330,32 +274,5 @@ function permissionLabel(permission: PermissionState) {
 async function registerServiceWorker() {
   await navigator.serviceWorker.register("/sw.js");
   return navigator.serviceWorker.ready;
-}
-
-async function showTestNotification(registration: ServiceWorkerRegistration, slug: string) {
-  try {
-    const options: NotificationOptions & { renotify?: boolean; vibrate?: number[] } = {
-      body: "Nếu thấy thông báo này, quyền hiển thị thông báo của thiết bị đang hoạt động.",
-      icon: `/${slug}/icons/icon-192.png`,
-      badge: `/${slug}/icons/icon-192.png`,
-      tag: `local-test-${Date.now()}`,
-      renotify: true,
-      requireInteraction: true,
-      vibrate: [350, 140, 350, 140, 500]
-    };
-    await registration.showNotification("Thông báo thử", options);
-    return true;
-  } catch {
-    try {
-      const notification = new Notification("Thông báo thử", {
-        body: "Nếu thấy thông báo này, quyền hiển thị thông báo của thiết bị đang hoạt động.",
-        icon: `/${slug}/icons/icon-192.png`
-      });
-      notification.onclick = () => window.focus();
-      return true;
-    } catch {
-      return false;
-    }
-  }
 }
 
