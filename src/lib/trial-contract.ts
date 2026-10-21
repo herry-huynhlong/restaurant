@@ -52,6 +52,8 @@ export const trialInput = z
             "uploads",
             "media",
             "post-login",
+            "restaurant-login",
+            "restaurant-entry",
             "select-restaurant",
             "unauthorized",
             "_next",

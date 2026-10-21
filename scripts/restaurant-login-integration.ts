@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import {encode} from 'next-auth/jwt';
 import {prisma} from '@/lib/db/prisma';
 import {getRestaurantPostLoginPath, getPostLoginPath} from '@/server/services/auth-redirect-service';
+import {trialInput} from '@/lib/trial-contract';
 
 const db = new URL(process.env.DATABASE_URL || 'http://invalid');
 if(db.hostname!=='127.0.0.1'||db.port!=='55432'||db.pathname!=='/restaurant_trial_test') throw Error('ISOLATED_TEST_REQUIRED');
@@ -21,6 +22,8 @@ async function login(email:string,pw:string){
 }
 async function snapshot(){return {trials:await prisma.trialRegistration.count(),requests:await prisma.restaurantSubscriptionRequest.count(),entitlements:await prisma.subscriptionEntitlement.count()};}
 async function main(){
+ assert.equal(trialInput.shape.slug.safeParse('restaurant-login').success,false);
+ assert.equal(trialInput.shape.slug.safeParse('restaurant-entry').success,false);
  const before=await snapshot();
  const user=await prisma.user.create({data:{name:'Isolated login QA',email:prefix+'@example.test',passwordHash:await bcrypt.hash(password,10),platformRole:'PLATFORM_ADMIN'}});
  const a=await prisma.restaurant.create({data:{name:'Login QA A',slug:prefix+'-a',plan:'TRAIN',planEntitlement:'BASIC',subscriptionEnd:new Date(Date.now()+86400000)}});
