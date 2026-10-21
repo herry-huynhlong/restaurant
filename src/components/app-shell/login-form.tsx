@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-export function LoginForm() {
+export function LoginForm({ destination }: { destination?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export function LoginForm() {
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
-    const callbackUrl = searchParams.get("callbackUrl") ?? "/post-login";
+    const callbackUrl = destination ?? searchParams.get("callbackUrl") ?? "/post-login";
 
     const result = await signIn("credentials", {
       email,

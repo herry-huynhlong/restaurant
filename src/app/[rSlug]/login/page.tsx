@@ -1,4 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/options";
+import { getRestaurantPostLoginPath } from "@/server/services/auth-redirect-service";
 import { RestaurantLoginForm } from "@/components/app-shell/restaurant-login-form";
 import { prisma } from "@/lib/db/prisma";
 
@@ -24,6 +27,12 @@ export default async function RestaurantLoginPage({
 
   if (!restaurant) {
     notFound();
+  }
+
+  const session = await getServerSession(authOptions);
+  if (session?.user?.id) {
+    const path = await getRestaurantPostLoginPath(session.user.id, restaurant.slug);
+    if (path !== "/unauthorized") redirect(path);
   }
 
   return (

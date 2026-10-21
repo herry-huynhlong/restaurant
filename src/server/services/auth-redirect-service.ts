@@ -8,8 +8,15 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
     return platformRoutes.dashboard;
   }
 
+  return getRestaurantPostLoginPath(userId);
+}
+
+// Customer entry deliberately resolves memberships, never the platform role.
+export async function getRestaurantPostLoginPath(userId: string, restaurantSlug?: string) {
+  const user = await prisma.user.findUnique({where:{id:userId},select:{isActive:true}});
+  if (!user?.isActive) return "/restaurant-login";
   const memberships = await prisma.restaurantUser.findMany({
-    where: { userId, isActive: true, deletedAt: null },
+    where: { userId, isActive: true, deletedAt: null, ...(restaurantSlug ? { restaurant: { slug: restaurantSlug } } : {}) },
     include: {
       restaurant: {
         select: { slug: true, status: true, plan: true, planEntitlement: true, businessType: true }
@@ -18,6 +25,7 @@ export async function getPostLoginPath(userId: string, platformRole: string) {
     orderBy: { createdAt: "asc" }
   });
 
+  if (restaurantSlug && memberships.length === 0) return "/unauthorized";
   if (memberships.length !== 1) {
     return "/select-restaurant";
   }
