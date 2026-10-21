@@ -126,8 +126,8 @@ async function main() {
     "QAVIO and QuánPilot use exactly the same trial contract",
     async () => {
       assert.equal(
-        await readFile("src/lib/trial-contract.ts", "utf8"),
-        await readFile(path.resolve(process.env.QAVIO_REPOSITORY_PATH||"../qavio","src/lib/trial-contract.ts"), "utf8"),
+        (await readFile("src/lib/trial-contract.ts", "utf8")).replace(/\r\n/g, "\n"),
+        (await readFile(path.resolve(process.env.QAVIO_REPOSITORY_PATH||"../qavio","src/lib/trial-contract.ts"), "utf8")).replace(/\r\n/g, "\n"),
       );
     },
   );
