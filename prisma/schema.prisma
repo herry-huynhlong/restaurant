@@ -1002,3 +1002,42 @@ model RestaurantSubscriptionEvent {
   @@index([requestId])
   @@index([action])
 }
+
+// Only QuánPilot stores self-registration and email-verification state.
+model TrialRegistration {
+  id String @id @default(cuid())
+  keyHash String @unique
+  requestHash String
+  challengeId String @unique
+  googleSubject String @unique
+  restaurantId String @unique
+  ownerUserId String @unique
+  result Json
+  createdAt DateTime @default(now())
+}
+model TrialIdentityChallenge {
+  id String @id @default(uuid())
+  stateHash String @unique
+  flowHash String
+  pkceVerifier String
+  nonce String
+  expiresAt DateTime
+  verifiedAt DateTime?
+  email String?
+  ownerName String?
+  googleSubject String?
+  ticketHash String? @unique
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+}
+model TrialRateBucket {
+  keyHash String @id
+  count Int
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model TrialServiceNonce {
+  keyHash String @id
+  expiresAt DateTime
+  @@index([expiresAt])
+}

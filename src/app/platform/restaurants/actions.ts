@@ -1,6 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
+import {createRestaurantRecords} from "@/server/services/restaurant-provision-service";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -329,86 +330,8 @@ export async function createRestaurantAction(formData: FormData) {
       ownerUserExists: Boolean(existingOwner)
     });
     const restaurant = await prisma.$transaction(async (tx) => {
-      const createdRestaurant = await tx.restaurant.create({
-        data: {
-          name: parsed.data.name,
-          slug: parsed.data.slug,
-          logoUrl: parsed.data.logoUrl ?? null,
-          status: parsed.data.status,
-          businessType: parsed.data.businessType,
-          plan: parsed.data.plan,
-          planEntitlement: parsed.data.plan === "TRAIN" ? parsed.data.planEntitlement : parsed.data.plan === "PRO" ? "PRO" : "BASIC",
-          subscriptionStatus: parsed.data.subscriptionStatus,
-          subscriptionStart,
-          subscriptionEnd
-        }
-      });
-
-      const owner = await tx.user.upsert({
-        where: { email: parsed.data.ownerEmail },
-        update: {
-          name: parsed.data.ownerName,
-          phone: parsed.data.ownerPhone ?? null
-        },
-        create: {
-          name: parsed.data.ownerName,
-          email: parsed.data.ownerEmail,
-          phone: parsed.data.ownerPhone ?? null,
-          passwordHash
-        }
-      });
-
-      await tx.restaurantUser.create({
-        data: {
-          restaurantId: createdRestaurant.id,
-          userId: owner.id,
-          username: parsed.data.ownerEmail,
-          role: "OWNER"
-        }
-      });
-
-      await tx.restaurantSetting.create({
-        data: {
-          restaurantId: createdRestaurant.id,
-          restaurantName: parsed.data.name,
-          logoUrl: parsed.data.logoUrl ?? null,
-          phone: parsed.data.phone ?? null,
-          address: parsed.data.address ?? null,
-          timezone: parsed.data.timezone,
-          primaryLanguage: parsed.data.primaryLanguage,
-          currency: parsed.data.currency
-        }
-      });
-
-      await tx.area.create({
-        data: {
-          restaurantId: createdRestaurant.id,
-          name: "Khu vực mặc định"
-        }
-      });
-
-      await tx.auditLog.createMany({
-        data: [
-          {
-            restaurantId: createdRestaurant.id,
-            userId: actor.id,
-            action: "RESTAURANT_CREATED",
-            entityType: "Restaurant",
-            entityId: createdRestaurant.id,
-            metadataJson: { slug: createdRestaurant.slug, plan: createdRestaurant.plan, planEntitlement: createdRestaurant.planEntitlement, businessType: createdRestaurant.businessType }
-          },
-          {
-            restaurantId: createdRestaurant.id,
-            userId: actor.id,
-            action: "OWNER_CREATED",
-            entityType: "User",
-            entityId: owner.id,
-            metadataJson: { email: owner.email }
-          }
-        ]
-      });
-
-      return createdRestaurant;
+      const {restaurant}=await createRestaurantRecords(tx,{...parsed.data,subscriptionStart,subscriptionEnd},passwordHash,actor.id);
+      return restaurant;
     });
 
     createdRestaurantId = restaurant.id;

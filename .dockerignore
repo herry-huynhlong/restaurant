@@ -12,3 +12,5 @@ docs
 backups
 runtime
 host-metrics
+
+.trial-runtime

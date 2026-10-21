@@ -32,7 +32,7 @@ export default async function RestaurantLoginPage({
         <div className="mb-6">
           <p className="text-sm font-medium text-teal-700">{restaurant.name}</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-normal">Đăng nhập {roleLoginLabels[searchParams?.role ?? ""] ?? "nhân viên"}</h1>
-          <p className="mt-2 text-sm text-slate-600">Dùng tên đăng nhập do chủ quán hoặc quản lý tạo.</p>
+          <p className="mt-2 text-sm text-slate-600">{searchParams?.role === "OWNER" ? "Sử dụng email và mật khẩu tài khoản chủ quán của bạn." : "Dùng tên đăng nhập do chủ quán hoặc quản lý tạo."}</p>
         </div>
         {restaurant.status === "ACTIVE" ? (
           <RestaurantLoginForm slug={restaurant.slug} initialError={searchParams?.error} />

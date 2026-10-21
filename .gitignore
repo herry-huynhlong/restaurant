@@ -6,3 +6,5 @@ dist
 coverage
 *.tsbuildinfo
 Restaurant/
+
+.trial-runtime/
