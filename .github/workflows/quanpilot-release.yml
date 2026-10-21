@@ -1,0 +1,46 @@
+name: QuanPilot Linux release
+on:
+  workflow_dispatch:
+    inputs:
+      vapid_public_key:
+        description: Existing public web push application key
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: quanpilot-linux-release
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install and validate
+        run: |
+          npm install --global pnpm@11.19.0
+          pnpm install --frozen-lockfile
+          pnpm prisma:generate
+          pnpm lint
+          pnpm exec tsc --noEmit
+      - name: Build Linux image outside production
+        env:
+          VAPID_PUBLIC_KEY: ${{ inputs.vapid_public_key }}
+        run: |
+          TAG="${GITHUB_SHA::7}"
+          docker build --build-arg NEXT_PUBLIC_VAPID_PUBLIC_KEY="$VAPID_PUBLIC_KEY" --label org.opencontainers.image.revision="$GITHUB_SHA" -t "quanpilot-app:$TAG" .
+          mkdir -p release
+          docker image inspect "quanpilot-app:$TAG" --format '{{json .}}' | jq -s '[.[]|{id:.Id,tags:.RepoTags,size:.Size,revision:.Config.Labels["org.opencontainers.image.revision"]}]' > release/images.json
+          docker save "quanpilot-app:$TAG" | gzip -1 > release/quanpilot-images.tar.gz
+          cd release
+          sha256sum quanpilot-images.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quanpilot-linux-release-${{ github.sha }}
+          path: release/
+          compression-level: 0
+          retention-days: 7
