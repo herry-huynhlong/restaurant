@@ -17,7 +17,12 @@
 
 ## Phát hành
 
-Đang chuẩn bị image CI ngoài VPS. Không migration hoặc build trên VPS1GB. Chỉ recreate app QuánPilot và web QAVIO, giữ env/flags/DB/worker/Portfolio. Giữ imagebe133f2 làm rollback QuánPilot, QAVIO3c22501. Kết quả production sẽ cập nhật sau deploy.
+Đã deploy image `quanpilot-app:05ff9ad`, source `05ff9ad0d1d102ee5d2d2a4e8db9839e951e1b48`; CI39601344608 success, Linux build ngoài VPS. QAVIO đồng thời phát hành7ebeb22/CI39601339711 success.
+
+- Artifact checksum/OCI config/layers/revision được kiểm chứng với image đã chạy. App Up, login/NextAuth200, `/thien-dao/admin/tables` anonymous307 về login. CRUD và responsive trên trang có phiên đã kiểm ở QA cô lập nêu trên, không tạo bàn/QA trên production.
+- Chỉ recreate app QuánPilot và web QAVIO; env toàn bộ trước/sau khớp. Hai DB, maintenance worker, QAVIO worker và Portfolio giữ nguyên ID/start/restart count, PortfolioHTTPS200. Không migration;5/27migration không đổi.
+- Backup mới/off-host/restore disposable PASS; fixture QA và phiên test đã dọn. Không sửa dữ liệu nhà hàng hiện có, QR hoặc phiên bàn.
+- Disk sau2.1G trống/91%; đã dọn riêng archive sau xác minh từng image, không prune hoặc xóa volume. Giữ rollbackbe133f2 và QAVIO3c22501. Snapshot private `/opt/websites/qavio/.runtime/refinement-release-20261021/snapshot`; khôi phục overlay rồi recreate riêng app khi rollback, không restore DB. Bằng chứng chi tiết ở QAVIO docs/MARKETING_REFINEMENT.md và docs/marketing-refinement/.
 
 ![Trước sửa1024px](table-layout/before-1024.png)
 
