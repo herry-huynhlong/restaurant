@@ -1,6 +1,6 @@
 # QAVIO → QuánPilot: đăng ký TRAIN/BASIC một tháng
 
-Ngày thực hiện: 21/10/2026. Nhánh local của hai repository: `codex/qavio-self-service-trial`. Base QAVIO `5f734d6`, Restaurant `f1fc236`. Không có SSH, thay cấu hình production, tạo tài khoản trên production hoặc deploy trong task này. Các production build và HTTP test hiện chạy Windows local; chưa build image Linux hoặc nghiệm thu staging. Chỉ làm source và database test riêng.
+Ngày thực hiện: 21/10/2026. Giai đoạn phát triển dùng nhánh `codex/qavio-self-service-trial`, base QAVIO `5f734d6`, Restaurant `f1fc236`. Sau yêu cầu trực tiếp “oke lên web đi”, code đã merge/push main và triển khai riêng hai ứng dụng. QAVIO chạy source `41218f7`; QuánPilot chạy source `3408242`. Đăng ký dùng thử production vẫn đóng vì chưa có Google OAuth thật; Contact/DEMO intake hiện hành giữ mở. Kết quả local trước phát hành ở T4; bằng chứng triển khai Linux và giới hạn nghiệm thu ở phần cuối. Không tạo tài khoản/nhà hàng thử trên production.
 
 ## T1 — Luồng hiện tại và quyết định
 
@@ -93,3 +93,33 @@ QAVIO regression: integration.ts, integration-admin.ts, integration-contact.ts. 
 ## Trạng thái bàn giao
 
 Fixture browser nhà hàng/chủ quán và fixture Admin/Lead của lượt QA đã được dọn theo đúng ID/prefix. Không xóa dữ liệu QA có từ task trước hoặc dữ liệu production. Thư mục .trial-runtime của Restaurant được loại khỏi cả Git và Docker build context; .runtime QAVIO đã có loại trừ. Các secret QA chỉ nằm ở thư mục tạm bị ignore, không nằm trong source được push.
+
+
+## Phát hành code production — 21/10/2026
+
+Người dùng trực tiếp yêu cầu “oke lên web đi” sau báo cáo T4. Yêu cầu mới là phê duyệt triển khai code hai ứng dụng. Chưa có Google OAuth thật nên đây là phát hành code với kill switch đóng; không coi là nghiệm thu Google/staging hoặc hoàn tất mở self-registration. Không yêu cầu lại quyền push/deploy đã có.
+
+- QAVIO main/source `41218f7aeaff0caca8d42238dbdd8a408f81e40f`, image `qavio-web:41218f7`, Docker OCI index `sha256:0792c57314a02033e79e41d68b18afbdca0cc7fd38e9d6983bf4a09cf7dd7eca`, config `sha256:f852b5b46ec61e7059f2bcfe40281588cfeaad27f36f5f1cab2def9641d646e3`.
+- QuánPilot main/source `3408242005c8d5978676ed0277bdee84a3a8b785`, image `quanpilot-app:3408242`, Docker OCI index `sha256:cc7502545791f9f2799119f974a507662a750eb41f43dc0ef9c3dfa43f561c84`, config `sha256:51f9f8bcf858c5fc935b2fffdb83e00110bd3f796884f5667db30cdaf6a66a19`.
+- Linux CI ngoài VPS: QAVIO [39545084829](https://github.com/herry-huynhlong/qavio/actions/runs/39545084829) đạt lint/C/Admin/Contact/check-visible-poll, build và package; Restaurant [39545239052](https://github.com/herry-huynhlong/restaurant/actions/runs/39545239052) đạt lint/TypeScript, build Docker và package. Restaurant thêm workflow dispatch riêng; giữ đúng public VAPID key đang dùng qua build input, không gửi private key lên CI.
+- Artifact ZIP SHA256 QAVIO `cc06f0463e3d3cc374cb90fde5e50ced206a45d162a99f5795da5dc594aaa1dd`; Restaurant `454564822471e1b1ce947eab2359f5b5574ef015589cda67325e5c2ff0e9bf1e`. Đối chiếu GitHub artifact digest, gzip checksum, OCI index → manifest amd64 → config, layers và revision trước khi recreate. Lần đầu verifier dừng trước recreate do giả định image ID luôn là config; đã sửa verifier để kiểm đúng chuỗi OCI digest, không bỏ kiểm integrity.
+- Backup mới: cả hai PostgreSQL custom dump và uploads/media, mã hóa AES-256-CBC/PBKDF2, khóa ngẫu nhiên bọc RSA-OAEP SHA256 bằng public key backup hiện có. SHA256 ciphertext `f0ac53f750f906adfc52f8a003fb31d1f93a847def35c9a62414f35684684c3b`. Bản mã hóa có trên VPS và off-host local; private key không đưa lên server/CI.
+- Off-host restore đạt trên PostgreSQL local loopback55432: QAVIO5 migration, Restaurant26 migration. Migration mới được chạy thử trên bản Restaurant đã restore:27 migration, số bản ghi36 bảng cũ không đổi. Sau kiểm chứng đã xóa database restore cùng bản plaintext local, giữ archive mã hóa và bằng chứng. Không restore/reset production.
+- Production migration `20261021110000_qavio_trial_registration` đã áp dụng, tổng27 migration. Bốn bảng trial mới trống; số bản ghi36 bảng cũ giữ nguyên ngay trước/sau migration. QAVIO không cần migration, vẫn5.
+- Chỉ recreate `qavio-web-1` và `restaurant-app-1` lần lượt. Worker/PostgreSQL hai dự án và portfolio giữ nguyên ID/thời điểm khởi động. QAVIO worker vẫn `qavio-operations:c205bbd`; không đổi secret/quyền/bootstrapping Admin, không build trên VPS.
+- Domain QuánPilot được xác nhận từ NEXTAUTH_URL đang chạy: `https://demo.longh.org`; QAVIO `https://qavio.longh.org`. Không lấy domain từ file example.
+- Production HTTP đạt14 trang, `/request-demo`308→`/trial`, QAVIO ready200, QuánPilot login200, Contact/DEMO intake mở và validation422 với payload rỗng, anonymous Admin401, QUOTE/newsletter503, email disabled, noindex. QAVIO trial session `{enabled:false,identity:null}`; trial POST503; QuánPilot trial POST503/TRIAL_DISABLED. Không gửi PII hoặc tạo QA trial production.
+- Browser production: menu mobile mở/đóng,375px/1280px không tràn ngang,0 input thiếu label; Contact hiển thị đang tiếp nhận và nút gửi enabled; Google/trial submit disabled đúng trạng thái. Không nhập hoặc gửi dữ liệu khách; không thấy console error/warning ở lượt kiểm tra. Screenshot local `D:/anh/qavio/.runtime/trial-evidence/production-trial-closed.png`.
+- Sau rollout: QAVIO web healthy, cả hai login sẵn sàng; khoảng7.9GiB disk trống. QAVIOweb82MiB, QuánPilot app101MiB tại thời điểm kiểm tra; worker/database khác tiếp tục hoạt động.
+
+### Cấu hình và rollback
+
+QAVIO dùng compose.yaml + compose.production.yaml + compose.release-candidate.yaml như trước; `.env` pin QAVIO_IMAGE_TAG=41218f7, operations=c205bbd; `.env.production` QAVIO_TRIAL_ENABLED=false. QAVIO_CONSULTATION_FORMS_ENABLED=true; QUOTE/newsletter/mail/indexing giữ đóng.
+
+Restaurant production dùng `docker compose -f docker-compose.yml -f .trial-runtime/production-release.yaml up -d --no-build --no-deps app`. Overlay riêng trên VPS pin image3408242 và QUANPILOT_TRIAL_REGISTRATION_ENABLED=false, public origins thực tế. Các biến OAuth/service secret/quota chưa cấu hình. Những lần phát hành sau phải giữ overlay/image pin này, không dùng lệnh build trên VPS hoặc base compose để vô tình quay về image cũ.
+
+Rollback code: QAVIO phục hồi `.env`/`.env.production` từ `.runtime/trial-release-20261021/qavio/env-before`, recreate riêng web bằng image5ef3970. Restaurant đổi image trong overlay sang `quanpilot-rollback:pre-trial-20261021`, recreate riêng app; giữ kill switch false. Migration chỉ thêm bảng, có thể giữ nguyên khi rollback app; không xóa bảng/dữ liệu hoặc restore production. Bằng chứng deploy/backup nằm trong `/opt/websites/qavio/.runtime/trial-release-20261021`.
+
+### Để mở đăng ký dùng thử thật
+
+Cần OAuth Web Client thực với callback `https://demo.longh.org/api/integrations/qavio/trial/google/callback`; Client Secret nhập qua môi trường bảo mật, không chat/Git. Sau cấu hình: thiết lập secret HMAC riêng hai phía và quota hữu hạn; nghiệm thu Google thực/flow/end-to-end trên staging được duyệt rồi mới bật hai trial flags. Không mở QUOTE/newsletter/email/indexing. Đợt này chỉ đưa code lên web với trạng thái trung thực; tính năng tạo nhà hàng tự động chưa mở công khai.
