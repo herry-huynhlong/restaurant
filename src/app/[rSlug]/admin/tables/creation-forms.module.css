@@ -1,0 +1,9 @@
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,25rem),1fr));gap:1rem;align-items:start;margin-bottom:1.5rem;min-width:0}
+.card{container-type:inline-size;min-width:0;border:1px solid #e2e8f0;border-radius:.5rem;background:white;padding:1rem;box-shadow:0 1px 2px #0000000d}
+.fields{display:grid;gap:.75rem;margin-top:.75rem;min-width:0;align-items:end}
+.field{display:grid;gap:.375rem;min-width:0;font-size:.875rem;font-weight:500;color:#334155}
+.field input,.field select{height:2.75rem;min-width:0;width:100%;max-width:100%;border:1px solid #cbd5e1;border-radius:.375rem;background:white;padding:0 .75rem;font-weight:400}
+.field input:focus-visible,.field select:focus-visible{outline:2px solid #0f766e;outline-offset:2px}
+.submit{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;min-width:0;width:100%;padding:.625rem 1rem;border-radius:.375rem;background:#0f766e;color:white;font-size:.875rem;font-weight:600;white-space:nowrap;flex-shrink:0}
+@container (min-width:24rem){.tableFields{grid-template-columns:repeat(2,minmax(0,1fr))}.tableFields .submit{grid-column:1/-1;justify-self:end;width:auto;min-width:8rem}}
+@container (min-width:28rem){.areaFields{grid-template-columns:minmax(0,1fr) max-content}.areaFields .submit{width:auto;min-width:8rem}}

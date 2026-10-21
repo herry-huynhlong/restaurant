@@ -1,0 +1,123 @@
+[
+  {
+    "buttons": [
+      {
+        "height": 44,
+        "text": "Tạo khu vực",
+        "whiteSpace": "nowrap",
+        "width": 128
+      },
+      {
+        "height": 44,
+        "text": "Tạo bàn",
+        "whiteSpace": "nowrap",
+        "width": 128
+      }
+    ],
+    "content": 1024,
+    "fields": [
+      0,
+      0,
+      0,
+      538,
+      0,
+      0,
+      0,
+      333,
+      333
+    ],
+    "width": 1024
+  },
+  {
+    "buttons": [
+      {
+        "height": 44,
+        "text": "Tạo khu vực",
+        "whiteSpace": "nowrap",
+        "width": 239
+      },
+      {
+        "height": 44,
+        "text": "Tạo bàn",
+        "whiteSpace": "nowrap",
+        "width": 239
+      }
+    ],
+    "content": 305,
+    "fields": [
+      239,
+      239,
+      239
+    ],
+    "width": 320
+  },
+  {
+    "buttons": [
+      {
+        "height": 44,
+        "text": "Tạo khu vực",
+        "whiteSpace": "nowrap",
+        "width": 294
+      },
+      {
+        "height": 44,
+        "text": "Tạo bàn",
+        "whiteSpace": "nowrap",
+        "width": 294
+      }
+    ],
+    "content": 360,
+    "fields": [
+      294,
+      294,
+      294
+    ],
+    "width": 375
+  },
+  {
+    "buttons": [
+      {
+        "height": 44,
+        "text": "Tạo khu vực",
+        "whiteSpace": "nowrap",
+        "width": 422
+      },
+      {
+        "height": 44,
+        "text": "Tạo bàn",
+        "whiteSpace": "nowrap",
+        "width": 128
+      }
+    ],
+    "content": 768,
+    "fields": [
+      422,
+      205,
+      205
+    ],
+    "width": 768
+  },
+  {
+    "buttons": [
+      {
+        "height": 44,
+        "text": "Tạo khu vực",
+        "whiteSpace": "nowrap",
+        "width": 442
+      },
+      {
+        "height": 44,
+        "text": "Tạo bàn",
+        "whiteSpace": "nowrap",
+        "width": 128
+      }
+    ],
+    "content": 1440,
+    "fields": [
+      442,
+      215,
+      215
+    ],
+    "width": 1440
+  }
+]

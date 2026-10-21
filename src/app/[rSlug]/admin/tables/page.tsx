@@ -10,6 +10,7 @@ import { getRecentNotifications } from "@/server/services/notification-service";
 import { getAdminTablesState } from "@/server/services/table-state-service";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { getLatestPaidPaymentSummariesByTable } from "@/server/services/payment-detail-service";
+import styles from './creation-forms.module.css';
 
 export default async function TablesPage({
   params,
@@ -60,23 +61,23 @@ export default async function TablesPage({
     >
       <FeedbackBanner error={searchParams?.error} success={searchParams?.success} />
 
-      <section className="mb-6 grid gap-4 lg:grid-cols-2">
-        <form className="rounded-lg border bg-white p-4 shadow-sm" action={createAreaAction.bind(null, access.restaurant.slug)}>
+      <section className={styles.grid} aria-label="Tạo khu vực và bàn">
+        <form className={styles.card} action={createAreaAction.bind(null, access.restaurant.slug)}>
           <h2 className="flex items-center gap-2 text-base font-semibold"><Plus className="h-4 w-4" /> Tạo khu vực</h2>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <input className="h-10 flex-1 rounded-md border px-3" name="name" placeholder="Tên khu vực, ví dụ Khu A" required />
-            <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang tạo...">Tạo khu vực</PendingSubmitButton>
+          <div className={`${styles.fields} ${styles.areaFields}`}>
+            <label className={styles.field}>Tên khu vực<input name="name" placeholder="Tên khu vực, ví dụ Khu A" required /></label>
+            <PendingSubmitButton className={styles.submit} pendingLabel="Đang tạo...">Tạo khu vực</PendingSubmitButton>
           </div>
         </form>
 
-        <form className="rounded-lg border bg-white p-4 shadow-sm" action={createTableAction.bind(null, access.restaurant.slug)}>
+        <form className={styles.card} action={createTableAction.bind(null, access.restaurant.slug)}>
           <h2 className="flex items-center gap-2 text-base font-semibold"><Plus className="h-4 w-4" /> Tạo bàn</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-            <input className="h-10 rounded-md border px-3" name="name" placeholder="Tên bàn, ví dụ A01" required />
-            <select className="h-10 rounded-md border bg-white px-3" name="areaId" required>
+          <div className={`${styles.fields} ${styles.tableFields}`}>
+            <label className={styles.field}>Tên bàn<input name="name" placeholder="Tên bàn, ví dụ A01" required /></label>
+            <label className={styles.field}>Khu vực<select name="areaId" required>
               {areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
-            </select>
-            <PendingSubmitButton className="rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white" pendingLabel="Đang tạo...">Tạo bàn</PendingSubmitButton>
+            </select></label>
+            <PendingSubmitButton className={styles.submit} pendingLabel="Đang tạo...">Tạo bàn</PendingSubmitButton>
           </div>
         </form>
       </section>

@@ -213,10 +213,10 @@ export async function createTableAction(slug: string, formData: FormData) {
     });
     await audit(access.restaurant.id, access.user.id, "TABLE_CREATED", "RestaurantTable", table.id, { name: table.name });
     revalidatePath(path);
-    redirectWithMessage(path, "success", `Tạo bàn ${table.name} thành công.`);
   } catch {
     redirectWithMessage(path, "error", "Tên bàn đã tồn tại trong nhà hàng.");
   }
+  redirectWithMessage(path, "success", `Tạo bàn ${parsed.data.name} thành công.`);
 }
 
 export async function updateTableAction(slug: string, formData: FormData) {
