@@ -14,3 +14,9 @@ runtime
 host-metrics
 
 .trial-runtime
+
+# Temporary CI release inputs must never enter the application image.
+runtime-base
+release
+Dockerfile.ui-runtime
+runtime-*-layers.json

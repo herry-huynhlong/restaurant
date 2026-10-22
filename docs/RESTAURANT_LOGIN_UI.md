@@ -52,3 +52,7 @@ Không stage/xóa các file ảnh uploads/logos và thư mục qavio/ vốn chư
 ## Phê duyệt phát hành22/10/2026
 
 Chủ dự án trả lời “ok” sau yêu cầu xác nhận logo và đưa lên web. Đã xác nhận dùng icon PWA hiện có, được commit/push/CI/deploy phạm vi UI này. Phần chờ duyệt phía trên là lịch sử. Không cần hỏi lại quyền phát hành; phải kiểm dung lượng VPS trước tải/load và giữ rollback.
+
+### Đóng gói phù hợp dung lượng VPS
+
+Server kiểm tra ngày22/10 còn1.826.635.776byte trống; image hiện tại khoảng1.58GB. CI bổ sung tùy chọn dùng lại chính runtime của bản05ff9ad đã chạy, chỉ khi package/lock/config/schema/public giống hệt. CI vẫn build/kiểm bản mới trên Linux, giữ toàn bộ dependency/base layers cũ, thay build Next đã bỏ build cache và source/scripts; không thay runtime/auth/dependency. Workflow thường vẫn giữ đường build cũ nếu không chọn tùy chọn này. .dockerignore loại archive/metadata CI khỏi context. Cần kiểm prefix layer khớp image hiện tại và ngân sách disk trước khi load; không xóa image rollback để lấy chỗ.

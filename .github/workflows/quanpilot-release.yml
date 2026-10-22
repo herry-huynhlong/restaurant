@@ -6,8 +6,17 @@ on:
         description: Existing public web push application key
         required: false
         type: string
+      runtime_base_run:
+        description: Optional prior release run for UI-only runtime reuse
+        required: false
+        type: string
+      runtime_base_sha:
+        description: Exact prior source SHA with unchanged runtime dependencies
+        required: false
+        type: string
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: quanpilot-linux-release
   cancel-in-progress: false
@@ -17,6 +26,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -27,12 +38,46 @@ jobs:
           pnpm prisma:generate
           pnpm lint
           pnpm exec tsc --noEmit
+      - name: Download optional existing runtime
+        if: inputs.runtime_base_run != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: quanpilot-linux-release-${{ inputs.runtime_base_sha }}
+          path: runtime-base
+          run-id: ${{ inputs.runtime_base_run }}
+          github-token: ${{ github.token }}
       - name: Build Linux image outside production
         env:
           VAPID_PUBLIC_KEY: ${{ inputs.vapid_public_key }}
+          RUNTIME_BASE_SHA: ${{ inputs.runtime_base_sha }}
+          RUNTIME_BASE_RUN: ${{ inputs.runtime_base_run }}
         run: |
           TAG="${GITHUB_SHA::7}"
           docker build --build-arg NEXT_PUBLIC_VAPID_PUBLIC_KEY="$VAPID_PUBLIC_KEY" --label org.opencontainers.image.revision="$GITHUB_SHA" -t "quanpilot-app:$TAG" .
+          if [ -n "$RUNTIME_BASE_RUN" ]; then
+            [[ "$RUNTIME_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+            git diff --exit-code "$RUNTIME_BASE_SHA" HEAD -- package.json pnpm-lock.yaml pnpm-workspace.yaml Dockerfile next.config.mjs prisma public
+            (cd runtime-base && sha256sum -c SHA256SUMS)
+            test "$(jq -r '.[0].revision' runtime-base/images.json)" = "$RUNTIME_BASE_SHA"
+            docker load -i runtime-base/quanpilot-images.tar.gz
+            BASE="quanpilot-app:${RUNTIME_BASE_SHA::7}"
+            test "$(docker image inspect "$BASE" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')" = "$RUNTIME_BASE_SHA"
+            docker tag "quanpilot-app:$TAG" quanpilot-ui-build:current
+            cat > Dockerfile.ui-runtime <<'DOCKER'
+          FROM quanpilot-ui-build:current AS compiled
+          RUN rm -rf /app/.next/cache
+          FROM RUNTIME_BASE_PLACEHOLDER
+          RUN rm -rf /app/.next
+          COPY --from=compiled /app/.next /app/.next
+          COPY --from=compiled /app/src /app/src
+          COPY --from=compiled /app/scripts /app/scripts
+          DOCKER
+            sed -i "s|RUNTIME_BASE_PLACEHOLDER|$BASE|" Dockerfile.ui-runtime
+            docker build -f Dockerfile.ui-runtime --label org.opencontainers.image.revision="$GITHUB_SHA" -t "quanpilot-app:$TAG" .
+            docker image inspect "$BASE" --format '{{json .RootFS.Layers}}' > runtime-base-layers.json
+            docker image inspect "quanpilot-app:$TAG" --format '{{json .RootFS.Layers}}' > runtime-final-layers.json
+            node -e 'const fs=require("fs"),a=JSON.parse(fs.readFileSync("runtime-base-layers.json")),b=JSON.parse(fs.readFileSync("runtime-final-layers.json"));if(JSON.stringify(a)!==JSON.stringify(b.slice(0,a.length)))throw Error("Runtime base changed")'
+          fi
           mkdir -p release
           docker image inspect "quanpilot-app:$TAG" --format '{{json .}}' | jq -s '[.[]|{id:.Id,tags:.RepoTags,size:.Size,revision:.Config.Labels["org.opencontainers.image.revision"]}]' > release/images.json
           docker save "quanpilot-app:$TAG" | gzip -1 > release/quanpilot-images.tar.gz
