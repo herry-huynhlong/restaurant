@@ -1,6 +1,6 @@
 # Bảng giá QuánPilot và đồng bộ QAVIO
 
-Ngày kiểm thử: 22/10/2026. Trạng thái: hoàn thiện và kiểm thử local; **đã được chủ dự án duyệt phát hành** qua tin nhắn “oke lên đi” sau báo cáo local.
+Ngày phát hành: 22/10/2026. **Đã commit, push và deploy production cả QAVIO và QuánPilot**, theo phê duyệt “oke lên đi”.
 
 ## Nguồn giá và đồng bộ
 
@@ -8,7 +8,7 @@ Nguồn duy nhất là `Restaurant.PlatformPlanPrice`: `priceVnd` là tổng ti�
 
 Platform Owner và Platform Admin chỉnh tại `/platform/plans`. Platform Sub Admin và tài khoản nhà hàng không có quyền. Guard của Server Action giữ nguyên; service kiểm tra lại vai trò và tài khoản active. Transaction khóa sửa giá, ghi lịch sử before/after, actor và AuditLog cùng lúc. Mô tả nội bộ không đi ra API.
 
-`GET https://admin.qavio.site/api/public/pricing` (sau phát hành) chỉ đọc những kỳ active, published, giá dương. Response whitelist: plan/name/term/currency/final/monthly/original/discount/features/status/updatedAt, version SHA256, generatedAt/validUntil. Không seed DB; không trả id dòng giá, actor, khách hàng, subscription, ngân hàng, secret. POST/PUT/PATCH/DELETE trả 405. Không cần CORS vì QAVIO đọc từ server rồi proxy GET cùng origin `/api/public/pricing`.
+`GET https://admin.qavio.site/api/public/pricing` đang hoạt động, chỉ đọc những kỳ active, published, giá dương. Response whitelist: plan/name/term/currency/final/monthly/original/discount/features/status/updatedAt, version SHA256, generatedAt/validUntil. Không seed DB; không trả id dòng giá, actor, khách hàng, subscription, ngân hàng, secret. POST/PUT/PATCH/DELETE trả 405. Không cần CORS vì QAVIO đọc từ server rồi proxy GET cùng origin `/api/public/pricing`.
 
 QAVIO có cache RAM public 15 giây, fetch timeout 2,5 giây, client poll 15 giây và refresh khi trở lại tab. Mục tiêu cập nhật trong 35 giây khi tab foreground và nguồn hoạt động. Dữ liệu hết hạn sau 60 giây từ nguồn: timer phía client loại bỏ giá hết hạn; server không kéo dài validUntil khi lỗi. Cache còn hạn được dùng trong sự cố ngắn. Không còn giá tin cậy thì card chuyển sang “Liên hệ nhận báo giá”, trang vẫn HTTP 200. Proxy API trả 503 khi không còn dữ liệu hợp lệ.
 
@@ -22,7 +22,7 @@ Tiền lưu integer VND. Bình quân tháng dùng chia integer half-up, tương 
 
 Không sửa logic tạo subscription request/payment order, snapshot ngân hàng, thanh toán, entitlement hoặc PRO upgrade. Order cũ giữ số tiền/snapshot đã chốt; request/checkout mới dùng giá hiện tại. Trong khoảng cache truyền giá, khách vẫn xác nhận giá hiện hành trong QuánPilot; marketing không tạo checkout hoặc báo giá nâng cấp cá nhân.
 
-## Migration đề xuất
+## Migration đã triển khai
 
 `Restaurant/prisma/migrations/20261022090000_public_plan_pricing/migration.sql`:
 
@@ -31,7 +31,7 @@ Không sửa logic tạo subscription request/payment order, snapshot ngân hàn
 - CHECK giá gốc NULL hoặc lớn hơn giá bán dương.
 - Không UPDATE/DELETE dữ liệu cũ, không sửa giá, không đổi schema payment/subscription/nhà hàng.
 
-Đã chạy đủ 28 migration trên PostgreSQL `pricing_test` cô lập tại loopback 55432. Giá tạo bằng cơ chế hiện có giữ unpublished; đọc public không seed. **Chưa áp migration production.** Sau phát hành, chủ dự án tự duyệt/công bố các kỳ trong Platform Admin; migration không tự phê duyệt giá/giảm giá đang có. QAVIO không có migration.
+Đã chạy đủ 28 migration trên PostgreSQL `pricing_test` cô lập tại loopback 55432. Giá tạo bằng cơ chế hiện có giữ unpublished; đọc public không seed. **Đã áp migration production thành công: Restaurant 27 → 28, QAVIO giữ 5.** SQL có BEGIN/COMMIT; dry-run trên bản restore production cô lập đạt trước khi áp thật. Chủ dự án tự công bố các kỳ trong Platform Admin; migration không tự phê duyệt giá/giảm giá đang có. QAVIO không có migration.
 
 ## Giao diện
 
@@ -62,7 +62,7 @@ Không có file ảnh mẫu bảng giá được đính kèm ở yêu cầu này
 
 Restaurant: prisma/schema.prisma; migration SQL mới; src/lib/plan/pricing.ts; src/server/services/plan-pricing-service.ts; src/app/api/public/pricing/route.ts; platform/plans actions.ts và page.tsx; subscription-service.ts chỉ bổ sung tên actor trong dashboard; scripts/public-pricing-integration.ts; scripts/restaurant-login-integration.ts chỉ thêm cho phép DB pricing_test; tài liệu/ảnh.
 
-QAVIO: AGENTS.md cập nhật trạng thái chờ duyệt; .env.example; src/lib/site-config.ts chỉ metadata pricing; src/lib/pricing-contract.ts; src/server/pricing.ts; src/app/api/public/pricing/route.ts; src/components/pricing-table.tsx và module.css; src/app/(public)/pricing/page.tsx; scripts/pricing-cache-checks.ts và pricing-http-checks.mjs; tài liệu/ảnh.
+QAVIO: AGENTS.md cập nhật trạng thái phát hành; .env.example; src/lib/site-config.ts chỉ metadata pricing; src/lib/pricing-contract.ts; src/server/pricing.ts; src/app/api/public/pricing/route.ts; src/components/pricing-table.tsx và module.css; src/app/(public)/pricing/page.tsx; scripts/pricing-cache-checks.ts và pricing-http-checks.mjs; tài liệu/ảnh.
 
 Không sửa auth, NextAuth, mật khẩu, phân quyền tenant, QR, payment, trial, contact, email, flag production, Nginx hoặc dịch vụ khác. File Qavio.png root và upload/qavio untracked có sẵn không thuộc task, không stage.
 
@@ -76,7 +76,7 @@ Không sửa auth, NextAuth, mật khẩu, phân quyền tenant, QR, payment, tr
 6. Smoke HTTPS hai domain, health, GET pricing, cookie/auth, API405, SEO, trial/contact; xác nhận update/expiry và monitoring. Không tạo dữ liệu QA vào production.
 7. Rollback web về images hiện có trước task: QAVIO5f10868 và QuánPilot3574ce4. Giữ cột mới khi rollback; không drop cột/restore đè DB. Nếu quay lại Admin cũ, cần kiểm tra tương tác CHECK giá gốc trước chỉnh giá; ưu tiên bản sửa tiến thay vì gỡ ràng buộc tùy tiện. Nếu QAVIO cũ thì API mới không ảnh hưởng checkout.
 
-Không có commit/release SHA mới hoặc production smoke cho task này; chưa được phép báo đã lên web. Production vẫn phiên bản trước task. Dung lượng VPS không thay đổi bởi task local này.
+Đã hoàn tất quy trình trên. Bằng chứng production, nguồn image và dung lượng ghi ở phần kết quả bên dưới.
 
 ## Bàn giao local
 
@@ -84,4 +84,22 @@ Không có commit/release SHA mới hoặc production smoke cho task này; chưa
 
 ## Quyết định phát hành mới
 
-Chủ dự án đã duyệt commit/push/deploy cả hai repo và additive migration. Phát hành giữ bản gỡ newsletter đã lên production; không tự công bố giá hoặc thêm giảm giá. Rollback hiện tại QAVIO5f10868 (thay d590b1c ở kế hoạch trước), QuánPilot3574ce4. Chưa đánh dấu thành công production cho đến khi có bằng chứng triển khai bên dưới.
+Chủ dự án đã duyệt commit/push/deploy cả hai repo và additive migration. Phát hành giữ bản gỡ newsletter đã lên production; không tự công bố giá hoặc thêm giảm giá. Rollback hiện tại QAVIO5f10868 (thay d590b1c ở kế hoạch trước), QuánPilot3574ce4. Kết quả production đã được kiểm chứng bên dưới.
+
+
+## Kết quả production — 22/10/2026
+
+- Restaurant source `1edbfd9b1800cfa3dae4d6af7e7a9d99bc7ed2c1`, image `quanpilot-app:1edbfd9`; CI [39716133490](https://github.com/herry-huynhlong/restaurant/actions/runs/39716133490) SUCCESS. Full Linux build, không dùng runtime UI-only vì có schema đổi.
+- QAVIO source `cc06d0fef6994f46e7812cd5c33672c6e350152f`, image `qavio-web:cc06d0f`; CI [39716137026](https://github.com/herry-huynhlong/qavio/actions/runs/39716137026) SUCCESS. Lint, TypeScript, build và integration CI đạt.
+- Hai artifact được kiểm tra checksum, manifest/config digest, revision và rootfs layers trước deploy. Xem `pricing/image-integrity.json`.
+- Backup mới PostgreSQL + media/upload của hai dự án, mã hóa, tải off-host và restore cô lập PASS (QAVIO5/Restaurant27 migrations); migration dry-run trên backup Restaurant PASS. Cipher SHA256 `746d7dfaae087c9b852658ced68584ce20cb53f090da51b4e5265df9e6819d3e`. Backup mã hóa giữ ở thư mục riêng ngoài Git.
+- Production migration 28 PASS; fingerprint giá/lịch sử, payment snapshots, tenant và dữ liệu newsletter cũ không đổi. Không có giá nào tự công bố. Xem `pricing/production-migration.json`, `production-snapshots.json`.
+- HTTPS source API và QAVIO proxy đều200, cùng version và dữ liệu; POST/PUT/PATCH/DELETE405. Pricing200, Admin guard, login/CSRF/HTTPS đạt. Không sửa giá hoặc tạo khách/order QA trên production.
+- **Hiện có 0 kỳ giá được công bố.** Vì thế https://qavio.site/pricing hiện “Liên hệ nhận báo giá”. Vào https://admin.qavio.site/platform/plans → bật **Công bố trên QAVIO** cho các kỳ cần hiển thị → Lưu. Các lần sửa/công bố tiếp theo tự đồng bộ mục tiêu trong35giây khi nguồn hoạt động và tab foreground; không cần deploy lại. Các giá/ưu đãi trong ảnh QA không phải giá đã công bố.
+- Browser production desktop và mobile375: trang hiển thị đúng, không tràn ngang, không lỗi console/hydration được ghi nhận. Ảnh `pricing/production-desktop.jpg`, `production-mobile-375.jpg`. Tốc độ cập nhật số tiền/expiry đã kiểm thử trên QA cô lập; không công bố giá thử trên production.
+- Hồi quy newsletter:14trang/439liên kết, subscribe308, nhận mới/resend/confirm410, legacy token pages200/noindex, unsubscribe rỗng422, contact/demo rỗng422; guards/trial/login đạt. Bằng chứng `newsletter-removal/production-http.json`.
+- QAVIO web healthy; Restaurant app running và HTTP PASS (không cấu hình Docker healthcheck). Hai PostgreSQL và QAVIO worker healthy; maintenance worker/Portfolio running. Năm container không liên quan giữ nguyên ID/start/restart; env, mounts và flags nghiệp vụ không đổi. Xem `pricing/production-final.json`.
+- Disk trước73%/6.5G trống, sau79%/4.9G trống (5,247,184,896bytes). Chỉ bỏ archive của lần phát hành sau load; không prune image/volume, không build VPS.
+- Rollback: dùng cấu hình triển khai hiện có đặt lại image QAVIO`5f10868` và Restaurant`3574ce4`, recreate riêng web/app; hai image được giữ. Giữ migration additive, không drop cột hoặc restore đè DB. Kiểm tra CHECK giá gốc nếu chỉnh giá bằng Admin cũ; ưu tiên sửa tiến. Không động PG/worker/Portfolio.
+
+Các commit tài liệu sau source SHA ở trên chỉ bổ sung báo cáo/bằng chứng; không cần rebuild hoặc recreate container.
