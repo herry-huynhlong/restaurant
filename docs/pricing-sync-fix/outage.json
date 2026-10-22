@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-22T05:00:04.542Z",
+  "sourceIntentionallyStopped": true,
+  "api": 503,
+  "page": 200,
+  "expiredPricesRemoved": true,
+  "browserFallback": true,
+  "result": "PASS"
+}

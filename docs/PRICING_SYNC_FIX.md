@@ -57,6 +57,23 @@ Hai public API sau công bố trả đúng6giá và cùng version. Kỳ12 trên 
 
 QAVIO frontend không thay code: giữ imagecc06d0f, không cần recreate để đọc giá mới. Bản Admin QuánPilot chỉ thay phần hướng dẫn/status/feedback và tên actor hệ thống; triển khai riêng app qua CI ngoài VPS, image-only --no-build --pull never --no-deps. Không restart PostgreSQL/worker/Portfolio, không thay flags/env/auth/payment/OAuth.
 
-Source SHA, CI, image digest và kết quả deploy được bổ sung ở phần cuối sau xác minh. Hardening overlay chưa áp production; dùng quy trình image-only đang vận hành, kiểm source/artifact/config/rootfs và disk, giữ current image để rollback. Không giả định guard mới đã cài trên host.
+Source SHA, CI, image digest và kết quả deploy đã được xác minh ở phần cuối. Hardening overlay chưa áp production; dùng quy trình image-only đang vận hành, kiểm source/artifact/config/rootfs và disk, giữ current image để rollback. Không giả định guard mới đã cài trên host.
 
 Rollback app về image1edbfd9 nếu bản UI có lỗi; giữ publication đã được chủ duyệt (API cũ đã hỗ trợ). Không rollback schema hoặc restore đè DB. Gỡ công bố chỉ qua quyết định riêng của chủ dự án, không tự hoàn tác business approval vì lỗi UI.
+
+
+## Kết quả phát hành đã xác minh
+
+- Restaurant source **c889cc01f2238b1c487e45c37e4cdd39bc42d4db**, image `quanpilot-app:c889cc0`. [Build39725822661](https://github.com/herry-huynhlong/restaurant/actions/runs/39725822661) và [review39726237472](https://github.com/herry-huynhlong/restaurant/actions/runs/39726237472) đều SUCCESS; full Linux build, không UI-runtime reuse. Safety22ca, lint/typecheck, pricing/subscription/checkout integration trong CI PASS.
+- Docker image ID `sha256:bc1ac42910a8bef6cb68ffdf658794efd44338935bee087c705a89e4adac1f76`; config digest `sha256:31400e822d20f3deb50b4970cf21e771856eb111b0e172866e946062797bdec9`.
+- GitHub artifact ZIP digest `sha256:ab9f4b9eed31338d27ac84b26bb971db36dd30f80657a20305c031402ee613c2`; manifest SHA256 `268fc487d3eabe8d36e419081fa95cfb39c7957edb448135a8255f9a1c2a1292`; archive SHA256 `e0205c7d5298c3ed716b548cd50f035f706f9cc694cbce716ed7eb114715b532`.
+- CI review và VPS đều xác minh cùng manifest/source/config/rootfs; dự trù1,175,687,680bytes layer sau giải nén. Chỉ đo layer một lần trên VPS, trước load so lại archive/manifest bytes, sau load đối chiếu Config/RootFS/revision. ZIP và tar của lần release này được bỏ sau kiểm tra/load; backup mã hóa và rollback giữ nguyên.
+- QAVIO tiếp tục source/image `cc06d0fef6994f46e7812cd5c33672c6e350152f`, ID `sha256:0851dd9a343dc74a0b9011ed0b3f4a9a34f56a7676e1d3851c150b1badf41167`. Source app không sửa; chỉ thêm report/evidence vào repo, không tạo thêm image QAVIO trên VPS.
+- Deploy duy nhất Restaurant app bằng Compose JSON private từ runtime model hiện có: bỏ build, pin image ID, pull_policy never, up --no-build --pull never --no-deps app. Overlay runtime gốc chỉ cập nhật image tag; model khác giữ nguyên. Không tự áp logging/RAM/worker/PG hardening còn chờ duyệt.
+- App mới HTTP ready, image đúng ID, runtime env/mounts giữ nguyên (NODE_VERSION metadata phải khớp image và node --version). Sáu container khác giữ nguyên ID/start/restarts, gồm QAVIO, hai PG, workers và Portfolio. QAVIO/PG/worker health status từ Docker bình thường; Restaurant app chưa cấu hình Docker healthcheck, xác minh bằng HTTP.
+- Sau cutover: source và proxy HTTP200, cùng version và đủ6giá; POST/PUT/PATCH/DELETE405, Admin anonymous307, login/CSRF/HTTPS PASS. Không tạo khách/order QA production. Bằng chứng `production-http.json`, `production-deploy.json`, `production-publication.json` trong docs/pricing-sync-fix.
+- Browser production kiểm cả3/6/12 cho BASIC và PRO: tổng mỗi kỳ100.000đ; bình quân33.333/16.667/8.333đ. Không badge giảm. Desktop và mobile375 không overflow, không console/hydration error. Ảnh **production-desktop.jpg**, **production-mobile-375.jpg** và JSON **production-browser.json** chứa dữ liệu thật; ảnh qa-* chứa fixture riêng.
+- Trial registration regression22ca PASS trên restaurant_trial_test, gồm Google identity/nonce/audience, quota, idempotency, default TRAIN/BASIC và tenant guards. Không thử OAuth Google thật lại. QA Platform đã đăng xuất; tài khoản/nhà hàng/order QA đã dọn, giá preview chỉ trong pricing_test được đặt lại unpublished.
+- Disk trước deploy còn8.6GiB, sau khoảng7.4GiB, df68%; giữ rollback QAVIO5f10868 và Restaurant1edbfd9 (3574ce4 cũng chưa dọn). Không build/pull/prune/restart Engine hoặc reset/migrate DB.
+
+Kết luận vận hành: giá đã công bố sẽ tự theo thay đổi trong Platform Admin trong mục tiêu35s khi nguồn/tab hoạt động. Giá chưa công bố hoặc ngừng công bố không xuất hiện; nguồn lỗi không kéo dài tuổi dữ liệu. Các commit tài liệu sau c889cc0 chỉ ghi bằng chứng, không yêu cầu rebuild.

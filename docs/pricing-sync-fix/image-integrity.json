@@ -1,0 +1,45 @@
+{
+  "githubDigest": "sha256:ab9f4b9eed31338d27ac84b26bb971db36dd30f80657a20305c031402ee613c2",
+  "manifestSha256": "268fc487d3eabe8d36e419081fa95cfb39c7957edb448135a8255f9a1c2a1292",
+  "manifest": {
+    "format": 1,
+    "scope": "restaurant",
+    "sourceSha": "c889cc01f2238b1c487e45c37e4cdd39bc42d4db",
+    "image": "quanpilot-app:c889cc0",
+    "archive": "quanpilot-images.tar.gz",
+    "archiveBytes": 313286375,
+    "archiveSha256": "e0205c7d5298c3ed716b548cd50f035f706f9cc694cbce716ed7eb114715b532",
+    "imageBytes": 315154224,
+    "unpackedLayerBytes": 1175687680,
+    "configSha256": "31400e822d20f3deb50b4970cf21e771856eb111b0e172866e946062797bdec9",
+    "rootfs": {
+      "Type": "layers",
+      "Layers": [
+        "sha256:9b35de7893378218e365c34c2c735fb0032a859112fb7345ca8ea73f9aa1db70",
+        "sha256:73455f008d2c29b7bd012ed6034808c2eb31011ad5585202f9162c661bcfee9f",
+        "sha256:304cbc337ac002298f36802ea165638e0751e9d71f3065025df466bfac483932",
+        "sha256:0d441fd7f082d3ceb0aa923bbaf1c53fa09b6c5b3e4eeeb60a0980faa13b1a1a",
+        "sha256:a6a14a60a059ce70d9917ac911eb5ee06263ece91632613de6e562cfec9027d1",
+        "sha256:acd4e4ec5719bc52d2cf8c2ba8c620426d8cef376260dc2df805cc431ba675f1",
+        "sha256:adea50eced918ff0f4e05fb1edf61153cb00f32cf5774a30491b646e94c90c58",
+        "sha256:a14372ec76f0539e262f761a1ececed5be6e662034462a03fdf722be6fcd9dbd",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:abd5316dacada974525d1870274b0d0b00fd3cc0b7d34ac2c8592eb26167482d",
+        "sha256:1e666b422f54bca5dc8b3d2425a84dfd50cdc3274cb8f1116565bf5030da11ec",
+        "sha256:f3768779115cc4a73c82aef89d7bd772577602ae2c4eb1d9406394825cdaa85a",
+        "sha256:4fa6770182862d3fa3879caa2be006b3f6e1a20cc317d8ce0152bd726eeeb25d",
+        "sha256:287c054aa9ee64c1e5832439e4bf0bf5933931b2cd5d9f69c9c15fb105c2b3e4",
+        "sha256:44c0579633d5bb7f24f5d1a6b73fddd151a2b873926ec0729ed7b190e4029d7b",
+        "sha256:54c5eeb9e2241f2d92f9ba69f09c3ccf3aeb56faa8555a43b012eba7020223df",
+        "sha256:3f1bb4bcc3fe4aa13290d8901572805ab2b1a1e32aaac239101846b269f5f2c7",
+        "sha256:90861acfc0d728b6684326e2d682eba2c53a263fefc0a7da0a0eb5ca8bb619e8",
+        "sha256:eb47600063fb850e5206976083dea626d39287b5e1fa7b4986d40b3cb648362d",
+        "sha256:58aab55e63dfd5c35a9257118e61ab36a437248e31bcd5a656dac86118a1ace6",
+        "sha256:de2cc83aa56de0f34d860ebf2138d5da338496c28c1a401c4dd43c912cdfafe3",
+        "sha256:d48ac9386b8aa0f8f9622e71d87e2b53fe1e53d37879157d3ead9460a7498e43"
+      ]
+    },
+    "platform": "linux/amd64",
+    "unpackedBytes": 1175687680
+  }
+}

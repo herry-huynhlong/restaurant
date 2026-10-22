@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-22T05:04:44.732Z",
+  "terms": [
+    {
+      "months": 3,
+      "total": 100000,
+      "monthly": "33.333đ"
+    },
+    {
+      "months": 6,
+      "total": 100000,
+      "monthly": "16.667đ"
+    },
+    {
+      "months": 12,
+      "total": 100000,
+      "monthly": "8.333đ"
+    }
+  ],
+  "realData": true,
+  "noDiscount": true
+}

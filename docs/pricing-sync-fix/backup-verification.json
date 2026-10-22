@@ -1,0 +1,15 @@
+{
+  "encryptedSha256": "db411f50577ef321a8cc3d87bbc584a4efef114e942ecd86a2341a71e2bf867a",
+  "databases": {
+    "qavio": {
+      "migrations": 5,
+      "restore": "PASS"
+    },
+    "restaurant": {
+      "migrations": 28,
+      "restore": "PASS"
+    }
+  },
+  "offHost": true,
+  "result": "PASS"
+}

@@ -1,0 +1,17 @@
+{
+  "source": "c889cc01f2238b1c487e45c37e4cdd39bc42d4db",
+  "image": {
+    "ref": "quanpilot-app:c889cc0",
+    "id": "sha256:bc1ac42910a8bef6cb68ffdf658794efd44338935bee087c705a89e4adac1f76",
+    "revision": "c889cc01f2238b1c487e45c37e4cdd39bc42d4db",
+    "configDigest": "sha256:31400e822d20f3deb50b4970cf21e771856eb111b0e172866e946062797bdec9"
+  },
+  "applicationEnvAndMountsUnchanged": true,
+  "sixOtherContainersUnchanged": true,
+  "imageOnly": true,
+  "noBuildOrPull": true,
+  "noMigration": true,
+  "https": "PASS",
+  "freeBytes": 7936110592,
+  "result": "PASS"
+}
