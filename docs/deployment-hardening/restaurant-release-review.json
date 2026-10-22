@@ -1,0 +1,12 @@
+{
+  "sourceSha": "49c94dc40f8e3ddb7552ae83f3a8b4728c4cd481",
+  "scope": "restaurant",
+  "runId": 39722010546,
+  "runUrl": "https://github.com/herry-huynhlong/restaurant/actions/runs/39722010546",
+  "manifestSha256": "06e8156b5de707eff4604c527c4487649291137d0092510facaaa06c8f24cbc2",
+  "artifactDigest": "sha256:325a990d43ffcdaa59fcac03c10b06d4fa58d91020cee07ae4891b0c41b8a17c",
+  "approvalRequired": "49c94dc40f8e3ddb7552ae83f3a8b4728c4cd481:06e8156b5de707eff4604c527c4487649291137d0092510facaaa06c8f24cbc2",
+  "archiveBytes": 313272476,
+  "imageBytes": 315143062,
+  "deploymentPerformed": false
+}

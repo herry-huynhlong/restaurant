@@ -1,6 +1,6 @@
 # QAVIO & QuánPilot — bảo vệ quy trình phát hành
 
-Ngày: **22/10/2026 (Asia/Bangkok)**. Trạng thái: **đã chuẩn bị và kiểm thử local; chưa áp dụng production**. Chưa commit/push hoặc chạy workflow mới. Lượt này chỉ đọc VPS qua SSH, render cấu hình bằng stdin, đo tài nguyên và GET health; không ghi cấu hình, load/build/pull image, recreate, cleanup hoặc migration trên VPS.
+Ngày: **22/10/2026 (Asia/Bangkok)**. **Đã được duyệt push và dọn tài nguyên VPS** sau báo cáo local. Source tooling/workflows đã push; cấu hình image-only/logging/RAM chưa áp production. Audit ban đầu chỉ đọc; đợt dọn tiếp theo đã xóa đúng image/archive được kiểm kê, kết quả ở phần11. Không deploy/recreate/build/pull, migration hoặc đổi dữ liệu production.
 
 ## 1. Trước / sau
 
@@ -104,7 +104,7 @@ Không có cờ xác nhận thì không gọi rm. Sau người có thẩm quyề
 - So lại ref/ID/containers/rollback trước mỗi lần rm; Docker rm theo tag cụ thể, không force, không prune. Shared layers do Docker quản lý; không cộng Size để hứa dung lượng thu hồi.
 - Deploy và cleanup dùng chung flock `/run/lock/qavio-release.lock`; không chạy Docker thủ công song song. Lock không ngăn người root dùng công cụ khác.
 
-Audit dry-run tìm5image ứng viên: quanpilot-app05ff9ad/be133f2 và qavio-web7ebeb22/d590b1c/898451b. **Chưa xóa image nào.** Danh sách sẽ cần lập lại khi xin duyệt, vì container/tag có thể thay đổi. Rollback giữ QAVIO5f10868/QuánPilot3574ce4; sản xuất cc06d0f/1edbfd9.
+Audit dry-run ban đầu tìm5image ứng viên: quanpilot-app05ff9ad/be133f2 và qavio-web7ebeb22/d590b1c/898451b. **Đã lập lại plan và dọn5image theo yêu cầu tiếp theo của chủ dự án; xem phần11.** Các lần dọn tiếp cần lập plan mới, vì container/tag có thể thay đổi. Rollback giữ QAVIO5f10868/QuánPilot3574ce4; sản xuất cc06d0f/1edbfd9.
 
 ## 7. CI và CD có kiểm soát
 
@@ -112,7 +112,7 @@ Không có push trigger, SSH credential, self-hosted runner hoặc production se
 
 1. Owner/operator chạy build workflow bằng workflow_dispatch trên main.
 2. GitHub ubuntu-latest: offline safety tests, lint, TypeScript, integration trên PG test; Docker build toàn app. QAVIO có TypeScript check sau build; QuánPilot giữ check hiện có. QAVIO worker/QuánPilot worker không bị thay image bởi release web.
-3. Build tạo archive, images.json, release-manifest.json và SHA256SUMS. Manifest gồm SHA40, scope, image tag, Linux/amd64, config hash/rootfs, byte sizes. Package chỉ cho phép4file payload, chặn file thừa như .env. Shell build có pipefail; đóng gói lỗi phải làm workflow fail.
+3. Build tạo archive, images.json, release-manifest.json và SHA256SUMS. Manifest gồm SHA40, scope, image tag, Linux/amd64, config hash/rootfs, byte sizes và tổng layer sau giải nén. Docker/containerd có thể báo Size nén: guard đo streaming gzip từng layer, không đoán tỷ lệ nở; gặp Zstandard chưa có decoder thì dừng an toàn. Package chỉ cho phép4file payload, chặn file thừa như .env. Shell build có pipefail; đóng gói lỗi phải làm workflow fail.
 4. Upload artifact giữ7ngày. Summary ghi SHA40 và manifest SHA256. Không có production env/private snapshot trong artifact.
 5. Chạy workflow **Review built release** với build_run_id + source_sha. Nó kiểm đúng repository/workflow, eventmanual, main, run success, SHA và artifact name/digest từ GitHub; tải signed URL không gửi GitHub token sang host download, chỉ giải nén4tên file cho phép. Verify lại archive/config/platform rồi xuất review JSON. **Không SSH/deploy**.
 6. Chủ dự án duyệt source SHA, manifest digest, phạm vi service và plan. Approval token kỹ thuật không thay thế quyền duyệt của người dùng.
@@ -148,19 +148,19 @@ Khi thực thi mới thêm `--snapshot-dir /opt/websites/qavio/.runtime/release-
 - Lint và TypeScript hai repo PASS. Không đổi app source/schema nên không tạo test nghiệp vụ phản chiếu implementation.
 - Audit Linux qua SSH **chỉ đọc**: truyền overlay qua stdin cho docker compose config, không ghi config mới. Cả hai model noBuild/pullNever/logBounded/runtimePreserved PASS với runtime overlay thật. Inventory và cleanup_plan dry-run dùng code mới ở bộ nhớ, không cài lên VPS. Bằng chứng `deployment-hardening/read-only-audit.json`.
 - 7container giữ nguyên ID/start/restarts, origin ready và bốn HTTPS routes200. Node fetch từ máy local cũng200. Lần đầu probe Python urllib bị403 từ phía public; đã đổi sang TLS-verified curl chuẩn runbook, kiểm lại thành công, không thay Cloudflare.
-- Không load image/recreate thật bằng guard mới. Docker Engine local đang tắt; không khởi động Engine dùng chung. Bản workflow mới chưa push/chạy GitHub, vì vậy **chưa chứng minh end-to-end Linux build/release mới**. Cần chạy CI/review và rehearsal cô lập trước apply production. 22test không thay thế bài capacity/concurrent load hoặc thử ngắt nguồn thật.
+- Không load image/recreate thật bằng guard mới. Docker Engine local đang tắt; không khởi động Engine dùng chung. Build/review GitHub của bản tooling ban đầu đã PASS; bản tính layer sau giải nén cũng được push và kiểm tra lại. Kết quả source/run cuối ghi ở phần11. Chưa có cutover thật bằng guard mới; cần rehearsal cô lập trước apply production. 22test không thay thế bài capacity/concurrent load hoặc thử ngắt nguồn thật.
 - Đây là báo cáo local chuẩn bị, không tuyên bố đã áp rotation/limits hay CD mới vào production.
 
 ## 9. Ảnh hưởng và các quyết định còn chờ
 
-Không migration/reset/DB write, không thay subscription/payment/OAuth/trial/Admin/CMS/contact/pricing, secret/quyền/DNS/Nginx, Docker Engine hoặc Portfolio. Không xóa image/log/archive/backup/volume. Không thay tài khoản và dữ liệu Restaurant.
+Không migration/reset/DB write, không thay subscription/payment/OAuth/trial/Admin/CMS/contact/pricing, secret/quyền/DNS/Nginx, Docker Engine hoặc Portfolio. Ở đợt audit ban đầu không xóa gì. Đợt dọn được duyệt sau đó chỉ xóa5image và11archive Docker ở phần11; log/backup/volume/dữ liệu khách giữ nguyên. Không thay tài khoản và dữ liệu Restaurant.
 
 Cần chủ dự án quyết định trước bước tiếp theo:
 
-1. Duyệt commit/push tooling/workflows, chạy CI và rehearsal; sau kết quả đạt mới duyệt áp image-only deploy/log rotation cho web/app.
+1. Commit/push và CI đã được duyệt thực hiện; vẫn cần rehearsal và duyệt áp image-only deploy/log rotation cho web/app. Không suy diễn quyền dọn thành quyền recreate.
 2. Chọn khung bảo trì cho recreate worker/PG để rotation có hiệu lực; giữ volumes, backup và kiểm readiness. Không gộp restart PG vào deploy web.
 3. Duyệt sizing/nâng VPS và rehearsal trước áp RAM limits; không áp các cap đề xuất trên host1GB hiện tại.
-4. Nếu muốn dọn5image ứng viên, duyệt riêng **plan mới lập lại**. Không suy diễn duyệt tooling là duyệt xóa.
+4. Đã dọn5image theo phê duyệt trực tiếp tiếp theo. Mọi lần dọn khác cần plan và xác nhận phạm vi mới; không bật xóa tự động.
 5. Nếu muốn GitHub Environment, xác nhận người duyệt và quyền; nếu muốn monitor định kỳ, xác nhận cơ chế nhận cảnh báo. Chưa cấu hình hai mục này.
 
 ## 10. Rollback
@@ -176,3 +176,28 @@ docker compose --project-directory /opt/websites/qavio -p qavio \
 ```
 
 QuánPilot tương tự project restaurant, .trial-runtime và service app. Không down, down-v, prune, drop cột hay restore đè DB. Worker/PG logging nếu được duyệt triển khai sau cần snapshot riêng và khung bảo trì rollback riêng. Các base/dev Compose vẫn giữ nguyên để phục hồi cấu hình trước hardening; không quay về dùng build trên VPS.
+
+
+## 11. Push và dọn VPS theo phê duyệt tiếp theo — 22/10/2026
+
+Chủ dự án yêu cầu “oke push, sau đó check trên sever ... logs cache dự phòng ... xóa bớt”. Đây là phê duyệt riêng cho push/CI và dọn tài nguyên đã xác định không cần; chưa bao gồm áp config/recreate production.
+
+- Hardening ban đầu: QAVIO`a314019`, Restaurant`49c94dc`. Build Linux GitHub39722007600/39722010546 và review39722333362/39722440818 đều SUCCESS. Không SSH hoặc deploy từ workflows.
+- Đã bổ sung dự trù đúng layer OCI sau giải nén: QAVIO`3c30c53`, Restaurant`db1f6da`; kết quả build/review cuối cập nhật bên dưới. 22test/repo vẫn PASS, có fixture nén>100lần để chứng minh không dùng kích thước nén làm dung lượng cần load.
+- Dọn bằng plan mới, so container/image/mount/env hashes và12volumes trước/sau. Giữ QAVIOcc06d0f, QuánPilot1edbfd9 và rollback5f10868/3574ce4; giữ toàn bộ image container tham chiếu, worker/runtime/Portfolio/PostgreSQL.
+- Đã xóa đúng5image: quanpilot-app05ff9ad/be133f2, qavio-web7ebeb22/d590b1c/898451b. Các quy định giữ những tag này trong báo cáo lịch sử được thay bằng phê duyệt cleanup hiện tại. Không force/prune.
+- Đã xóa11file staging ở7đợt release cũ, tổng1,886,980,315bytes. Đây là10Docker image tar.gz và1ZIP trùng payload, **không phải DB backup**. Kiểm SHA256 với SHA256SUMS, metadata image, ZIP chỉ chứa payload release, path chính xác không symlink/mount và không tiến trình nào mở file; không xóa thư mục hoặc file khác.
+- Thu hồi tổng3,949,465,600bytes (~3.68GiB), gồm shared-layer image thực tế và archive. Free5,246,750,720→9,196,216,320bytes (~4.89→8.56GiB). df -h trước79%, sau63%, còn8.6G. Docker Images17→12, logical size13.04→10.98GB; không cộng image Size để hứa dung lượng thu hồi. QAVIO .runtime1.8G→34M, vẫn giữ metadata/backup/chứng cứ cần thiết.
+- Build cache0B, apt archives16KiB; không có cache build lớn cần dọn. Logs tổng khoảng241MiB, journal199MiB; giữ để chẩn đoán, không truncate/xóa Docker log hoặc mất lịch sử để đổi lấy lượng nhỏ. Bản logging mới vẫn cần recreate được duyệt.
+- Giữ12volumes;7container không đổi ID/image/start/restarts/mounts/env hash; PostgreSQL, upload/media, payment/subscription, OAuth/trial/CMS/contact/pricing và backup không bị thay/xóa. Bốn HTTPS checks PASS. Không restart engine hoặc service.
+- Còn4.407GB Docker “reclaimable” không được coi là rác: có rollback/worker/tool images ngoài whitelist. Không dọn tiếp chỉ vì Docker báo reclaimable.
+- Bằng chứng chính xác: `deployment-hardening/cleanup-20261022.json`; private plan/checksum trên VPS `.runtime/hardening-cleanup-20261022`. Script guard copy vào thư mục này chỉ phục vụ cleanup, không thay cấu hình deploy đang chạy.
+- Nếu cần phục hồi bản cũ hơn hai rollback đang giữ, phải lấy lại image từ nguồn build/off-host được kiểm chứng; không dựa vào những tag/archive vừa xóa. Hai rollback bắt buộc vẫn có sẵn trên VPS.
+
+
+### Kết quả CI cuối sau sửa dung lượng layer
+
+- QAVIO source `3c30c53d65b32be7cebd6318d99aab8de0d02087`: [build39722661715](https://github.com/herry-huynhlong/qavio/actions/runs/39722661715) SUCCESS, [review39722916957](https://github.com/herry-huynhlong/qavio/actions/runs/39722916957) SUCCESS. Archive132,613,359bytes; layer/size budget374,820,864bytes (không dùng133MB nén để dự trù load). Xem `deployment-hardening/qavio-release-review-final.json`.
+- QuánPilot source `db1f6dac2b4057c0fc6d84645ed56971096e6165`: [build39722664876](https://github.com/herry-huynhlong/restaurant/actions/runs/39722664876) SUCCESS; full build, không dùng nhánh UI runtime reuse. [Review39723092797](https://github.com/herry-huynhlong/restaurant/actions/runs/39723092797) SUCCESS, artifact checksum/source/manifest và layer budget đã xác minh. Archive313,249,635bytes, image budget1,175,590,912bytes; xem `deployment-hardening/restaurant-release-review-final.json`.
+- Cả hai CI chạy safety tests22ca/repo, lint/typecheck, integration PG cô lập và Docker build trên ubuntu-latest. Artifact mới có manifest/checksum đã pin SHA; workflow review không dùng SSH/secret production. Không load các image này lên VPS, không recreate hoặc áp config mới.
+- Những commit docs/evidence sau source SHA này không đổi runtime, không cần rebuild. CI của source không được diễn giải là đã deploy hardening trên production.

@@ -1,0 +1,97 @@
+{
+  "freeBeforeBytes": 5246750720,
+  "freeAfterBytes": 9196216320,
+  "recoveredBytes": 3949465600,
+  "usedPercentAfter": 64.77,
+  "deletedImages": [
+    {
+      "id": "sha256:0868af04b00ac881a564a8486ca58f8c12fd657d5f2ac9b6af6e2ddb2e3f3322",
+      "tags": [
+        "quanpilot-app:05ff9ad"
+      ],
+      "sizeBytes": 1579093072
+    },
+    {
+      "id": "sha256:2ec140498bbcf3d25ca182cf44f07728d1bfb9c4c9fd922b7b7986150f108134",
+      "tags": [
+        "quanpilot-app:be133f2"
+      ],
+      "sizeBytes": 1578659986
+    },
+    {
+      "id": "sha256:415d58a74b2a387150eb924e6121e34bf93180c4bf9fcfab9eb9b2c7044bae08",
+      "tags": [
+        "qavio-web:7ebeb22"
+      ],
+      "sizeBytes": 527598902
+    },
+    {
+      "id": "sha256:8fb2f2b7a45e47ae403635f7fc9836805c16edd23504a9c59b745fed499b7e39",
+      "tags": [
+        "qavio-web:d590b1c"
+      ],
+      "sizeBytes": 527924802
+    },
+    {
+      "id": "sha256:95debf731c78af991ff7cd2b1c5cb9aae8d50f3b55fd95a5b0b5e622f5f45769",
+      "tags": [
+        "qavio-web:898451b"
+      ],
+      "sizeBytes": 527856707
+    }
+  ],
+  "deletedReleaseArchives": [
+    {
+      "relative": "contact-admin-final-release/image/qavio-images.tar.gz",
+      "bytes": 146543642
+    },
+    {
+      "relative": "contact-production-release/image/qavio-images.tar.gz",
+      "bytes": 146586673
+    },
+    {
+      "relative": "contact-ux-release/image/qavio-images.tar.gz",
+      "bytes": 146510038
+    },
+    {
+      "relative": "oauth-live-release-20261021/restaurant/image/quanpilot-images.tar.gz",
+      "bytes": 312988956
+    },
+    {
+      "relative": "oauth-live-release-20261021/qavio/image/qavio-images.tar.gz",
+      "bytes": 131489554
+    },
+    {
+      "relative": "domain-qavio-site/qavio-final/image/qavio-images.tar.gz",
+      "bytes": 131487965
+    },
+    {
+      "relative": "domain-qavio-site/qavio/image/qavio-images.tar.gz",
+      "bytes": 131480948
+    },
+    {
+      "relative": "consultation-live-release/image/qavio-images.tar.gz",
+      "bytes": 146557546
+    },
+    {
+      "relative": "consultation-live-release/image/release.zip",
+      "bytes": 146558236
+    },
+    {
+      "relative": "trial-release-20261021/restaurant/image/quanpilot-images.tar.gz",
+      "bytes": 315280264
+    },
+    {
+      "relative": "trial-release-20261021/qavio/image/qavio-images.tar.gz",
+      "bytes": 131496493
+    }
+  ],
+  "keptRollback": [
+    "qavio-web:5f10868",
+    "quanpilot-app:3574ce4"
+  ],
+  "containersEnvironmentMountsVolumesUnchanged": true,
+  "databaseMediaBackupsLogsUntouched": true,
+  "https": "PASS",
+  "result": "PASS"
+}

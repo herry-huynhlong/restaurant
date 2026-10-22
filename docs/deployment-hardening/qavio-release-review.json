@@ -1,0 +1,12 @@
+{
+  "sourceSha": "a314019fbc0d4b2410e33f96c00357aab1514585",
+  "scope": "qavio",
+  "runId": 39722007600,
+  "runUrl": "https://github.com/herry-huynhlong/qavio/actions/runs/39722007600",
+  "manifestSha256": "39ebcfd3159d4c3fa97af7527a7036f356b982077c3b079da94ff1ac88f4111d",
+  "artifactDigest": "sha256:56f3bcacc7353b8e6b926f1c0b292dabafe42f09bb328948f7ee755ec91a58a7",
+  "approvalRequired": "a314019fbc0d4b2410e33f96c00357aab1514585:39ebcfd3159d4c3fa97af7527a7036f356b982077c3b079da94ff1ac88f4111d",
+  "archiveBytes": 132614635,
+  "imageBytes": 133235861,
+  "deploymentPerformed": false
+}
