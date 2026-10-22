@@ -29,7 +29,7 @@ async function main(){
  const a=await prisma.restaurant.create({data:{name:'Login QA A',slug:prefix+'-a',plan:'TRAIN',planEntitlement:'BASIC',subscriptionEnd:new Date(Date.now()+86400000)}});
  const b=await prisma.restaurant.create({data:{name:'Login QA B',slug:prefix+'-b',plan:'TRAIN',planEntitlement:'BASIC',subscriptionEnd:new Date(Date.now()+86400000)}});
  await prisma.restaurantUser.create({data:{userId:user.id,restaurantId:a.id,role:'OWNER'}});
- assert.match(await (await request('/restaurant-login')).text(),/Đăng nhập nhà hàng/);
+ assert.match(await (await request('/restaurant-login')).text(),/Chào mừng trở lại/);
  assert.equal((await request('/restaurant-entry')).headers.get('location'),'/restaurant-login');
  assert.equal(await getPostLoginPath(user.id,'PLATFORM_ADMIN'),'/platform');
  assert.equal(await getRestaurantPostLoginPath(user.id),`/${a.slug}/admin`);
@@ -54,7 +54,7 @@ async function main(){
  assert.equal((await request('/restaurant-entry')).headers.get('location'),'/restaurant-login');
  jar.clear();
  jar.set('next-auth.session-token',await encode({token:{id:user.id,platformRole:'USER',exp:1},secret:process.env.NEXTAUTH_SECRET!,maxAge:-60}));
- assert.match(await (await request('/restaurant-login')).text(),/Đăng nhập nhà hàng/);
+ assert.match(await (await request('/restaurant-login')).text(),/Chào mừng trở lại/);
  jar.clear();jar.set('qavio_trial_verification','not-a-login-session');
  assert.equal((await request('/restaurant-entry')).headers.get('location'),'/restaurant-login');
  jar.clear();await login(user.email,password);
@@ -62,7 +62,7 @@ async function main(){
  assert.deepEqual(await snapshot(),before);
  await prisma.user.update({where:{id:user.id},data:{isActive:false}});
  assert.equal(await getRestaurantPostLoginPath(user.id),'/restaurant-login');
- assert.match(await (await request('/restaurant-login')).text(),/Đăng nhập nhà hàng/);
+ assert.match(await (await request('/restaurant-login')).text(),/Chào mừng trở lại/);
  console.log('PASS: anonymous, wrong/correct credentials, session resume, tenant isolation, platform separation, multi restaurant, logout/relogin, expired session, verification-cookie separation, no trial/subscription writes');
 }
 main().catch(()=>{console.error('RESTAURANT_LOGIN_INTEGRATION_FAILED');process.exitCode=1;}).finally(async()=>{

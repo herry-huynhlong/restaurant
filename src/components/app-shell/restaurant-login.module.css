@@ -1,0 +1,34 @@
+.page { min-height:100svh; display:grid; place-items:center; padding:32px; background:radial-gradient(ellipse at 12% 12%,#dff3ef,transparent 55%),#f3f7f7; color:#132c30; }
+.card { width:100%; max-width:1120px; min-height:650px; display:grid; grid-template-columns:1fr 1.05fr; overflow:hidden; border:1px solid #dce8e6; border-radius:28px; background:#fff; box-shadow:0 24px 70px #073e3812; }
+.brand { display:flex; flex-direction:column; gap:60px; padding:52px 46px 38px; background:radial-gradient(ellipse at 0 0,#16877b,transparent 70%),linear-gradient(145deg,#075e55,#064940); color:#fff; }
+.identity { display:flex; align-items:center; gap:20px; }
+.logo { width:96px; height:96px; flex-shrink:0; object-fit:contain; border-radius:24px; }
+.brandName { margin:0; font-size:36px; line-height:1.2; font-weight:750; letter-spacing:-1px; }
+.tagline { margin:8px 0 0; color:#d1eee8; font-size:14px; line-height:1.6; }
+.introduction { margin:auto 0; }
+.introduction h2 { max-width:350px; margin:0; font-size:40px; font-weight:650; line-height:1.22; letter-spacing:-1.2px; text-wrap:balance; }
+.introduction p { max-width:365px; margin:24px 0 0; color:#d1eee8; font-size:16px; line-height:1.85; }
+.signature { margin:0; color:#b4d8d0; font-size:13px; letter-spacing:.15px; }
+.signature strong { color:#eef9f6; font-size:12px; letter-spacing:1.5px; margin-left:3px; }
+.formPanel { display:flex; align-items:center; padding:64px 54px; min-width:0; }
+.formContent { width:100%; max-width:410px; margin:auto; }
+.formContent h1 { margin:0; font-size:32px; font-weight:700; line-height:1.3; letter-spacing:-.8px; }
+.formIntro { margin:12px 0 36px; color:#637777; font-size:15px; line-height:1.6; }
+.form { display:flex; flex-direction:column; gap:22px; }
+.label { display:block; font-size:14px; font-weight:600; line-height:1.5; color:#294444; }
+.input,.passwordInput { display:block; margin-top:9px; width:100%; min-width:0; height:52px; border:1px solid #cbdad7; border-radius:10px; padding:0 15px; background:#fff; color:#183b38; font-size:16px; outline:none; transition:border-color .15s,box-shadow .15s; }
+.input:focus,.passwordInput:focus { border-color:#0f766e; box-shadow:0 0 0 3px #0f766e20; }
+.passwordField { position:relative; }
+.passwordInput { padding-right:56px; }
+.passwordToggle { position:absolute; right:4px; top:4px; display:grid; place-items:center; width:44px; height:44px; border-radius:7px; color:#526f69; background:transparent; }
+.passwordToggle:hover { background:#edf6f3; }
+.passwordToggle:focus-visible,.submit:focus-visible,.trial a:focus-visible { outline:3px solid #0f766e; outline-offset:3px; }
+.submit { min-height:52px; width:100%; border-radius:10px; background:#0f766e; color:#fff; font-size:15px; font-weight:650; box-shadow:0 5px 12px #0f766e18; transition:background .15s; }
+.submit:hover { background:#095e57; }
+.submit:disabled { cursor:wait; opacity:.65; }
+.error { margin:0; padding:12px; border:1px solid #fecaca; border-radius:8px; background:#fff1f2; color:#9f1239; font-size:14px; line-height:1.5; }
+.trial { margin:30px 0 0; text-align:center; font-size:14px; line-height:1.8; color:#637777; }
+.trial a { display:inline-block; color:#0b6c61; font-weight:650; text-decoration:underline; text-underline-offset:4px; }
+@media(max-width:1000px) { .brand{padding:40px 30px;gap:40px}.identity{gap:14px}.logo{width:76px;height:76px;border-radius:20px}.brandName{font-size:30px}.introduction h2{font-size:34px}.formPanel{padding:44px 32px}.formContent h1{font-size:28px} }
+@media(max-width:700px) { .page{padding:16px;align-items:start}.card{grid-template-columns:1fr;min-height:0;border-radius:22px}.brand{padding:26px 26px 22px;gap:18px}.identity{gap:14px}.logo{width:60px;height:60px;border-radius:16px}.brandName{font-size:28px}.tagline{margin-top:4px;font-size:13px}.introduction{margin:0}.introduction h2{max-width:none;font-size:24px;letter-spacing:-.5px;line-height:1.3}.introduction p{margin-top:10px;max-width:none;font-size:14px;line-height:1.65}.signature{font-size:11px}.signature strong{font-size:10px}.formPanel{padding:30px 26px}.formContent h1{font-size:26px}.formIntro{margin:8px 0 26px;font-size:14px}.form{gap:18px}.trial{margin-top:24px} }
+@media(max-width:360px) { .page{padding:10px}.brand{padding:22px 20px 18px;gap:14px}.logo{width:52px;height:52px}.brandName{font-size:25px}.tagline{font-size:12px}.introduction h2{font-size:21px}.introduction p{font-size:13px;line-height:1.55;margin-top:8px}.formPanel{padding:26px 20px}.formContent h1{font-size:23px}.trial{font-size:13px}.formIntro{margin-bottom:22px} }

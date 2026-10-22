@@ -1,0 +1,20 @@
+{
+  "passwordToggle": {
+    "pressed": "true",
+    "trialLink": "https://qavio.site/trial",
+    "visible": true,
+    "hiddenAgain": true
+  },
+  "emailValidation": {
+    "invalidEmailRejected": true,
+    "requiredEmail": true,
+    "requiredPassword": true,
+    "submitType": "submit"
+  },
+  "wrongPasswordRejected": true,
+  "correctTenant": true,
+  "existingSessionResumed": true,
+  "loggedOut": true,
+  "qaFixtureRemoved": true,
+  "consoleWarningsAndErrors": []
+}

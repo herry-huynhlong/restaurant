@@ -2,9 +2,13 @@
 
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import styles from "./restaurant-login.module.css";
+import { useId, useState } from "react";
 
-export function LoginForm({ destination }: { destination?: string }) {
+export function LoginForm({ destination, restaurantStyle = false }: { destination?: string; restaurantStyle?: boolean }) {
+  const passwordId = useId();
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -39,30 +43,27 @@ export function LoginForm({ destination }: { destination?: string }) {
   }
 
   return (
-    <form className="space-y-4" onSubmit={onSubmit}>
-      <label className="block text-sm font-medium">
+    <form className={restaurantStyle ? styles.form : "space-y-4"} onSubmit={onSubmit}>
+      <label className={restaurantStyle ? styles.label : "block text-sm font-medium"}>
         Email
         <input
-          className="mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"
+          className={restaurantStyle ? styles.input : "mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"}
           name="email"
           type="email"
           autoComplete="email"
           required
         />
       </label>
-      <label className="block text-sm font-medium">
-        Mật khẩu
-        <input
-          className="mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-        />
-      </label>
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      <div>
+        <label className={restaurantStyle ? styles.label : "block text-sm font-medium"} htmlFor={passwordId}>Mật khẩu</label>
+        <div className={restaurantStyle ? styles.passwordField : undefined}>
+          <input id={passwordId} className={restaurantStyle ? styles.passwordInput : "mt-1 h-11 w-full rounded-md border px-3 outline-none focus:border-teal-600"} name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required />
+          {restaurantStyle && <button type="button" className={styles.passwordToggle} aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}>{showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button>}
+        </div>
+      </div>
+      {error ? <p role="alert" className={restaurantStyle ? styles.error : "text-sm text-red-600"}>{error}</p> : null}
       <button
-        className="h-11 w-full rounded-md bg-teal-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        className={restaurantStyle ? styles.submit : "h-11 w-full rounded-md bg-teal-700 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"}
         type="submit"
         disabled={isSubmitting}
       >

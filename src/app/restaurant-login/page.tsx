@@ -1,3 +1,5 @@
+import Image from "next/image";
+import styles from "@/components/app-shell/restaurant-login.module.css";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/app-shell/login-form";
@@ -12,12 +14,27 @@ export default async function RestaurantAccountLoginPage() {
     const path = await getRestaurantPostLoginPath(session.user.id);
     if(path !== "/restaurant-login") redirect(path);
   }
-  return <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
-    <section className="w-full max-w-sm rounded-lg border bg-white p-6 shadow-sm">
-      <p className="text-sm font-medium text-teal-700">QuánPilot</p>
-      <h1 className="mt-2 text-2xl font-semibold">Đăng nhập nhà hàng</h1>
-      <p className="mb-6 mt-2 text-sm text-slate-600">Sử dụng email và mật khẩu tài khoản hiện có. Không cần đăng ký dùng thử hoặc xác minh Google lại.</p>
-      <LoginForm destination="/restaurant-entry" />
+  return <main className={styles.page}>
+    <section className={styles.card} aria-label="Đăng nhập QuánPilot">
+      <aside className={styles.brand} aria-label="Về QuánPilot">
+        <div className={styles.identity}>
+          <Image className={styles.logo} src="/icons/icon-512.png" alt="Logo QuánPilot" width={96} height={96} priority />
+          <div><p className={styles.brandName}>QuánPilot</p><p className={styles.tagline}>Nền tảng quản lý nhà hàng</p></div>
+        </div>
+        <div className={styles.introduction}>
+          <h2>Vận hành thuận tiện hơn mỗi ngày.</h2>
+          <p>Quản lý bàn, đơn hàng, nhân viên và hoạt động kinh doanh trên một hệ thống.</p>
+        </div>
+        <p className={styles.signature}>Một sản phẩm của <strong>QAVIO</strong></p>
+      </aside>
+      <div className={styles.formPanel}>
+        <div className={styles.formContent}>
+          <h1>Chào mừng trở lại</h1>
+          <p className={styles.formIntro}>Đăng nhập tài khoản QuánPilot</p>
+          <LoginForm destination="/restaurant-entry" restaurantStyle />
+          <p className={styles.trial}>Chưa có tài khoản? <a href="https://qavio.site/trial">Đăng ký dùng thử <span aria-hidden="true">→</span></a></p>
+        </div>
+      </div>
     </section>
   </main>;
 }

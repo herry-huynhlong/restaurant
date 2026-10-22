@@ -1,0 +1,44 @@
+[
+  {
+    "buttonBottom": 519.203125,
+    "columns": "545.359px 572.625px",
+    "height": 720,
+    "logo": [
+      {
+        "alt": "Logo QuánPilot",
+        "loaded": true,
+        "width": 96
+      }
+    ],
+    "overflow": false,
+    "width": 1280
+  },
+  {
+    "buttonBottom": 611.84375,
+    "columns": "298px",
+    "height": 780,
+    "overflow": false,
+    "width": 320
+  },
+  {
+    "buttonBottom": 668.25,
+    "columns": "341px",
+    "height": 844,
+    "overflow": false,
+    "width": 375
+  },
+  {
+    "buttonBottom": 668.25,
+    "columns": "356px",
+    "height": 844,
+    "overflow": false,
+    "width": 390
+  },
+  {
+    "buttonBottom": 668.59375,
+    "columns": "342.438px 359.562px",
+    "height": 1024,
+    "overflow": false,
+    "width": 768
+  }
+]
