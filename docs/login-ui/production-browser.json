@@ -1,0 +1,21 @@
+{
+  "responsive": [
+    {
+      "buttonBottom": 519.203125,
+      "height": 720,
+      "logoLoaded": true,
+      "overflow": false,
+      "width": 1280
+    },
+    {
+      "buttonBottom": 668.25,
+      "height": 844,
+      "logoLoaded": true,
+      "overflow": false,
+      "width": 375
+    }
+  ],
+  "passwordToggle": true,
+  "logs": [],
+  "result": "PASS"
+}

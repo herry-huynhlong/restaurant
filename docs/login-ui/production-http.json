@@ -1,0 +1,11 @@
+{
+  "https": true,
+  "newLogin": true,
+  "officialAssetUnchanged": true,
+  "trialLink": true,
+  "anonymousGuards": true,
+  "secureHostOnlyCookies": true,
+  "qavioPreserved": true,
+  "noProductionQaCreated": true,
+  "result": "PASS"
+}
