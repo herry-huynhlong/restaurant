@@ -1,4 +1,5 @@
 import copy
+import gzip
 import io
 import json
 from pathlib import Path
@@ -139,8 +140,8 @@ class ReleaseSafety(unittest.TestCase):
                'config': {'Labels': {'org.opencontainers.image.revision': sha}}}
         archive = root / 'qavio-images.tar.gz'
         with tarfile.open(archive, 'w:gz') as t:
-            for n, b in [('manifest.json', json.dumps([{'Config': 'config.json', 'RepoTags': [ref]}]).encode()),
-                         ('config.json', json.dumps(cfg).encode())]:
+            for n, b in [('manifest.json', json.dumps([{'Config': 'config.json', 'RepoTags': [ref], 'Layers': ['layer.tar.gz']}]).encode()),
+                         ('config.json', json.dumps(cfg).encode()), ('layer.tar.gz', gzip.compress(b'x' * (1024 * 1024)))]:
                 info = tarfile.TarInfo(n)
                 info.size = len(b)
                 t.addfile(info, io.BytesIO(b))
@@ -153,7 +154,8 @@ class ReleaseSafety(unittest.TestCase):
             sha = self.artifact(root)
             result = g.package(root, 'qavio', sha)
             m = g.verify(root, sha, result['manifestSha256'])
-            self.assertGreater(m['unpackedBytes'], 0)
+            self.assertGreaterEqual(m['unpackedBytes'], 1024 * 1024)
+            self.assertGreater(m['unpackedLayerBytes'], m['archiveBytes'] * 100)
             for s, h in [('b'*40, result['manifestSha256']), (sha, 'c'*64)]:
                 with self.assertRaises(ValueError):
                     g.verify(root, s, h)

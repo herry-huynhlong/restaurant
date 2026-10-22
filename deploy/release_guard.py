@@ -7,6 +7,7 @@ import argparse
 import contextlib
 import copy
 import hashlib
+import gzip
 import json
 import os
 from pathlib import Path
@@ -80,6 +81,33 @@ def rootfs(cfg):
     return {'Type': cfg['rootfs']['type'], 'Layers': cfg['rootfs']['diff_ids']}
 
 
+def unpacked_layer_bytes(path):
+    """Docker/containerd Size and OCI tar member sizes may be COMPRESSED.
+
+    Stream every selected layer to measure the disk budget without extracting it.
+    Unknown compression fails closed; do not guess a fixed expansion ratio.
+    """
+    total = 0
+    with tarfile.open(path, 'r:gz') as t:
+        manifests = json.load(t.extractfile('manifest.json'))
+        need(len(manifests) == 1, 'ONE_IMAGE_REQUIRED')
+        layers = sorted((t.getmember(name) for name in manifests[0]['Layers']), key=lambda member: member.offset_data)
+        for member in layers:
+            with t.extractfile(member) as f:
+                # peek avoids a backwards seek/reinflate of the outer gzip per layer.
+                prefix = f.peek(4)[:4]
+                need(prefix != b'\x28\xb5\x2f\xfd', 'ZSTD_LAYER_REQUIRES_SUPPORTED_SIZE_DECODER')
+                if prefix[:2] == b'\x1f\x8b':
+                    with gzip.GzipFile(fileobj=f) as decoded:
+                        for block in iter(lambda: decoded.read(1024 * 1024), b''):
+                            total += len(block)
+                else:
+                    # Legacy Docker save exports uncompressed layer.tar members.
+                    total += member.size
+    need(total > 0, 'EMPTY_IMAGE_LAYERS')
+    return total
+
+
 def package(directory, scope, sha):
     need(re.fullmatch('[0-9a-f]{40}', sha), 'FULL_SOURCE_SHA_REQUIRED')
     root = Path(directory)
@@ -93,6 +121,7 @@ def package(directory, scope, sha):
     manifest = {'format': 1, 'scope': scope, 'sourceSha': sha, 'image': ref,
                 'archive': archive.name, 'archiveBytes': archive.stat().st_size,
                 'archiveSha256': digest(archive), 'imageBytes': image['size'],
+                'unpackedLayerBytes': unpacked_layer_bytes(archive),
                 'configSha256': cfg_hash, 'rootfs': rootfs(cfg),
                 'platform': 'linux/amd64'}
     private_json(root / 'release-manifest.json', manifest)
@@ -122,8 +151,10 @@ def verify(directory, sha, manifest_sha):
     # Upper bound includes every uncompressed archive member, not only shared layers.
     with tarfile.open(path, 'r:gz') as t:
         unpacked = sum(x.size for x in t)
+    layers = unpacked_layer_bytes(path)
+    need(layers == m['unpackedLayerBytes'], 'LAYER_EXPANSION_SIZE_MISMATCH')
     need(m['imageBytes'] > 0 and m['archiveBytes'] > 0, 'BAD_SIZE')
-    m['unpackedBytes'] = unpacked
+    m['unpackedBytes'] = max(unpacked, layers)
     return m
 
 
