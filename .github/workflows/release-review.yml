@@ -1,0 +1,37 @@
+name: Review built release (NO production access)
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full 40-character main source SHA approved for review
+        required: true
+        type: string
+      build_run_id:
+        description: Successful QuanPilot Linux release run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source run and artifact without SSH
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+        run: |
+          python3 deploy/review_release.py --repository "$GITHUB_REPOSITORY" --scope restaurant --run-id "$BUILD_RUN_ID" --sha "$SOURCE_SHA" --output reviewed
+          echo '### Review only: production not changed' >> "$GITHUB_STEP_SUMMARY"
+          cat reviewed-review.json >> "$GITHUB_STEP_SUMMARY"
+          echo 'Owner must approve the exact source SHA and manifest digest before the operator runs release_guard.py deploy.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-review-${{ github.run_id }}
+          path: reviewed-review.json
+          retention-days: 7

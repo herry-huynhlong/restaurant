@@ -41,6 +41,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Test offline deployment safety
+        run: python3 -m unittest discover -s deploy -p 'test_*.py' -v
       - name: Install and validate
         run: |
           npm install --global pnpm@11.19.0
@@ -68,6 +70,7 @@ jobs:
           run-id: ${{ inputs.runtime_base_run }}
           github-token: ${{ github.token }}
       - name: Build Linux image outside production
+        shell: bash
         env:
           VAPID_PUBLIC_KEY: ${{ inputs.vapid_public_key }}
           RUNTIME_BASE_SHA: ${{ inputs.runtime_base_sha }}
@@ -102,8 +105,9 @@ jobs:
           mkdir -p release
           docker image inspect "quanpilot-app:$TAG" --format '{{json .}}' | jq -s '[.[]|{id:.Id,tags:.RepoTags,size:.Size,revision:.Config.Labels["org.opencontainers.image.revision"]}]' > release/images.json
           docker save "quanpilot-app:$TAG" | gzip -1 > release/quanpilot-images.tar.gz
-          cd release
-          sha256sum quanpilot-images.tar.gz > SHA256SUMS
+          python3 deploy/release_guard.py package --scope restaurant --sha "$GITHUB_SHA" --directory release > release-review.json
+          echo '### Release built; VPS deployment requires separate approval' >> "$GITHUB_STEP_SUMMARY"
+          cat release-review.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: quanpilot-linux-release-${{ github.sha }}

@@ -1,0 +1,310 @@
+{
+  "mode": "READ_ONLY",
+  "at": "2026-10-22T03:58:55Z",
+  "projects": {
+    "qavio": {
+      "runtimePreserved": true,
+      "noBuild": true,
+      "pullNever": true,
+      "boundedLogs": true
+    },
+    "restaurant": {
+      "runtimePreserved": true,
+      "noBuild": true,
+      "pullNever": true,
+      "boundedLogs": true
+    }
+  },
+  "inventory": {
+    "disk": {
+      "usedPercent": 79.9,
+      "freeBytes": 5246861312,
+      "incomingUpperBoundBytes": 0,
+      "reserveBytes": 2610569625,
+      "requiredFreeBytes": 2610569625,
+      "severity": "ok",
+      "allowed": true,
+      "memoryAvailableBytes": 475918336
+    },
+    "containers": [
+      {
+        "name": "qavio-web-1",
+        "image": "qavio-web:cc06d0f",
+        "imageId": "sha256:0851dd9a343dc74a0b9011ed0b3f4a9a34f56a7676e1d3851c150b1badf41167",
+        "running": true,
+        "oomKilled": false,
+        "memoryLimit": 536870912,
+        "logPolicy": {
+          "Type": "json-file",
+          "Config": {
+            "max-file": "3",
+            "max-size": "10m"
+          }
+        },
+        "logDirectoryBytes": 45056,
+        "persistentStorage": [
+          {
+            "destination": "/var/lib/qavio/media",
+            "type": "volume",
+            "bytes": 61440
+          },
+          {
+            "destination": "/var/lib/qavio/ops",
+            "type": "volume",
+            "bytes": 16384
+          }
+        ]
+      },
+      {
+        "name": "restaurant-app-1",
+        "image": "quanpilot-app:1edbfd9",
+        "imageId": "sha256:f55a721f58a4d92cc2189a2f84f40be3db15a84537514688833abcb882dd1cd1",
+        "running": true,
+        "oomKilled": false,
+        "memoryLimit": 0,
+        "logPolicy": {
+          "Type": "json-file",
+          "Config": {}
+        },
+        "logDirectoryBytes": 45056,
+        "persistentStorage": [
+          {
+            "destination": "/app/backups",
+            "type": "bind",
+            "bytes": 20344832
+          },
+          {
+            "destination": "/app/host-metrics",
+            "type": "bind",
+            "bytes": 8192
+          },
+          {
+            "destination": "/app/runtime",
+            "type": "bind",
+            "bytes": 6447104
+          },
+          {
+            "destination": "/app/public/uploads",
+            "type": "bind",
+            "bytes": 3919872
+          }
+        ]
+      },
+      {
+        "name": "qavio-worker-1",
+        "image": "qavio-operations:c205bbd",
+        "imageId": "sha256:bf455cf861a440999217c8034ac42b14e1cd2cfa171aa764575282e0d416645c",
+        "running": true,
+        "oomKilled": false,
+        "memoryLimit": 134217728,
+        "logPolicy": {
+          "Type": "json-file",
+          "Config": {
+            "max-file": "2",
+            "max-size": "5m"
+          }
+        },
+        "logDirectoryBytes": 835584,
+        "persistentStorage": [
+          {
+            "destination": "/var/lib/postgresql/data",
+            "type": "volume",
+            "bytes": 4096
+          },
+          {
+            "destination": "/var/lib/qavio/media",
+            "type": "volume",
+            "bytes": 61440
+          },
+          {
+            "destination": "/var/lib/qavio/ops",
+            "type": "volume",
+            "bytes": 16384
+          }
+        ]
+      },
+      {
+        "name": "qavio-qavio-postgres-1",
+        "image": "postgres:16-alpine",
+        "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "running": true,
+        "oomKilled": false,
+        "memoryLimit": 134217728,
+        "logPolicy": {
+          "Type": "json-file",
+          "Config": {
+            "max-file": "2",
+            "max-size": "5m"
+          }
+        },
+        "logDirectoryBytes": 73728,
+        "persistentStorage": [
+          {
+            "destination": "/var/lib/postgresql/data",
+            "type": "volume",
+            "bytes": 49651712
+          }
+        ]
+      },
+      {
+        "name": "restaurant-maintenance-worker-1",
+        "image": "restaurant-maintenance-worker",
+        "imageId": "sha256:177db78c31d3bfa7cd3d608093ae3c3585264b05f7781c0defc088cfc32a71ab",
+        "running": true,
+        "oomKilled": false,
+        "memoryLimit": 0,
+        "logPolicy": {
+          "Type": "json-file",
+          "Config": {}
+        },
+        "logDirectoryBytes": 45056,
+        "persistentStorage": [
+          {
+            "destination": "/app/backups",
+            "type": "bind",
+            "bytes": 20344832
+          },
+          {
+            "destination": "/app/host-metrics",
+            "type": "bind",
+            "bytes": 8192
+          },
+          {
+            "destination": "/app/runtime",
+            "type": "bind",
+            "bytes": 6447104
+          },
+          {
+            "destination": "/app/public/uploads",
+            "type": "bind",
+            "bytes": 3919872
+          }
+        ]
+      },
+      {
+        "name": "longh-portfolio",
+        "image": "portfolio-portfolio",
+        "imageId": "sha256:ad47ccaa50641ea7a20ff1b28c05bb690bb070d776cd66889c2f18fdbca2bfa1",
+        "running": true,
+        "oomKilled": false,
+        "memoryLimit": 0,
+        "logPolicy": {
+          "Type": "json-file",
+          "Config": {}
+        },
+        "logDirectoryBytes": 40960,
+        "persistentStorage": []
+      },
+      {
+        "name": "restaurant-postgres-1",
+        "image": "postgres:16-alpine",
+        "imageId": "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+        "running": true,
+        "oomKilled": false,
+        "memoryLimit": 0,
+        "logPolicy": {
+          "Type": "json-file",
+          "Config": {}
+        },
+        "logDirectoryBytes": 1028096,
+        "persistentStorage": [
+          {
+            "destination": "/var/lib/postgresql/data",
+            "type": "volume",
+            "bytes": 70144000
+          }
+        ]
+      }
+    ],
+    "dockerStorage": "TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE\nImages          17        6         13.04GB   4.787GB (36%)\nContainers      7         7         5.157MB   0B (0%)\nLocal Volumes   12        5         217.2MB   97.75MB (45%)\nBuild Cache     0         0         0B        0B",
+    "memorySamples": "{\"BlockIO\":\"1.92GB / 293MB\",\"CPUPerc\":\"0.01%\",\"Container\":\"a2cd2cea9923eb3676e133df28d250fe5c75bc1a03819937fb09bd5bee210bf3\",\"ID\":\"a2cd2cea9923\",\"MemPerc\":\"7.82%\",\"MemUsage\":\"40.05MiB / 512MiB\",\"Name\":\"qavio-web-1\",\"NetIO\":\"591kB / 1.17MB\",\"PIDs\":\"14\"}\n{\"BlockIO\":\"1.97GB / 633MB\",\"CPUPerc\":\"0.02%\",\"Container\":\"3042d214b52be91b04203b14122b7f365f5b0a1306ea67a19a7c09626baee2ae\",\"ID\":\"3042d214b52b\",\"MemPerc\":\"7.86%\",\"MemUsage\":\"75.13MiB / 955.4MiB\",\"Name\":\"restaurant-app-1\",\"NetIO\":\"803kB / 4.92MB\",\"PIDs\":\"25\"}\n{\"BlockIO\":\"34.3GB / 2.19GB\",\"CPUPerc\":\"0.76%\",\"Container\":\"bed18b0a5fb190868d86e22478293d31cbdd0f9b0c2d761e6de00380e4248473\",\"ID\":\"bed18b0a5fb1\",\"MemPerc\":\"13.95%\",\"MemUsage\":\"17.86MiB / 128MiB\",\"Name\":\"qavio-worker-1\",\"NetIO\":\"24kB / 126B\",\"PIDs\":\"18\"}\n{\"BlockIO\":\"11.4GB / 1.13GB\",\"CPUPerc\":\"1.00%\",\"Container\":\"9c34b12afa0c77abf3a1885a1e92f43c6cd60bcd2c706ebeeae9feb68db5818d\",\"ID\":\"9c34b12afa0c\",\"MemPerc\":\"9.78%\",\"MemUsage\":\"12.52MiB / 128MiB\",\"Name\":\"qavio-qavio-postgres-1\",\"NetIO\":\"2.51MB / 6.81MB\",\"PIDs\":\"17\"}\n{\"BlockIO\":\"13.8GB / 1.36GB\",\"CPUPerc\":\"0.00%\",\"Container\":\"329e476b573c36dfa26fb85e5da3bfa0f787076c11d9e212d69717901ed3321a\",\"ID\":\"329e476b573c\",\"MemPerc\":\"1.59%\",\"MemUsage\":\"15.22MiB / 955.4MiB\",\"Name\":\"restaurant-maintenance-worker-1\",\"NetIO\":\"46.3MB / 44.2MB\",\"PIDs\":\"36\"}\n{\"BlockIO\":\"31.6GB / 892MB\",\"CPUPerc\":\"0.00%\",\"Container\":\"5c392d10a95965a04b53a621239c4040457567ecd68ea8093b5b60ad8d224f7b\",\"ID\":\"5c392d10a959\",\"MemPerc\":\"0.30%\",\"MemUsage\":\"2.832MiB / 955.4MiB\",\"Name\":\"longh-portfolio\",\"NetIO\":\"1.7MB / 10.4MB\",\"PIDs\":\"11\"}\n{\"BlockIO\":\"13.3GB / 2.36GB\",\"CPUPerc\":\"0.12%\",\"Container\":\"4257a22d5d16f10bd0017d5aa258d044218e7efb79af289c8df9a460df50fd6e\",\"ID\":\"4257a22d5d16\",\"MemPerc\":\"1.74%\",\"MemUsage\":\"16.6MiB / 955.4MiB\",\"Name\":\"restaurant-postgres-1\",\"NetIO\":\"85.4MB / 93.5MB\",\"PIDs\":\"14\"}",
+    "directories": {
+      "/opt/websites/qavio/.runtime": 1922252800,
+      "/opt/websites/restaurant/.trial-runtime": 12288,
+      "/opt/websites/qavio/backups": 8192,
+      "/opt/websites/restaurant/backups": 20344832,
+      "/opt/websites/restaurant/runtime": 6447104,
+      "/root/.npm": null,
+      "/root/.cache": 32768
+    }
+  },
+  "cleanup": {
+    "candidates": [
+      {
+        "id": "sha256:0868af04b00ac881a564a8486ca58f8c12fd657d5f2ac9b6af6e2ddb2e3f3322",
+        "tags": [
+          "quanpilot-app:05ff9ad"
+        ],
+        "sizeBytes": 1579093072
+      },
+      {
+        "id": "sha256:2ec140498bbcf3d25ca182cf44f07728d1bfb9c4c9fd922b7b7986150f108134",
+        "tags": [
+          "quanpilot-app:be133f2"
+        ],
+        "sizeBytes": 1578659986
+      },
+      {
+        "id": "sha256:415d58a74b2a387150eb924e6121e34bf93180c4bf9fcfab9eb9b2c7044bae08",
+        "tags": [
+          "qavio-web:7ebeb22"
+        ],
+        "sizeBytes": 527598902
+      },
+      {
+        "id": "sha256:8fb2f2b7a45e47ae403635f7fc9836805c16edd23504a9c59b745fed499b7e39",
+        "tags": [
+          "qavio-web:d590b1c"
+        ],
+        "sizeBytes": 527924802
+      },
+      {
+        "id": "sha256:95debf731c78af991ff7cd2b1c5cb9aae8d50f3b55fd95a5b0b5e622f5f45769",
+        "tags": [
+          "qavio-web:898451b"
+        ],
+        "sizeBytes": 527856707
+      }
+    ],
+    "rollback": {
+      "qavio-web": {
+        "ref": "qavio-web:5f10868",
+        "id": "sha256:3d5f062bffe8ee2f4db2466334dee8ac356f8b3b1ea563207ad4ec3db156fad5",
+        "verified": true
+      },
+      "quanpilot-app": {
+        "ref": "quanpilot-app:3574ce4",
+        "id": "sha256:d4318e3b8e576e36afed72f6595ac1c627c02d58d44400c98a1254e0896070d2",
+        "verified": true
+      }
+    },
+    "protectedIds": [
+      "sha256:0851dd9a343dc74a0b9011ed0b3f4a9a34f56a7676e1d3851c150b1badf41167",
+      "sha256:177db78c31d3bfa7cd3d608093ae3c3585264b05f7781c0defc088cfc32a71ab",
+      "sha256:3d5f062bffe8ee2f4db2466334dee8ac356f8b3b1ea563207ad4ec3db156fad5",
+      "sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea",
+      "sha256:ad47ccaa50641ea7a20ff1b28c05bb690bb070d776cd66889c2f18fdbca2bfa1",
+      "sha256:bf455cf861a440999217c8034ac42b14e1cd2cfa171aa764575282e0d416645c",
+      "sha256:d4318e3b8e576e36afed72f6595ac1c627c02d58d44400c98a1254e0896070d2",
+      "sha256:f55a721f58a4d92cc2189a2f84f40be3db15a84537514688833abcb882dd1cd1"
+    ],
+    "confirmation": "fb20829b2173084f50f21538e2d7da7723504df6b2a4dcb4b0008c2066e16af0",
+    "mode": "dry-run"
+  },
+  "memoryCgroup": {
+    "qavio-web-1": "114634752\n251400192\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 44",
+    "qavio-worker-1": "60649472\n134221824\nlow 0\nhigh 0\nmax 88631\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+    "restaurant-app-1": "137805824\n324272128\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 43",
+    "restaurant-maintenance-worker-1": "37875712\n203640832\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 3",
+    "qavio-qavio-postgres-1": "12300288\n122687488\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 1",
+    "restaurant-postgres-1": "34840576\n74371072\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 138"
+  },
+  "containersUnchanged": true,
+  "publicHttpsChecks": {
+    "https://qavio.site/api/ready": "PASS",
+    "https://qavio.site/pricing": "PASS",
+    "https://admin.qavio.site/restaurant-login": "PASS",
+    "https://admin.qavio.site/api/public/pricing": "PASS"
+  },
+  "originChecks": "PASS"
+}

@@ -8,3 +8,5 @@ coverage
 Restaurant/
 
 .trial-runtime/
+__pycache__/
+*.pyc

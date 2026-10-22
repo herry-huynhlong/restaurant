@@ -1,0 +1,16 @@
+# LAST overlay, including AFTER .trial-runtime/production-release.yaml.
+services:
+  app:
+    build: !reset null
+    image: ${RELEASE_IMAGE:?Use release_guard.py and an approved manifest}
+    pull_policy: never
+    logging: {driver: json-file, options: {max-size: 10m, max-file: '3'}}
+  maintenance-worker:
+    build: !reset null
+    image: ${RELEASE_WORKER_IMAGE:?Pin the existing worker image}
+    pull_policy: never
+    logging: {driver: json-file, options: {max-size: 10m, max-file: '3'}}
+  postgres:
+    image: ${RELEASE_POSTGRES_IMAGE:?Pin the existing PostgreSQL image}
+    pull_policy: never
+    logging: {driver: json-file, options: {max-size: 10m, max-file: '3'}}
