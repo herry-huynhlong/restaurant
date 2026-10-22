@@ -1,6 +1,7 @@
 import { CheckCircle2, Crown, ShieldCheck } from "lucide-react";
 import { PlatformShell } from "@/components/app-shell/platform-shell";
 import { FeedbackBanner } from "@/components/admin/feedback-banner";
+import { discountBasisPoints } from "@/lib/plan/pricing";
 import { productBrand } from "@/lib/brand";
 import { requirePlatformOwner } from "@/lib/rbac/guards";
 import {
@@ -87,14 +88,20 @@ export default async function PlatformPlansPage({
                         <p className="mt-1 text-lg font-semibold">{price.termMonths} tháng</p>
                       </div>
                       <label className="block text-sm font-medium">
-                        Giá bán
-                        <input className="mt-1 h-10 w-full rounded-md border bg-white px-3" name="priceVnd" type="number" min={0} step={1000} defaultValue={price.priceVnd} />
+                        Giá bán cả kỳ (VND)
+                        <input className="mt-1 h-10 w-full rounded-md border bg-white px-3" name="priceVnd" type="number" min={0} step={1} defaultValue={price.priceVnd} />
                       </label>
                       <div>
                         <p className="text-sm font-medium">Bình quân mỗi tháng</p>
                         <p className="mt-2 rounded-md border bg-white px-3 py-2 text-sm font-semibold">{formatVnd(price.monthlyPriceVnd)}/tháng</p>
                       </div>
                     </div>
+                    <label className="mt-3 block text-sm font-medium">
+                      Giá gốc cả kỳ (VND, chỉ nhập khi có ưu đãi thật)
+                      <input className="mt-1 h-10 w-full rounded-md border bg-white px-3" name="originalPriceVnd" type="number" min={1} step={1} defaultValue={price.originalPriceVnd ?? ""} />
+                    </label>
+                    <p className="mt-2 text-xs text-slate-600">Để trống giá gốc khi không giảm giá. Giá bán cả kỳ là số tiền dùng cho yêu cầu thanh toán mới.</p>
+                    <p className="mt-2 text-xs text-slate-600">Ưu đãi: {price.originalPriceVnd ? `${(discountBasisPoints(price.originalPriceVnd, price.priceVnd) / 100).toLocaleString("vi-VN", {maximumFractionDigits: 2})}%` : "Không có"} · Cập nhật: {formatDateTime(price.updatedAt)} · {price.isPublished ? "Đã công bố" : "Chưa công bố"}</p>
                     <label className="mt-3 block text-sm font-medium">
                       Mô tả gói
                       <textarea className="mt-1 min-h-16 w-full rounded-md border bg-white px-3 py-2" name="description" defaultValue={planPriceDescription(price.plan, price.description)} />
@@ -108,6 +115,10 @@ export default async function PlatformPlansPage({
                         <label className="inline-flex items-center gap-2">
                           <input name="isRecommended" type="checkbox" defaultChecked={price.isRecommended} />
                           Đề xuất
+                        </label>
+                        <label className="inline-flex items-center gap-2">
+                          <input name="isPublished" type="checkbox" defaultChecked={price.isPublished} />
+                          Công bố trên QAVIO
                         </label>
                       </div>
                       <PendingSubmitButton
@@ -134,7 +145,8 @@ export default async function PlatformPlansPage({
                 <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
                   <div>
                     <p className="font-semibold">{item.plan} · {item.termMonths} tháng</p>
-                    <p className="mt-1 text-slate-500">{formatDateTime(item.createdAt)}</p>
+                    <p className="mt-1 text-slate-500">{formatDateTime(item.createdAt)} · {item.actorName}</p>
+                    <p className="mt-1 text-slate-500">Giá gốc: {item.oldOriginalPriceVnd ? formatVnd(item.oldOriginalPriceVnd) : "Không có"} → {item.newOriginalPriceVnd ? formatVnd(item.newOriginalPriceVnd) : "Không có"} · Công bố: {item.oldIsPublished ? "Bật" : "Tắt"} → {item.newIsPublished ? "Bật" : "Tắt"}</p>
                   </div>
                   <p className="font-medium text-slate-700">
                     {item.oldPriceVnd == null ? "Khởi tạo" : `${formatVnd(item.oldPriceVnd)} → ${formatVnd(item.newPriceVnd)}`}

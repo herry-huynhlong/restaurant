@@ -803,6 +803,8 @@ model PlatformPlanPrice {
   plan            RestaurantPlan
   termMonths      Int
   priceVnd        Int
+  originalPriceVnd Int?
+  isPublished Boolean @default(false)
   monthlyPriceVnd Int
   isActive        Boolean        @default(true)
   isRecommended   Boolean        @default(false)
@@ -821,6 +823,10 @@ model PlatformPlanPriceHistory {
   priceId          String?
   plan             String
   termMonths       Int
+  oldOriginalPriceVnd Int?
+  newOriginalPriceVnd Int?
+  oldIsPublished Boolean?
+  newIsPublished Boolean?
   oldPriceVnd      Int?
   newPriceVnd      Int
   oldIsActive      Boolean?

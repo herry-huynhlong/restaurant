@@ -7,7 +7,7 @@ import {getRestaurantPostLoginPath, getPostLoginPath} from '@/server/services/au
 import {trialInput} from '@/lib/trial-contract';
 
 const db = new URL(process.env.DATABASE_URL || 'http://invalid');
-if(db.hostname!=='127.0.0.1'||db.port!=='55432'||db.pathname!=='/restaurant_trial_test') throw Error('ISOLATED_TEST_REQUIRED');
+if(db.hostname!=='127.0.0.1'||db.port!=='55432'||!['/restaurant_trial_test','/pricing_test'].includes(db.pathname)) throw Error('ISOLATED_TEST_REQUIRED');
 const base='http://127.0.0.1:3200', prefix='login-'+randomUUID(), password=randomBytes(24).toString('hex');
 const jar=new Map<string,string>();
 function cookie(){return [...jar].map(([k,v])=>`${k}=${v}`).join('; ');}

@@ -24,6 +24,16 @@ jobs:
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: quanpilot_ci_ephemeral
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,6 +48,17 @@ jobs:
           pnpm prisma:generate
           pnpm lint
           pnpm exec tsc --noEmit
+      - name: Verify isolated pricing and checkout
+        env:
+          DATABASE_URL: postgresql://postgres:quanpilot_ci_ephemeral@127.0.0.1:55432/pricing_test
+          SUBSCRIPTION_TEST_DATABASE_URL: postgresql://postgres:quanpilot_ci_ephemeral@127.0.0.1:55432/pricing_test
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U postgres pricing_test
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx scripts/public-pricing-integration.ts
+          pnpm exec tsx scripts/subscription-postgres-integration.ts
+          pnpm exec tsx scripts/subscription-checkout-checks.ts
+          pnpm exec tsx scripts/subscription-entitlement-credit-checks.ts
       - name: Download optional existing runtime
         if: inputs.runtime_base_run != ''
         uses: actions/download-artifact@v4
