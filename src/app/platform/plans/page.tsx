@@ -48,6 +48,7 @@ export default async function PlatformPlansPage({
   await requirePlatformOwner();
   const groups = groupFeaturesByLabel();
   const pricing = await getPlanPricingDashboard();
+  const publishedCount = pricing.prices.filter(price => price.isPublished && price.isActive && price.priceVnd > 0).length;
 
   return (
     <PlatformShell title="Quản lý gói dịch vụ" subtitle={productBrand.plansSubtitle}>
@@ -62,6 +63,15 @@ export default async function PlatformPlansPage({
               Giá được lưu trong hệ thống và dùng làm cơ sở chốt tiền cho các yêu cầu đăng ký mới. Những yêu cầu đã tạo vẫn giữ giá tại thời điểm xác nhận.
             </p>
           </div>
+        </div>
+
+        <div className={`mt-4 rounded-xl border p-4 text-sm ${publishedCount ? "border-teal-200 bg-teal-50 text-teal-950" : "border-amber-200 bg-amber-50 text-amber-950"}`} role="status">
+          <p className="font-semibold">Đang công bố trên QAVIO: {publishedCount}/{pricing.prices.length} kỳ giá</p>
+          <p className="mt-1 leading-6">
+            {publishedCount === 0 ? "Website đang hiển thị Liên hệ nhận báo giá vì chưa có kỳ giá được công bố. " : "Website chỉ hiển thị những kỳ giá đang bán và được công bố. "}
+            Để hiển thị một kỳ giá, bật Công bố trên QAVIO ở kỳ đó rồi bấm Lưu. Những lần sửa giá đã công bố sẽ tự cập nhật trên QAVIO trong khoảng 35 giây.
+          </p>
+          <p className="mt-1 leading-6">Giá PRO ở đây là giá đăng ký và gia hạn thông thường; báo giá nâng cấp riêng của từng nhà hàng được xử lý trong tài khoản nhà hàng.</p>
         </div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">

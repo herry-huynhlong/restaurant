@@ -76,7 +76,7 @@ export async function getPlanPricingDashboard() {
   ]);
 
   const actors = await prisma.user.findMany({ where: { id: { in: history.flatMap(item => item.actorUserId ? [item.actorUserId] : []) } }, select: { id: true, name: true } });
-  return { prices, history: history.map(item => ({ ...item, actorName: actors.find(actor => actor.id === item.actorUserId)?.name ?? "Tài khoản không còn tồn tại" })), policy };
+  return { prices, history: history.map(item => ({ ...item, actorName: item.actorUserId ? actors.find(actor => actor.id === item.actorUserId)?.name ?? "Tài khoản không còn tồn tại" : "Thao tác hệ thống" })), policy };
 }
 
 export async function getPublicPlanPrices() {

@@ -48,6 +48,8 @@ const allowedFeedbackMessages = new Set([
   "Đã khóa nhà hàng.",
   "Đã khóa thiết bị nhân viên.",
   "Đã lưu bảng giá dịch vụ.",
+  "Đã lưu và công bố kỳ giá trên QAVIO. Website tự cập nhật trong khoảng 35 giây.",
+  "Đã lưu kỳ giá, chưa công bố trên QAVIO. Bật Công bố trên QAVIO rồi Lưu để hiển thị trên website.",
   "Đã lưu cài đặt.",
   "Đã lưu cấu hình thanh toán subscription.",
   "Đã lưu chính sách lưu trữ.",

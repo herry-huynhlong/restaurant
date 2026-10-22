@@ -46,19 +46,24 @@ export async function confirmPlanPermissionsAction(formData: FormData) {
 
 export async function updatePlanPriceAction(formData: FormData) {
   const actor = await requirePlatformOwner();
+  let published = false;
   try {
-    await updatePlatformPlanPrice(actor.id, {
+    const saved = await updatePlatformPlanPrice(actor.id, {
       priceId: String(formData.get("priceId") ?? ""), priceVnd: String(formData.get("priceVnd") ?? ""),
       originalPriceVnd: String(formData.get("originalPriceVnd") ?? ""),
       isActive: formData.get("isActive") === "on", isPublished: formData.get("isPublished") === "on",
       isRecommended: formData.get("isRecommended") === "on", description: String(formData.get("description") ?? "")
     });
+    published = saved.isPublished;
   } catch (error) {
     const message = error instanceof z.ZodError ? validationMessage(error) : "Không thể lưu giá. Vui lòng kiểm tra kỳ giá và thử lại.";
     redirect(`${platformRoutes.plans}?error=${encodeURIComponent(message)}`);
   }
   revalidatePath(platformRoutes.plans);
-  redirect(`${platformRoutes.plans}?success=${encodeURIComponent("Đã lưu bảng giá dịch vụ.")}`);
+  const message = published
+    ? "Đã lưu và công bố kỳ giá trên QAVIO. Website tự cập nhật trong khoảng 35 giây."
+    : "Đã lưu kỳ giá, chưa công bố trên QAVIO. Bật Công bố trên QAVIO rồi Lưu để hiển thị trên website.";
+  redirect(`${platformRoutes.plans}?success=${encodeURIComponent(message)}`);
 }
 
 function readSubmittedMatrix(formData: FormData) {
