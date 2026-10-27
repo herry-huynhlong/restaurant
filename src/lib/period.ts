@@ -38,11 +38,23 @@ function getZonedParts(date: Date, timeZone: string) {
 }
 
 function zonedDateToUtc(parts: { year: number; month: number; day: number; hour?: number; minute?: number; second?: number }, timeZone: string) {
-  const utcGuess = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0));
-  const zonedGuess = getZonedParts(utcGuess, timeZone);
-  const asUtc = Date.UTC(zonedGuess.year, zonedGuess.month - 1, zonedGuess.day, zonedGuess.hour, zonedGuess.minute, zonedGuess.second);
   const wantedUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0);
-  return new Date(utcGuess.getTime() + wantedUtc - asUtc);
+  const localStamp = (date: Date) => {
+    const local = getZonedParts(date, timeZone);
+    return Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second);
+  };
+  // Consider offsets on both sides of a clock change, rather than assuming
+  // the UTC guess has the offset at local midnight (e.g. Sydney DST).
+  const candidates = [-36, 0, 36].map((hours) => {
+    const probe = wantedUtc + hours * 3600000;
+    return wantedUtc - (localStamp(new Date(probe)) - probe);
+  });
+  const exact = candidates.filter((candidate) => localStamp(new Date(candidate)) === wantedUtc);
+  if (exact.length) return new Date(Math.min(...exact)); // First occurrence of an ambiguous midnight.
+  // Midnight can be skipped by DST. Use the first corresponding instant
+  // after the gap, consistently for both adjacent half-open ranges.
+  return new Date(candidates.filter((candidate) => localStamp(new Date(candidate)) > wantedUtc)
+    .sort((a, b) => localStamp(new Date(a)) - localStamp(new Date(b)) || a - b)[0]);
 }
 
 export function localDateBoundaryToUtc(value: string, timeZone = "Asia/Ho_Chi_Minh", dayOffset = 0) {
@@ -65,46 +77,27 @@ export function localDateBoundaryToUtc(value: string, timeZone = "Asia/Ho_Chi_Mi
   }, timeZone);
 }
 
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-function addMonths(date: Date, months: number) {
-  const next = new Date(date);
-  next.setUTCMonth(next.getUTCMonth() + months);
-  return next;
-}
-
-function addYears(date: Date, years: number) {
-  const next = new Date(date);
-  next.setUTCFullYear(next.getUTCFullYear() + years);
-  return next;
-}
-
 export function getPeriodRange(period: ReportPeriod, timeZone = "Asia/Ho_Chi_Minh", now = new Date()) {
   const today = getZonedParts(now, timeZone);
-  const todayStart = zonedDateToUtc({ year: today.year, month: today.month, day: today.day }, timeZone);
+  // Do calendar arithmetic before conversion. A local first-of-month can be
+  // the 31st in UTC; adding a UTC month would overflow into the wrong month.
   const localDay = new Date(Date.UTC(today.year, today.month - 1, today.day));
   const dayOffset = (localDay.getUTCDay() + 6) % 7;
-
-  if (period === "week") {
-    const start = addDays(todayStart, -dayOffset);
-    return { start, end: addDays(start, 7) };
-  }
-
-  if (period === "month") {
-    const start = zonedDateToUtc({ year: today.year, month: today.month, day: 1 }, timeZone);
-    return { start, end: addMonths(start, 1) };
-  }
-
-  if (period === "year") {
-    const start = zonedDateToUtc({ year: today.year, month: 1, day: 1 }, timeZone);
-    return { start, end: addYears(start, 1) };
-  }
-
-  return { start: todayStart, end: addDays(todayStart, 1) };
+  const boundary = (year: number, month: number, day: number) => {
+    const calendar = new Date(Date.UTC(year, month - 1, day));
+    return zonedDateToUtc({ year: calendar.getUTCFullYear(), month: calendar.getUTCMonth() + 1, day: calendar.getUTCDate() }, timeZone);
+  };
+  if (period === "week") return {
+    start: boundary(today.year, today.month, today.day - dayOffset),
+    end: boundary(today.year, today.month, today.day - dayOffset + 7)
+  };
+  if (period === "month") return {
+    start: boundary(today.year, today.month, 1), end: boundary(today.year, today.month + 1, 1)
+  };
+  if (period === "year") return {
+    start: boundary(today.year, 1, 1), end: boundary(today.year + 1, 1, 1)
+  };
+  return { start: boundary(today.year, today.month, today.day), end: boundary(today.year, today.month, today.day + 1) };
 }
 
 export function getPreviousPeriodRange(period: ReportPeriod, timeZone = "Asia/Ho_Chi_Minh", now = new Date()) {
@@ -124,6 +117,21 @@ export function getBucketKey(date: Date, period: ReportPeriod, timeZone = "Asia/
   const parts = getZonedParts(date, timeZone);
   if (period === "year") return `${parts.year}-${String(parts.month).padStart(2, "0")}`;
   return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
+export function getPeriodBucketKeys(period: ReportPeriod, start: Date, end: Date, timeZone: string) {
+  const first = getZonedParts(start, timeZone);
+  const last = getZonedParts(end, timeZone);
+  const cursor = new Date(Date.UTC(first.year, first.month - 1, first.day));
+  const limit = Date.UTC(last.year, last.month - 1, last.day);
+  const keys: string[] = [];
+  while (cursor.getTime() < limit) {
+    const yearMonth = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}`;
+    keys.push(period === "year" ? yearMonth : `${yearMonth}-${String(cursor.getUTCDate()).padStart(2, "0")}`);
+    if (period === "year") cursor.setUTCMonth(cursor.getUTCMonth() + 1, 1);
+    else cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return keys;
 }
 
 export function getBucketLabel(key: string, period: ReportPeriod) {

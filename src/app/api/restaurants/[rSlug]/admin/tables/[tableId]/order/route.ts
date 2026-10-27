@@ -97,6 +97,16 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
       return { order: null };
     }
 
+    // Serialize existing-session orders with customer orders and confirmation,
+    // while preserving table -> session lock order and new-session behavior.
+    await tx.$queryRaw`
+      SELECT id FROM "DiningSession"
+      WHERE "restaurantId" = ${access.restaurant.id} AND "tableId" = ${table.id}
+        AND status IN ('OPEN', 'AWAITING_PAYMENT')
+      ORDER BY id
+      FOR UPDATE
+    `;
+
     let activeSession = await tx.diningSession.findFirst({
       where: {
         restaurantId: access.restaurant.id,

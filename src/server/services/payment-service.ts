@@ -32,6 +32,18 @@ export async function confirmDiningSessionPaid({
   const paymentIdempotencyKey = `payment-request-${diningSessionId}`;
 
   return prisma.$transaction(async (tx) => {
+    const sessionRef = await tx.diningSession.findFirst({
+      where: { id: diningSessionId, restaurantId }, select: { tableId: true }
+    });
+    if (!sessionRef) return { ok: false, reason: "SESSION_NOT_ACTIVE" };
+    // All order/payment writers lock table -> session. Staff ordering and QR
+    // session creation already lock the table; the reverse order can deadlock.
+    const lockedTable = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "RestaurantTable"
+      WHERE id = ${sessionRef.tableId} AND "restaurantId" = ${restaurantId}
+      FOR UPDATE
+    `;
+    if (lockedTable.length === 0) return { ok: false, reason: "SESSION_NOT_ACTIVE" };
     const lockedActiveSession = await tx.$queryRaw<{ id: string }[]>`
       SELECT id
       FROM "DiningSession"
@@ -41,22 +53,24 @@ export async function confirmDiningSessionPaid({
       FOR UPDATE
     `;
 
-    if (lockedActiveSession.length === 0) {
-      const existingPaidPayment = await tx.payment.findFirst({
-        where: {
-          restaurantId,
-          diningSessionId,
-          status: "PAID"
-        },
-        include: {
-          diningSession: {
-            include: { table: true }
-          }
-        },
-        orderBy: { paidAt: "desc" }
-      });
+    // Also preserve an existing paid snapshot if legacy session status is
+    // inconsistent. Do not silently repair historical financial data here.
+    const existingPaidPayment = await tx.payment.findFirst({
+      where: {
+        restaurantId,
+        diningSessionId,
+        status: "PAID"
+      },
+      include: {
+        diningSession: {
+          include: { table: true }
+        }
+      },
+      orderBy: { paidAt: "desc" }
+    });
 
-      if (existingPaidPayment) return paidPaymentResult(existingPaidPayment);
+    if (existingPaidPayment) return paidPaymentResult(existingPaidPayment);
+    if (lockedActiveSession.length === 0) {
       return { ok: false, reason: "SESSION_NOT_ACTIVE" };
     }
 

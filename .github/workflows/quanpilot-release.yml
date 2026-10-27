@@ -61,6 +61,22 @@ jobs:
           pnpm exec tsx scripts/subscription-postgres-integration.ts
           pnpm exec tsx scripts/subscription-checkout-checks.ts
           pnpm exec tsx scripts/subscription-entitlement-credit-checks.ts
+      - name: Verify financial Phase 0 on isolated PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:quanpilot_ci_ephemeral@127.0.0.1:55432/tax_phase0_test
+          TAX_PHASE0_TEST_DATABASE_URL: postgresql://postgres:quanpilot_ci_ephemeral@127.0.0.1:55432/tax_phase0_test
+          NEXTAUTH_SECRET: phase0-ci-only-not-a-production-secret
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U postgres tax_phase0_test
+          pnpm exec prisma migrate deploy
+          pnpm test:period
+          pnpm test:tax-phase0
+          pnpm test:paid-bill
+          pnpm test:invoice-print
+          pnpm test:cashier-realtime
+          pnpm test:staff-pos
+          pnpm test:customer-name
+          pnpm test:tables-responsive
       - name: Download optional existing runtime
         if: inputs.runtime_base_run != ''
         uses: actions/download-artifact@v4
@@ -78,6 +94,21 @@ jobs:
         run: |
           TAG="${GITHUB_SHA::7}"
           docker build --build-arg NEXT_PUBLIC_VAPID_PUBLIC_KEY="$VAPID_PUBLIC_KEY" --label org.opencontainers.image.revision="$GITHUB_SHA" -t "quanpilot-app:$TAG" .
+          export DATABASE_URL=postgresql://postgres:quanpilot_ci_ephemeral@127.0.0.1:55432/tax_phase0_test
+          export TAX_PHASE0_TEST_DATABASE_URL="$DATABASE_URL"
+          export NEXTAUTH_SECRET=phase0-ci-only-not-a-production-secret
+          docker run --detach --pull never --name phase0-http --network host \
+            -e DATABASE_URL -e NEXTAUTH_SECRET -e NEXTAUTH_URL=http://127.0.0.1:3300 \
+            "quanpilot-app:$TAG" node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3300
+          trap 'docker rm -f phase0-http >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3300/restaurant-login >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3300/restaurant-login >/dev/null
+          pnpm exec tsx scripts/tax-phase0-postgres.ts --http
+          docker rm -f phase0-http >/dev/null
+          trap - EXIT
           if [ -n "$RUNTIME_BASE_RUN" ]; then
             [[ "$RUNTIME_BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
             git diff --exit-code "$RUNTIME_BASE_SHA" HEAD -- package.json pnpm-lock.yaml pnpm-workspace.yaml Dockerfile next.config.mjs prisma public

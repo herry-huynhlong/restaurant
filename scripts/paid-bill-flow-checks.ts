@@ -53,7 +53,8 @@ includes(historyRoute, '"BILL_PRINT"', "Paid bill history must enforce the bill-
 includes(detailService, 'dayHeading: dateKey === todayKey ? `Hôm nay', "Paid bill history must group recent bills by local day.");
 includes(paymentTable, 'aria-label="Đóng lịch sử bill"', "Paid bill history must provide an accessible close control.");
 includes(reportPage, "PaymentReportTable", "Payment history must keep the paid bill detail and reprint flow.");
-includes(cashierPage, "activeDiningSessionWhere", "Cashiers must receive every active dining session, not only payment requests.");
+includes(cashierPage, "getCashierState(access.restaurant.id)", "Cashiers must use the tenant-scoped live state service.");
+includes("src/server/services/cashier-state-service.ts", "where: { restaurantId, ...activeDiningSessionWhere() }", "Cashiers must receive every active dining session, not only payment requests.");
 includes(cashierPage, "BillHistoryButton", "Cashiers must retain paginated access to paid bill history.");
 includes(cashierWorkspace, "expectedGrandTotal", "Cashier payment must reject a bill that changed after it was displayed.");
 includes(cashierWorkspace, "Chưa có món", "Cashiers must see an active table before its first order.");

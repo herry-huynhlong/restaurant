@@ -57,6 +57,12 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   const { order, isDuplicate } = existingOrder
     ? { order: existingOrder, isDuplicate: true }
     : await prisma.$transaction(async (tx) => {
+      const lockedTable = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "RestaurantTable"
+        WHERE id = ${context.table.id} AND "restaurantId" = ${context.restaurant.id}
+        FOR UPDATE
+      `;
+      if (lockedTable.length === 0) return { order: null, isDuplicate: false };
       const lockedActiveSession = await tx.$queryRaw<{ id: string }[]>`
         SELECT id
         FROM "DiningSession"

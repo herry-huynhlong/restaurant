@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/db/prisma";
-import { formatInTimeZone, getBucketKey, getBucketLabel, getPeriodRange, getPreviousPeriodRange, type ReportPeriod } from "@/lib/period";
+import { formatInTimeZone, getBucketKey, getBucketLabel, getPeriodBucketKeys, getPeriodRange, getPreviousPeriodRange, type ReportPeriod } from "@/lib/period";
 import { paymentMethodLabels } from "@/lib/payment-method";
 
-export async function getRestaurantPaymentReport(restaurantId: string, period: ReportPeriod) {
+export async function getRestaurantPaymentReport(restaurantId: string, period: ReportPeriod, now = new Date()) {
   const settings = await prisma.restaurantSetting.findUnique({ where: { restaurantId } });
   const timeZone = settings?.timezone ?? "Asia/Ho_Chi_Minh";
-  const { start, end } = getPeriodRange(period, timeZone);
-  const previousRange = getPreviousPeriodRange(period, timeZone);
+  const { start, end } = getPeriodRange(period, timeZone, now);
+  const previousRange = getPreviousPeriodRange(period, timeZone, now);
 
   const [payments, previousPayments] = await Promise.all([
     prisma.payment.findMany({
@@ -103,27 +103,9 @@ export async function getRestaurantPaymentReport(restaurantId: string, period: R
 }
 
 function buildPeriodBuckets(period: ReportPeriod, start: Date, end: Date, timeZone: string, amounts: Map<string, number>) {
-  const buckets: Array<{ key: string; label: string; amount: number }> = [];
-  const cursor = new Date(start);
-
-  while (cursor < end) {
-    const key = getBucketKey(cursor, period, timeZone);
-    if (!buckets.some((bucket) => bucket.key === key)) {
-      buckets.push({
-        key,
-        label: getBucketLabel(key, period),
-        amount: amounts.get(key) ?? 0
-      });
-    }
-
-    if (period === "year") {
-      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-    } else {
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
-    }
-  }
-
-  return buckets;
+  return getPeriodBucketKeys(period, start, end, timeZone).map((key) => ({
+    key, label: getBucketLabel(key, period), amount: amounts.get(key) ?? 0
+  }));
 }
 
 function buildMoneyComparison(current: number, previous: number) {

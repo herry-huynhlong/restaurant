@@ -36,7 +36,7 @@ const formCount = files.reduce((count, path) => {
 
 assertIncludes("src/components/ui/pending-submit-button.tsx", ["useFormStatus", "disabled={disabled || pending}", "pendingLabel"]);
 assertIncludes("src/components/admin/feedback-banner.tsx", ["setTimeout", "router.replace", "role={safeError ? \"alert\" : \"status\"}"]);
-assertIncludes("src/components/admin/subscription-pricing-client.tsx", ["dialogRef.current?.close()", "PendingSubmitButton", "setSelectedPrice(null)"]);
+assertIncludes("src/components/admin/subscription-pricing-client.tsx", ["confirmDialogRef.current?.close()", "checkoutDialogRef.current?.close()", "disabled={isStartingCheckout}", "setSelectedPrice(null)"]);
 assertIncludes("src/components/platform/owners-manager.tsx", ["editDialogRef.current?.close()", "resetDialogRef.current?.close()", "setPassword(\"\")", "PendingSubmitButton"]);
 assertIncludes("src/components/platform/restaurant-row-actions.tsx", ["permanentDeleteDialogRef.current?.close()", "setConfirmPassword(\"\")", "PendingSubmitButton"]);
 assertIncludes("src/components/platform/backup-history-card.tsx", ["state.status !== \"success\"", "onAccepted(state.restoreJobId, state.message)", "FormCancelButton"]);
@@ -53,6 +53,7 @@ const unmanagedSubmitFiles = files
       && !content.includes("useFormStatus")
       && !content.includes("isPending")
       && !content.includes("isSubmitting")
+      && !content.includes("disabled={isStartingCheckout}")
       && !content.includes("disabled={pending}");
   })
   .map((path) => relative(root, path));

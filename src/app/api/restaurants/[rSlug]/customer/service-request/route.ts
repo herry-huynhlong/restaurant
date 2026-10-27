@@ -36,7 +36,27 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
   }
 
   const eventType = parsed.data.requestType === "REQUEST_PAYMENT" ? "PAYMENT_REQUESTED" : "SERVICE_REQUEST_CREATED";
-  const { serviceRequest, isDuplicate, totalAmount } = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
+    // Keep the same table -> session lock order as staff orders and payment.
+    const lockedTable = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "RestaurantTable"
+      WHERE id = ${context.table.id} AND "restaurantId" = ${context.restaurant.id}
+      FOR UPDATE
+    `;
+    if (lockedTable.length === 0) return null;
+    // Context was read before parsing the request. Serialize with payment and
+    // orders, then recheck status inside the transaction (including retries).
+    const activeSession = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "DiningSession"
+      WHERE id = ${context.diningSession.id}
+        AND "restaurantId" = ${context.restaurant.id}
+        AND "tableId" = ${context.table.id}
+        AND status IN ('OPEN', 'AWAITING_PAYMENT')
+      FOR UPDATE
+    `;
+    if (activeSession.length === 0) return null;
+    if (await tx.payment.findFirst({ where: { restaurantId: context.restaurant.id, diningSessionId: context.diningSession.id, status: "PAID" }, select: { id: true } })) return null;
+
     const existingOpenRequest = await tx.serviceRequest.findFirst({
       where: {
         restaurantId: context.restaurant.id,
@@ -155,6 +175,11 @@ export async function POST(request: NextRequest, { params }: { params: { rSlug: 
 
     return { serviceRequest: created, isDuplicate: false, totalAmount: bill?.grandTotal ?? 0 };
   });
+
+  if (!result) {
+    return NextResponse.json({ error: "Phiên phục vụ này đã kết thúc. Vui lòng quét lại mã QR để bắt đầu phiên mới." }, { status: 409 });
+  }
+  const { serviceRequest, isDuplicate, totalAmount } = result;
 
   if (isDuplicate) {
     return NextResponse.json({
