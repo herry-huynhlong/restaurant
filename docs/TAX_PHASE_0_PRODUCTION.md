@@ -104,7 +104,7 @@ App mới bắt đầu **09:41:03 ngày 27/10/2026 (UTC+7)**. Triển khai qua r
 - So thực tế Config.Env trước/sau: **không có key/value thay đổi**, bao gồm auth và cấu hình runtime; Node trước/sau cùng v22.23.4.
 - Mounts app giữ nguyên. Không gọi migration, reset, restore production DB, rebuild VPS hoặc restart Docker Engine.
 
-Sau deploy: free **6.020.771.840 bytes (~5,61 GiB)**, `df` báo 76% used. Một mẫu MemAvailable 553 MiB; swap 805/2047 MiB; app khoảng 29,84 MiB theo docker stats tại mẫu đo. Đây là số đo ngắn hạn, không phải bằng chứng đủ tải peak cho VPS RAM 1 GB.
+Sau deploy, kiểm tra cuối: free **6.020.755.456 bytes (~5,61 GiB)**, `df` báo 76% used, MemAvailable 534 MiB và swap 801/2047 MiB. App khoảng 29,84 MiB theo docker stats ở mẫu trước đó. Đây là số đo ngắn hạn, không phải bằng chứng đủ tải peak cho VPS RAM 1 GB.
 
 ## 6. Production smoke test an toàn
 
@@ -127,13 +127,13 @@ Không tạo order, bàn, Payment, service request hoặc giao dịch khách gi�
 
 ## 7. Theo dõi sau phát hành
 
-Mẫu định kỳ đến **09:46:37 (UTC+7)**, khoảng 5 phút 34 giây sau app start, kết hợp kiểm tra safe access log tiếp sau:
+Mẫu định kỳ đến **09:51:18 (UTC+7)**, khoảng 10 phút 15 giây sau app start, kết hợp kiểm tra safe access log:
 
 - App và PostgreSQL: không thấy `deadlock detected`/40P01, transaction timeout, Prisma P2028 hoặc lỗi confirm payment trong cửa sổ log đã xem.
 - pg_stat_database được SELECT trong read-only transaction: deadlocks 0, conflicts 0, không tăng so baseline.
-- Safe Nginx access log dùng chung QAVIO/QuánPilot sau app start: **74 request, 0 HTTP 5xx** ở lần đọc kiểm chứng; shared access log khác cũng 0 5xx trong cửa sổ xem. Chỉ tổng hợp timestamp/status, không xuất log gốc/IP/URL khách.
+- Safe Nginx access log dùng chung QAVIO/QuánPilot sau app start: **92 request, 0 HTTP 5xx** ở lần đọc kiểm chứng; shared access log khác có 41 request, 0 5xx trong cửa sổ xem. Chỉ tổng hợp timestamp/status, không xuất log gốc/IP/URL khách.
 - Smoke sau đăng nhập: dashboard 406 ms, bàn 2.172 ms, báo cáo tháng 578 ms, lịch sử bill 281 ms. Số đo đơn lẻ qua public HTTPS, không phải benchmark/SLA hoặc kiểm thử tải.
-- App running, không restart ngoài lần recreate đã duyệt; sáu container còn lại không đổi ID/image/StartedAt/RestartCount.
+- App running, RestartCount 0, không restart ngoài lần recreate đã duyệt; sáu container còn lại không đổi ID/image/StartedAt/RestartCount. Image ID lần kiểm tra cuối khớp image đã phát hành.
 
 Không tạo automation/cron theo dõi dài hạn. Cửa sổ quan sát ngắn đạt yêu cầu smoke hiện tại; vẫn cần theo dõi vận hành thực tế và tải peak trong các đợt sau.
 
