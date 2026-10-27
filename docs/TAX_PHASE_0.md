@@ -1,5 +1,7 @@
 # QUÁNPILOT — NGHIỆM THU GIAI ĐOẠN 0
 
+**Đã phát hành production 27/10/2026:** source `cd82e8d7e73ce4a9203089172b0ba485ab47b516`, CI Linux 40438733493 SUCCESS, riêng app cutover lúc 09:41 UTC+7. Smoke và audit sau deploy đạt theo ngoại lệ đã duyệt, bill lịch sử không đổi; sáu container khác giữ nguyên. Xem [TAX_PHASE_0_PRODUCTION.md](TAX_PHASE_0_PRODUCTION.md) để biết image/checksum, backup, quan sát vận hành và kết luận GO. Các ghi nhận NO-GO bên dưới mô tả lần kiểm tra trước khi chủ dự án duyệt ngoại lệ.
+
 **Ngoại lệ được duyệt 27/10/2026:** tiếp tục phát hành, giữ nguyên bill lịch sử có hai cảnh báo, đối soát chứng từ riêng và chưa xác minh. Không đổi Payment, snapshot, invoiceNumber, trạng thái phiên hay phạm vi báo cáo doanh thu. Đợt backup/audit mới vẫn cùng một ngoại lệ, không có cảnh báo mới. Báo cáo production sẽ ghi kết quả thực tế sau CI/deploy.
 
 **Cập nhật phát hành 27/10/2026:** chủ dự án đã duyệt quy trình phát hành. Backup/off-host/restore PASS; audit bản sao production phát hiện một bill lịch sử thiếu snapshot và còn trạng thái phiên legacy PAID. Đã dừng trước commit/push/CI/deploy theo điều kiện dữ liệu. Xem [báo cáo phát hành](TAX_PHASE_0_DEPLOYMENT.md) để biết kết quả và quyết định NO-GO hiện tại. Các mục bên dưới giữ nguyên kết quả nghiệm thu local ngày 26/10.

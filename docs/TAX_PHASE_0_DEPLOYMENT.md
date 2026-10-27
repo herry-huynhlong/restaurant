@@ -1,5 +1,7 @@
 # QuánPilot Phase 0 — kiểm tra phát hành production
 
+**Kết quả tiếp theo:** sau khi được duyệt ngoại lệ, đã phát hành source `cd82e8d` ngày 27/10/2026 và đạt smoke/audit production. Xem [TAX_PHASE_0_PRODUCTION.md](TAX_PHASE_0_PRODUCTION.md). Báo cáo này giữ lịch sử quyết định NO-GO tại audit ban đầu, không phải trạng thái production hiện tại.
+
 **Cập nhật:** chủ dự án đã duyệt ngoại lệ đúng một bill lịch sử và cho tiếp tục phát hành; bản ghi giữ nguyên, chưa xác minh chứng từ gốc. Kết luận NO-GO bên dưới là tại lần kiểm tra ban đầu. Kết quả đợt phát hành tiếp theo sẽ được ghi trong `TAX_PHASE_0_PRODUCTION.md`.
 
 Ngày **27/10/2026**, Asia/Bangkok. Chủ dự án đã duyệt phát hành có kiểm soát, với điều kiện dừng nếu phát hiện vấn đề dữ liệu hoặc không đạt backup/capacity.
