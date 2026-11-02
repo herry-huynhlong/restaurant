@@ -1,0 +1,38 @@
+{
+  "checks": [
+    {
+      "hasCustomerQrError": false,
+      "hasRecoveryMessage": true,
+      "heading": "Đăng nhập quản lý",
+      "manifest": "/thien-dao/admin/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "hasCustomerQrError": false,
+      "hasRecoveryMessage": true,
+      "heading": "Đăng nhập phục vụ",
+      "manifest": "/thien-dao/staff/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "hasCustomerQrError": false,
+      "hasRecoveryMessage": true,
+      "heading": "Đăng nhập bếp",
+      "manifest": "/thien-dao/kitchen/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "hasCustomerQrError": false,
+      "hasRecoveryMessage": true,
+      "heading": "Đăng nhập thu ngân",
+      "manifest": "/thien-dao/cashier/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    }
+  ],
+  "consoleErrors": [],
+  "nativeIphoneTested": false
+}

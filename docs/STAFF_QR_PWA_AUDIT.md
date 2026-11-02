@@ -2,7 +2,7 @@
 
 ## Kết quả và phạm vi
 
-Đã sửa source local và kiểm thử bản production build trên PostgreSQL cô lập. Chưa commit/push/deploy, không ghi dữ liệu production hoặc đổi QAVIO marketing. Chủ dự án xác nhận gặp lỗi trên hai iPhone mới: web đăng nhập được, icon ứng dụng mở lỗi. Chưa có kiểm chứng native Add to Home Screen trên Android/iPhone của bản sửa; không coi HTTP/browser desktop là kiểm thử thiết bị thật.
+Đã sửa, commit/push riêng và phát hành source `d06e3a7ac69dfcc66ceaa9a1bfd57f4e3497616b` sau phê duyệt tiếp theo của chủ dự án. Không ghi dữ liệu production hoặc đổi QAVIO marketing. Chủ dự án xác nhận gặp lỗi trên hai iPhone mới: web đăng nhập được, icon ứng dụng mở lỗi. Sau phát hành, chủ dự án trả lời **“Chưa kiểm tra trên iPhone”**; nghiệm thu native vẫn PENDING. Không coi HTTP/browser desktop là kiểm thử thiết bị thật. Xem [báo cáo production](STAFF_QR_PWA_PRODUCTION.md).
 
 ## Nguyên nhân đã xác minh
 
@@ -61,8 +61,8 @@ Kết quả browser: [browser.json](staff-pwa-audit/browser.json). Ảnh là QA;
 
 ## Phát hành và nghiệm thu còn lại
 
-- Source local đã qua kiểm tra liên quan; chưa phát hành, không tuyên bố lỗi iPhone production đã hết. Không build trên VPS. Cần commit riêng phạm vi, CI Linux/image-only QuánPilot app, giữ rollback và kiểm capacity/backup theo runbook; không recreate PG/worker hoặc migration.
-- Sau phát hành: kiểm HTML QR login từng role, JSON manifest/start_url; kiểm production health, đăng nhập và chuyển tenant không tạo giao dịch giả.
+- Source đã qua CI Linux trên checkout sạch và phát hành image-only riêng QuánPilot app; giữ rollback, kiểm capacity/backup theo runbook; không recreate PG/worker hoặc migration. Không tuyên bố lỗi iPhone đã hết.
+- Đã kiểm HTML QR login từng role, JSON manifest/start_url, HTTP readiness và giao diện production; không tạo tài khoản QA hoặc giao dịch giả production. Hồi quy form UX PASS trên checkout sạch của CI; lỗi scanner local do report filter sửa dở không nằm trong commit phát hành.
 - Trên từng iPhone của chủ dự án: Safari → QR bộ phận → đăng nhập → hoàn tất tên thiết bị nếu có → thêm màn hình chính → đóng Safari → mở icon → vào đúng workspace → đóng/mở lại lần nữa. Thử riêng bốn role, sau đó thử hết phiên để thấy login rõ ràng. Android cần quy trình tương tự.
 - Icon đã cài bằng id customer/start_url welcome trước bản sửa có thể phải gỡ và thêm lại từ đúng trang nhân viên một lần. Không cam kết cập nhật hồi tố được mọi icon iOS cũ.
 - Nếu app mới không có cookie phiên của trình duyệt, không khôi phục bằng cách đọc/copy JWT từ storage hoặc bypass auth: đăng nhập tài khoản một lần trong app, sau đó kiểm đóng/mở giữ phiên. Chưa xác nhận hành vi chuyển cookie trên hai iPhone cụ thể; đây là phần nghiệm thu native còn thiếu.

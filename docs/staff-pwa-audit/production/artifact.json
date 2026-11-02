@@ -1,0 +1,56 @@
+{
+  "review": {
+    "sourceSha": "d06e3a7ac69dfcc66ceaa9a1bfd57f4e3497616b",
+    "scope": "restaurant",
+    "runId": 41402480413,
+    "runUrl": "https://github.com/herry-huynhlong/restaurant/actions/runs/41402480413",
+    "manifestSha256": "b9a9cccfe7f2c552eb226a9a6e7268bf3b3ee9eee31a0988d2f19844c525b486",
+    "artifactDigest": "sha256:3a82414bc931278192c75d2a0100d8a421beeb8b31cd1e85fcfc2d6c54a2e24e",
+    "approvalRequired": "d06e3a7ac69dfcc66ceaa9a1bfd57f4e3497616b:b9a9cccfe7f2c552eb226a9a6e7268bf3b3ee9eee31a0988d2f19844c525b486",
+    "archiveBytes": 313390590,
+    "imageBytes": 1177081344,
+    "deploymentPerformed": false
+  },
+  "manifest": {
+    "format": 1,
+    "scope": "restaurant",
+    "sourceSha": "d06e3a7ac69dfcc66ceaa9a1bfd57f4e3497616b",
+    "image": "quanpilot-app:d06e3a7",
+    "archive": "quanpilot-images.tar.gz",
+    "archiveBytes": 313390590,
+    "archiveSha256": "030666664d3942ba4ce45d9210f369efbc9c9e0e3598e07913ae9127c6078383",
+    "imageBytes": 315283893,
+    "unpackedLayerBytes": 1177081344,
+    "configSha256": "3c1cb0d41fd1d8d7d6683fc8149f72257dc299961f38aa3fd606c01fb319be99",
+    "rootfs": {
+      "Type": "layers",
+      "Layers": [
+        "sha256:44a87794b739d471ec360bec56cc0ceac640d06bbf579ee7d9061a0b88d09818",
+        "sha256:09282d8f6dc3f140ce030eb4e3846b30c465220b50fd0962514f40dfc5122fd4",
+        "sha256:985fa6649f64124b2ab93baeb7a549ac3877147f438dd5931a2c5179aa83eef3",
+        "sha256:d8d64e272e1628c506685a6d413e953de1128072f8d9f58e9f781e0ad6fdee9f",
+        "sha256:6b6d01cb4b38660434f1ec5ef231fd25b6585c18893e02231eb10d38f36b29c3",
+        "sha256:0a6641aeca1522896fb29ee75cc7e1d05f0840b7193ca92641fad7ae2cd38d0e",
+        "sha256:c2455b069ad7388d612a07635dbb2ca85b87dcf56f2208659b8264784c916e77",
+        "sha256:ff5ae666311517de2c3da1ae7abb3913a1fe58606fc51ed5fcf7c55a2d2d300e",
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "sha256:4b70cd8d190fde47e2d68460fb084ecc68d2299ec860cb54bcc44cfc815d2cdf",
+        "sha256:f3d27fbb0d7a1b3dbfbb075521d4a92c87f158f2ce76cddeb9ec181d5920eb7d",
+        "sha256:f44482e7cbddecbe9f41ff620877825812a1c88986f6dcb066184c7837303d3c",
+        "sha256:cde8e58a9a34a8e8a2ea608a605e066986d7add7ec8e810ba1daf7002405a749",
+        "sha256:0d969513684a994c52f9055cdaf1e6e443a269a9b847dc44cad067573572d024",
+        "sha256:2490701f9982f0e268f851760e74aa961b8f4461cb2574be03d1c700c939cdb9",
+        "sha256:69c35bc16b801aad37c0fe87f5cc544777436fd730cd4915238fccc344a21cab",
+        "sha256:032d71b3c9956a09deda8b191cb7b1013c526600d6bcb637bfe1dc7b2090a495",
+        "sha256:00e967a14463e31c420a3c98c26a8df7b1eb53290d4c082661ff63fd324656e6",
+        "sha256:b921dee2455df5091b04d775d975608fc68a185a2a9499745c7a64ef275b5ce1",
+        "sha256:6a646adf6f88a383a6f6269533d3609a307846460b440bdd707881aad2ed16e1",
+        "sha256:e500990143aae700134a40556ff3506bc9bdc99d67a8f3c36210a8df0fcc285a",
+        "sha256:104e8a212ccadad21fc2b53b502983eb5436e974d2a192c7c15ceb37c3a0e46a"
+      ]
+    },
+    "platform": "linux/amd64",
+    "unpackedBytes": 1177081344
+  },
+  "verified": true
+}

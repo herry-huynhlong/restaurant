@@ -1,0 +1,8 @@
+{
+  "result": "PASS",
+  "appRestartCount": 0,
+  "appUptimeSeconds": 293,
+  "sixOtherContainersUnchanged": true,
+  "diskFreeBytes": 11361984512,
+  "memoryAvailableBytes": 425938944
+}

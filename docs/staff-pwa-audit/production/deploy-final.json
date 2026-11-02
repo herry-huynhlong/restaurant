@@ -1,0 +1,28 @@
+{
+  "source": "d06e3a7ac69dfcc66ceaa9a1bfd57f4e3497616b",
+  "image": "quanpilot-app:d06e3a7",
+  "imageId": "sha256:3f3149fe5412523950b03a7cc17ae87d3768f6041b5b5328e2c36b54e01cd7eb",
+  "rollbackImageId": "sha256:7fd156dc7047b269aa01742177046b3121ac49f175e28c421e87e021159ebe54",
+  "healthy": true,
+  "mode": "applied",
+  "envPreserved": true,
+  "mountsPreserved": true,
+  "unrelatedContainersUnchanged": true,
+  "noBuildOrPull": true,
+  "noMigration": true,
+  "archiveRemovedAfterVerifiedLoad": true,
+  "preflight": {
+    "usedPercent": 56.48,
+    "freeBytes": 11362013184,
+    "incomingUpperBoundBytes": 0,
+    "reserveBytes": 2610569625,
+    "requiredFreeBytes": 2610569625,
+    "severity": "ok",
+    "allowed": true,
+    "memoryAvailableBytes": 438640640
+  },
+  "freeBytes": 11362009088,
+  "memoryAvailableBytes": 523448320,
+  "firstAttempt": "report snapshot overwrite rejected; automatic app rollback; no data changes",
+  "retry": "reused already verified immutable local image; final report written once"
+}
