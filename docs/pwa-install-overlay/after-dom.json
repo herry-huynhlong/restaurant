@@ -1,0 +1,21 @@
+{
+  "buttonHit": true,
+  "panel": {
+    "bottom": 344,
+    "height": 166,
+    "position": "static",
+    "width": 343,
+    "x": 16,
+    "y": 178
+  },
+  "scroll": 375,
+  "tabs": {
+    "bottom": 575,
+    "height": 150,
+    "position": "sticky",
+    "width": 375,
+    "x": 0,
+    "y": 425
+  },
+  "viewport": 390
+}

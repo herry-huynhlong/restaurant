@@ -1,0 +1,22 @@
+{
+  "atOverlap": "min-w-0 flex-1 truncate text-sm font-semibold",
+  "overlap": 150,
+  "panel": {
+    "className": "absolute right-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-lg border bg-white p-4 text-sm shadow-lg",
+    "height": 232,
+    "position": "absolute",
+    "width": 288,
+    "x": -173.484375,
+    "y": 175,
+    "zIndex": "20"
+  },
+  "tabs": {
+    "className": "sticky top-0 z-20 -mx-3 border-b bg-slate-50/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4",
+    "height": 150,
+    "position": "sticky",
+    "width": 390,
+    "x": 0,
+    "y": 201,
+    "zIndex": "20"
+  }
+}

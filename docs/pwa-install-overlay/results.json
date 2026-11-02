@@ -1,0 +1,145 @@
+{
+  "date": "2026-11-02",
+  "environment": "isolated PostgreSQL QA, production build, connected browser",
+  "before": {
+    "atOverlap": "min-w-0 flex-1 truncate text-sm font-semibold",
+    "overlap": 150,
+    "panel": {
+      "className": "absolute right-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-lg border bg-white p-4 text-sm shadow-lg",
+      "height": 232,
+      "position": "absolute",
+      "width": 288,
+      "x": -173.484375,
+      "y": 175,
+      "zIndex": "20"
+    },
+    "tabs": {
+      "className": "sticky top-0 z-20 -mx-3 border-b bg-slate-50/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4",
+      "height": 150,
+      "position": "sticky",
+      "width": 390,
+      "x": 0,
+      "y": 201,
+      "zIndex": "20"
+    }
+  },
+  "after": {
+    "buttonHit": true,
+    "panel": {
+      "bottom": 344,
+      "height": 166,
+      "position": "static",
+      "width": 343,
+      "x": 16,
+      "y": 178
+    },
+    "scroll": 375,
+    "tabs": {
+      "bottom": 575,
+      "height": 150,
+      "position": "sticky",
+      "width": 375,
+      "x": 0,
+      "y": 425
+    },
+    "viewport": 390
+  },
+  "roles": [
+    {
+      "role": "WAITER",
+      "buttonHit": true,
+      "clientWidth": 375,
+      "panelRight": 359,
+      "panelX": 16,
+      "position": "static",
+      "tabsBelowPanel": true,
+      "closeWorks": true,
+      "autoOpen": false,
+      "standaloneInstallHidden": true,
+      "native": false
+    },
+    {
+      "role": "KITCHEN",
+      "buttonHit": true,
+      "clientWidth": 390,
+      "panelRight": 374,
+      "panelX": 16,
+      "position": "static",
+      "tabsBelowPanel": true,
+      "closeWorks": true,
+      "autoOpen": false,
+      "standaloneInstallHidden": true,
+      "native": false
+    },
+    {
+      "role": "CASHIER",
+      "buttonHit": true,
+      "clientWidth": 375,
+      "panelRight": 359,
+      "panelX": 16,
+      "position": "static",
+      "tabsBelowPanel": true,
+      "closeWorks": true,
+      "autoOpen": false,
+      "standaloneInstallHidden": true,
+      "native": false
+    },
+    {
+      "role": "MANAGER",
+      "buttonHit": true,
+      "clientWidth": 375,
+      "panelRight": 359,
+      "panelX": 16,
+      "position": "static",
+      "tabsBelowPanel": true,
+      "closeWorks": true,
+      "autoOpen": false,
+      "standaloneInstallHidden": true,
+      "native": false
+    }
+  ],
+  "responsive": [
+    {
+      "buttonHit": true,
+      "clientWidth": 305,
+      "panelRight": 289,
+      "panelX": 16,
+      "position": "static",
+      "scroll": 305,
+      "width": 320
+    },
+    {
+      "buttonHit": true,
+      "clientWidth": 360,
+      "panelRight": 344,
+      "panelX": 16,
+      "position": "static",
+      "scroll": 360,
+      "width": 375
+    },
+    {
+      "buttonHit": true,
+      "clientWidth": 375,
+      "panelRight": 359,
+      "panelX": 16,
+      "position": "static",
+      "scroll": 375,
+      "width": 390
+    },
+    {
+      "buttonHit": true,
+      "clientWidth": 753,
+      "panelRight": 552.09375,
+      "panelX": 168.09375,
+      "position": "static",
+      "scroll": 753,
+      "width": 768
+    }
+  ],
+  "toggleCloses": true,
+  "escapeClosesAndRestoresFocus": true,
+  "login320NoOverflow": true,
+  "console": [],
+  "nativeSafariAfterFix": "PENDING",
+  "simulation": "QA proxy supplies iPhone user agent and navigator.standalone signal; browser engine unchanged; no native install or Safari toolbar emulation"
+}
