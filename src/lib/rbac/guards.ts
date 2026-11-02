@@ -8,12 +8,13 @@ import { hasAnyRestaurantRole } from "@/lib/rbac/roles";
 import { restaurantRoutes } from "@/lib/routes";
 import { isRestaurantInMaintenance } from "@/lib/restaurant-maintenance";
 import { canRestaurantOperate } from "@/lib/tenant/restaurant";
+import { staffPwaLoginUrl } from "@/lib/tenant-pwa";
 
-export async function requireAuthenticatedUser() {
+export async function requireAuthenticatedUser(signInPath = "/login") {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect(signInPath);
   }
 
   return session.user;
@@ -56,7 +57,8 @@ export async function requireRestaurantAccess(
   allowedRoles?: RestaurantRole[],
   options: { allowExpiredSubscription?: boolean } = {}
 ) {
-  const user = await requireAuthenticatedUser();
+  const department = ["WAITER", "KITCHEN", "CASHIER", "MANAGER"].find(role => allowedRoles?.includes(role as RestaurantRole));
+  const user = await requireAuthenticatedUser(staffPwaLoginUrl(rSlug, department));
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug: rSlug },

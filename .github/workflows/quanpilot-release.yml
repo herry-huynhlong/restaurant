@@ -139,6 +139,31 @@ jobs:
           python3 deploy/release_guard.py package --scope restaurant --sha "$GITHUB_SHA" --directory release > release-review.json
           echo '### Release built; VPS deployment requires separate approval' >> "$GITHUB_STEP_SUMMARY"
           cat release-review.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify employee PWA in packaged image on isolated PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:quanpilot_ci_ephemeral@127.0.0.1:55432/staff_pwa_test
+          NEXTAUTH_SECRET: staff-pwa-ci-only-not-a-production-secret
+        run: |
+          docker exec ${{ job.services.postgres.id }} createdb -U postgres staff_pwa_test
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx scripts/staff-pwa-checks.ts
+          pnpm test:staff-device-name
+          pnpm test:staff-soft-delete
+          pnpm test:form-ux
+          TAG="${GITHUB_SHA::7}"
+          docker run --detach --pull never --name staff-pwa-http --network host \
+            -e DATABASE_URL -e NEXTAUTH_SECRET -e NEXTAUTH_URL=http://127.0.0.1:3450 \
+            -e QUANPILOT_TRIAL_REGISTRATION_ENABLED=false \
+            "quanpilot-app:$TAG" node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3450
+          trap 'docker rm -f staff-pwa-http >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3450/restaurant-login >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3450/restaurant-login >/dev/null
+          pnpm exec tsx scripts/staff-pwa-http-checks.ts
+          docker rm -f staff-pwa-http >/dev/null
+          trap - EXIT
       - uses: actions/upload-artifact@v4
         with:
           name: quanpilot-linux-release-${{ github.sha }}

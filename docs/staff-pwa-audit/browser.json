@@ -1,0 +1,30 @@
+[
+  {
+    "hasRecoveryMessage": true,
+    "heading": "Đăng nhập quản lý",
+    "manifest": "/staff-pwa-browser-1793601661196/admin/manifest.webmanifest",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "hasRecoveryMessage": true,
+    "heading": "Đăng nhập phục vụ",
+    "manifest": "/staff-pwa-browser-1793601661196/staff/manifest.webmanifest",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "hasRecoveryMessage": true,
+    "heading": "Đăng nhập bếp",
+    "manifest": "/staff-pwa-browser-1793601661196/kitchen/manifest.webmanifest",
+    "scroll": 390,
+    "width": 390
+  },
+  {
+    "hasRecoveryMessage": true,
+    "heading": "Đăng nhập thu ngân",
+    "manifest": "/staff-pwa-browser-1793601661196/cashier/manifest.webmanifest",
+    "scroll": 390,
+    "width": 390
+  }
+]

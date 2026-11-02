@@ -22,7 +22,8 @@ export function RestaurantLoginForm({ slug, initialError }: { slug: string; init
     const formData = new FormData(event.currentTarget);
     const username = normalizeUsername(String(formData.get("username") ?? ""));
     const password = String(formData.get("password") ?? "");
-    const callbackUrl = searchParams.get("callbackUrl") ?? "/post-login";
+    // Resolve the authenticated membership within the restaurant scanned in QR.
+    const callbackUrl = searchParams.get("callbackUrl") ?? `/${slug}/login`;
 
     const result = await signIn("credentials", {
       restaurantSlug: slug,

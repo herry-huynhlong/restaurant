@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
+import { staffPwaStartUrl, type TenantPwaContext } from "@/lib/tenant-pwa";
 
-export type TenantPwaContext = "customer" | "admin" | "staff" | "kitchen" | "cashier";
+export type { TenantPwaContext } from "@/lib/tenant-pwa";
 
 type TenantPwaBranding = {
   name: string;
@@ -11,6 +12,12 @@ type TenantPwaBranding = {
 };
 
 const contextConfig: Record<TenantPwaContext, { idSuffix: string; startPath: string; manifestPath: string; description: string }> = {
+  employee: {
+    idSuffix: "employee",
+    startPath: "login",
+    manifestPath: "employee/manifest.webmanifest",
+    description: "ứng dụng nhân viên"
+  },
   customer: {
     idSuffix: "customer",
     startPath: "welcome",
@@ -85,7 +92,7 @@ export async function getTenantPwaBranding(slug: string): Promise<TenantPwaBrand
 export function buildTenantPwaManifest(branding: TenantPwaBranding, context: TenantPwaContext) {
   const config = contextConfig[context];
   const scope = `/${branding.slug}/`;
-  const startUrl = `/${branding.slug}/${config.startPath}`;
+  const startUrl = staffPwaStartUrl(branding.slug, context);
 
   return {
     id: `${scope}pwa/${config.idSuffix}`,
