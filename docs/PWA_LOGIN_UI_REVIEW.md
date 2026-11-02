@@ -1,5 +1,7 @@
 # Rà soát giao diện đăng nhập PWA nhân viên
 
+**Cập nhật phát hành:** sau khi chủ dự án duyệt, bản sửa đã được commit/push/deploy. Xem [báo cáo production](PWA_DUAL_FLOW_PRODUCTION.md). Nội dung dưới ghi lại trạng thái tại thời điểm QA trước phát hành; native acceptance vẫn PENDING.
+
 Ngày: 02/11/2026. Chưa commit/push/deploy. Bổ sung cho `PWA_DUAL_FLOW_IMPLEMENTATION.md`.
 
 ## Phạm vi và nguyên nhân ảnh trước

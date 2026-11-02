@@ -1,0 +1,95 @@
+{
+  "source": "55ef71cd7e3979d7ad950bbf376768e876e48b18",
+  "publicDepartmentChecks": [
+    {
+      "role": "MANAGER",
+      "manifest": "/thien-dao/pwa/admin",
+      "scope": "/thien-dao/",
+      "startUrl": "/thien-dao/login?pwa=1&role=MANAGER",
+      "qrLoginCorrect": true,
+      "missingSessionLoginCorrect": true,
+      "oldWorkspaceStartResolvesLogin": true
+    },
+    {
+      "role": "WAITER",
+      "manifest": "/thien-dao/pwa/staff",
+      "scope": "/thien-dao/",
+      "startUrl": "/thien-dao/login?pwa=1&role=WAITER",
+      "qrLoginCorrect": true,
+      "missingSessionLoginCorrect": true,
+      "oldWorkspaceStartResolvesLogin": true
+    },
+    {
+      "role": "KITCHEN",
+      "manifest": "/thien-dao/pwa/kitchen",
+      "scope": "/thien-dao/",
+      "startUrl": "/thien-dao/login?pwa=1&role=KITCHEN",
+      "qrLoginCorrect": true,
+      "missingSessionLoginCorrect": true,
+      "oldWorkspaceStartResolvesLogin": true
+    },
+    {
+      "role": "CASHIER",
+      "manifest": "/thien-dao/pwa/cashier",
+      "scope": "/thien-dao/",
+      "startUrl": "/thien-dao/login?pwa=1&role=CASHIER",
+      "qrLoginCorrect": true,
+      "missingSessionLoginCorrect": true,
+      "oldWorkspaceStartResolvesLogin": true
+    }
+  ],
+  "employeeManifestCorrect": true,
+  "customerManifestUnchanged": true,
+  "unrelatedContainersUnchanged": true,
+  "containers": [
+    {
+      "name": "/restaurant-app-1",
+      "running": true,
+      "health": "not-configured"
+    },
+    {
+      "name": "/qavio-web-1",
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "/qavio-worker-1",
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "/qavio-qavio-postgres-1",
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "/restaurant-maintenance-worker-1",
+      "running": true,
+      "health": "not-configured"
+    },
+    {
+      "name": "/longh-portfolio",
+      "running": true,
+      "health": "not-configured"
+    },
+    {
+      "name": "/restaurant-postgres-1",
+      "running": true,
+      "health": "healthy"
+    }
+  ],
+  "recentAppErrorCounts": {
+    "TypeError": 0,
+    "ReferenceError": 0,
+    "PrismaClientKnownRequestError": 0,
+    "P2028": 0,
+    "deadlock detected": 0
+  },
+  "http": "PASS",
+  "diskFreeBytes": 11334410240,
+  "memoryAvailableBytes": 472571904,
+  "nativeIphoneAcceptance": "PENDING_NO_CONNECTED_NATIVE_INFRA",
+  "androidNativeAcceptance": "PENDING_NO_CONNECTED_NATIVE_INFRA",
+  "noProductionTestAccountsOrTransactions": true,
+  "at": "2026-11-02T10:14:21Z"
+}

@@ -1,0 +1,35 @@
+{
+  "environment": "production browser viewport 390x844; not native PWA",
+  "checks": [
+    {
+      "role": "MANAGER",
+      "installVisible": true,
+      "manifest": "/thien-dao/admin/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "role": "WAITER",
+      "installVisible": true,
+      "manifest": "/thien-dao/staff/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "role": "KITCHEN",
+      "installVisible": true,
+      "manifest": "/thien-dao/kitchen/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "role": "CASHIER",
+      "installVisible": true,
+      "manifest": "/thien-dao/cashier/manifest.webmanifest",
+      "scroll": 390,
+      "width": 390
+    }
+  ],
+  "consoleErrors": [],
+  "nativeAcceptance": "PENDING"
+}

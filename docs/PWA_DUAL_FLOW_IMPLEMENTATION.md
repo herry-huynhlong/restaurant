@@ -1,5 +1,7 @@
 # PWA nhân viên — hỗ trợ hai quy trình cài đặt
 
+**Cập nhật phát hành:** bản source `55ef71c` đã lên production sau phê duyệt của chủ dự án. Xem [báo cáo production](PWA_DUAL_FLOW_PRODUCTION.md). Các trạng thái chưa commit/deploy bên dưới là ghi nhận lúc hoàn tất QA; nghiệm thu native vẫn PENDING.
+
 Ngày kiểm tra: 02/11/2026. Trạng thái: source QA đạt; native acceptance **PENDING**; chưa commit, push hoặc deploy.
 
 ## Kết luận
