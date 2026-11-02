@@ -1,0 +1,23 @@
+{
+  "mode": "dry-run",
+  "scope": "restaurant",
+  "service": "app",
+  "image": "quanpilot-app:d41191f",
+  "disk": {
+    "usedPercent": 57.82,
+    "freeBytes": 11010232320,
+    "incomingUpperBoundBytes": 1197580288,
+    "reserveBytes": 2610569625,
+    "requiredFreeBytes": 3808149913,
+    "severity": "ok",
+    "allowed": true,
+    "memoryAvailableBytes": 503152640
+  },
+  "runtimePreserved": true,
+  "requiresApproval": "d41191f11ce5b9fbefcda002f39b49062a394089:d47d8374bdd8362848beb5e72c4314a8e76bc1d8772e82ef435c194e4af68b3f",
+  "loggingDeferredServices": [
+    "maintenance-worker",
+    "postgres"
+  ],
+  "migration": "never"
+}

@@ -1,0 +1,55 @@
+{
+  "environment": "production anonymous tenant login pages; desktop browser at mobile viewport, not native Safari",
+  "checks": [
+    {
+      "role": "WAITER",
+      "buttonHit": true,
+      "clientWidth": 390,
+      "manifest": "/thien-dao/staff/manifest.webmanifest",
+      "panelLeft": 41,
+      "panelPosition": "static",
+      "panelRight": 349,
+      "width": 390,
+      "autoOpen": false,
+      "closeWorks": true
+    },
+    {
+      "role": "MANAGER",
+      "buttonHit": true,
+      "clientWidth": 390,
+      "manifest": "/thien-dao/admin/manifest.webmanifest",
+      "panelLeft": 41,
+      "panelPosition": "static",
+      "panelRight": 349,
+      "width": 390,
+      "autoOpen": false,
+      "closeWorks": true
+    },
+    {
+      "role": "KITCHEN",
+      "buttonHit": true,
+      "clientWidth": 390,
+      "manifest": "/thien-dao/kitchen/manifest.webmanifest",
+      "panelLeft": 41,
+      "panelPosition": "static",
+      "panelRight": 349,
+      "width": 390,
+      "autoOpen": false,
+      "closeWorks": true
+    },
+    {
+      "role": "CASHIER",
+      "buttonHit": true,
+      "clientWidth": 390,
+      "manifest": "/thien-dao/cashier/manifest.webmanifest",
+      "panelLeft": 41,
+      "panelPosition": "static",
+      "panelRight": 349,
+      "width": 390,
+      "autoOpen": false,
+      "closeWorks": true
+    }
+  ],
+  "console": [],
+  "nativeSafariAfterFix": "PENDING"
+}

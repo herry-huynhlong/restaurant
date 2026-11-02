@@ -1,0 +1,11 @@
+{
+  "result": "PASS",
+  "restore": "PASS",
+  "environment": "isolated localhost:55432 temporary database",
+  "migrations": 28,
+  "mediaArchiveVerified": true,
+  "encryptedSha256": "6d5f24db59786d48cb68473280837b58ec6680c482acc4f1ee451bdf46571e13",
+  "dumpSha256": "88acb4176e92ed7c79edc667b350a9fbc9d33535ae3e3c18369f6ca994fae9b2",
+  "at": "2026-11-02T14:30:05.558Z",
+  "productionDataChanged": false
+}

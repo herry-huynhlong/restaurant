@@ -1,5 +1,7 @@
 # Nút Cài App/hướng dẫn bị che trên iPhone — sửa giao diện
 
+**Cập nhật phát hành:** sau phê duyệt CI/CD, source `d41191f` đã lên production. Xem [báo cáo phát hành](PWA_INSTALL_OVERLAY_PRODUCTION.md). Những trạng thái chưa commit/deploy bên dưới ghi nhận lúc hoàn tất QA; native Safari sau sửa vẫn PENDING.
+
 Ngày: 02/11/2026. Baseline production: `55ef71c`. **Đã sửa và kiểm thử local QA; chưa commit/push/deploy.**
 
 ## Nguyên nhân có bằng chứng

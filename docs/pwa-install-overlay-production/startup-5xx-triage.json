@@ -1,0 +1,1 @@
+{"appStartedAt": "2026-11-02T14:40:17.712802+00:00", "readinessProofFileAt": "2026-11-02T14:40:32.654646+00:00", "startupNginxErrors": [{"file": "qavio.error.log", "at": "2026-11-02T14:40:19+00:00", "connectionRefused": false, "reasons": ["connection reset by peer", "recv() failed"], "quanpilotUpstream": true, "qavioUpstream": false}]}

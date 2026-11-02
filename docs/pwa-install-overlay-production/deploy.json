@@ -1,0 +1,34 @@
+{
+  "mode": "applied",
+  "scope": "restaurant",
+  "service": "app",
+  "image": "quanpilot-app:d41191f",
+  "disk": {
+    "usedPercent": 57.82,
+    "freeBytes": 11010224128,
+    "incomingUpperBoundBytes": 1197580288,
+    "reserveBytes": 2610569625,
+    "requiredFreeBytes": 3808149913,
+    "severity": "ok",
+    "allowed": true,
+    "memoryAvailableBytes": 481505280
+  },
+  "runtimePreserved": true,
+  "requiresApproval": "d41191f11ce5b9fbefcda002f39b49062a394089:d47d8374bdd8362848beb5e72c4314a8e76bc1d8772e82ef435c194e4af68b3f",
+  "loggingDeferredServices": [
+    "maintenance-worker",
+    "postgres"
+  ],
+  "migration": "never",
+  "healthy": true,
+  "unrelatedContainersUnchanged": true,
+  "source": "d41191f11ce5b9fbefcda002f39b49062a394089",
+  "imageId": "sha256:0899628b7077c64aa4aace41182dac61846254f73fd83bbface1fb50dbcba72e",
+  "rollbackImageId": "sha256:2421ed83bb0ae411f973da84edbd2b91b09ec0266e5530288ac8751f4f79e839",
+  "envPreserved": true,
+  "noMigration": true,
+  "freeBytes": 10995331072,
+  "memoryAvailableBytes": 470749184,
+  "archiveRemovedAfterVerifiedLoad": true,
+  "freeAfterArchiveRemoval": 11312611328
+}

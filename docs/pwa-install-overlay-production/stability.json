@@ -1,0 +1,42 @@
+{
+  "result": "PASS",
+  "source": "d41191f11ce5b9fbefcda002f39b49062a394089",
+  "imageId": "sha256:0899628b7077c64aa4aace41182dac61846254f73fd83bbface1fb50dbcba72e",
+  "appRestartCount": 0,
+  "appUptimeSeconds": 246,
+  "sixOtherContainersUnchanged": true,
+  "containersRunning": 7,
+  "diskFreeBytes": 11312590848,
+  "memoryAvailableBytes": 498745344,
+  "errorCountsSinceAppStart": {
+    "restaurant-app-1": {
+      "TypeError": 0,
+      "ReferenceError": 0,
+      "PrismaClientKnownRequestError": 0,
+      "P2028": 0,
+      "deadlock detected": 0,
+      "Transaction.*timed out": 0
+    },
+    "restaurant-postgres-1": {
+      "TypeError": 0,
+      "ReferenceError": 0,
+      "PrismaClientKnownRequestError": 0,
+      "P2028": 0,
+      "deadlock detected": 0,
+      "Transaction.*timed out": 0
+    }
+  },
+  "httpAccessSinceAppStart": {
+    "scope": "shared QAVIO/QuanPilot safe Nginx access log",
+    "requests": 104,
+    "http5xx": 1
+  },
+  "appLogging": {
+    "Type": "json-file",
+    "Config": {
+      "max-file": "3",
+      "max-size": "10m"
+    }
+  },
+  "nativeAcceptance": "PENDING"
+}
