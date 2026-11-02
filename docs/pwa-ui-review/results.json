@@ -1,0 +1,94 @@
+{
+  "date": "2026-11-02",
+  "environment": "isolated local QA, production build",
+  "fixtureName": "Nhà hàng QAVIO (synthetic QA tenant, not production)",
+  "matrix": [
+    {
+      "role": "MANAGER",
+      "mode": "browser",
+      "hasInstall": true,
+      "hasLogin": true,
+      "native": false
+    },
+    {
+      "role": "MANAGER",
+      "mode": "standalone-simulated",
+      "hasInstall": false,
+      "hasLogin": true,
+      "native": false
+    },
+    {
+      "role": "WAITER",
+      "mode": "browser",
+      "hasInstall": true,
+      "hasLogin": true,
+      "native": false
+    },
+    {
+      "role": "WAITER",
+      "mode": "standalone-simulated",
+      "hasInstall": false,
+      "hasLogin": true,
+      "native": false
+    },
+    {
+      "role": "KITCHEN",
+      "mode": "browser",
+      "hasInstall": true,
+      "hasLogin": true,
+      "native": false
+    },
+    {
+      "role": "KITCHEN",
+      "mode": "standalone-simulated",
+      "hasInstall": false,
+      "hasLogin": true,
+      "native": false
+    },
+    {
+      "role": "CASHIER",
+      "mode": "browser",
+      "hasInstall": true,
+      "hasLogin": true,
+      "native": false
+    },
+    {
+      "role": "CASHIER",
+      "mode": "standalone-simulated",
+      "hasInstall": false,
+      "hasLogin": true,
+      "native": false
+    }
+  ],
+  "responsive": [
+    {
+      "loginVisible": true,
+      "scroll": 320,
+      "width": 320
+    },
+    {
+      "loginVisible": true,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "loginVisible": true,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "loginVisible": true,
+      "scroll": 768,
+      "width": 768
+    }
+  ],
+  "standaloneSession": {
+    "loginRedirectedToStaff": true,
+    "reloadRetainedWorkspace": true,
+    "installButtonHidden": true
+  },
+  "installHelp": "Only shown after clicking; desktop instructions observed in connected browser",
+  "consoleErrorsBeforeSignout": [],
+  "standaloneMethod": "QA-only GET proxy injects navigator.standalone=true before hydration; actual source components; not native installation; not evidence of OS cookie transfer",
+  "nativeAcceptance": "PENDING"
+}

@@ -1,0 +1,55 @@
+{
+  "roles": [
+    {
+      "role": "WAITER",
+      "credentialEntries": 1,
+      "installGuideBeforeLogin": true,
+      "installGuideAfterLogin": true,
+      "reloadRetainedWorkspace": true,
+      "newTabStartRetainedWorkspace": true,
+      "nativeInstall": false
+    },
+    {
+      "role": "KITCHEN",
+      "credentialEntries": 1,
+      "installGuideBeforeLogin": true,
+      "installGuideAfterLogin": true,
+      "reloadRetainedWorkspace": true,
+      "startUrlRetainedWorkspace": true,
+      "nativeInstall": false
+    },
+    {
+      "role": "CASHIER",
+      "credentialEntries": 1,
+      "installGuideBeforeLogin": true,
+      "installGuideAfterLogin": true,
+      "reloadRetainedWorkspace": true,
+      "startUrlRetainedWorkspace": true,
+      "nativeInstall": false
+    },
+    {
+      "role": "MANAGER",
+      "credentialEntries": 1,
+      "installGuideBeforeLogin": true,
+      "installGuideAfterLogin": true,
+      "reloadRetainedWorkspace": true,
+      "startUrlRetainedWorkspace": true,
+      "nativeInstall": false
+    }
+  ],
+  "layout": [
+    {
+      "canInstallBeforeLogin": true,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "canInstallBeforeLogin": true,
+      "scroll": 375,
+      "width": 375
+    }
+  ],
+  "errors": [],
+  "nativeAcceptance": "PENDING",
+  "osInstallPerformed": false
+}

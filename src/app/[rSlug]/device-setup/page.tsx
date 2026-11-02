@@ -26,6 +26,10 @@ export default async function StaffDeviceSetupPage({
     deviceId
   });
 
+  if (deviceSession && (!deviceSession.isActive || deviceSession.revokedAt)) {
+    redirect(`/${access.restaurant.slug}/login?pwa=1`);
+  }
+
   if (deviceSession?.operatorName && deviceSession.isActive && !deviceSession.revokedAt) {
     redirect(next);
   }

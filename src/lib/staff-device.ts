@@ -2,19 +2,42 @@
 
 const deviceIdKey = "staffDeviceId";
 
+function validDeviceId(value: string | null): value is string {
+  return Boolean(value && /^[a-zA-Z0-9_-]{8,120}$/.test(value));
+}
+
+function readDeviceCookie() {
+  const value = document.cookie.split(";").map(part => part.trim()).find(part => part.startsWith(`${deviceIdKey}=`));
+  if (!value) return null;
+  try {
+    const decoded = decodeURIComponent(value.slice(deviceIdKey.length + 1));
+    if (validDeviceId(decoded)) return decoded;
+  } catch { /* Invalid cookies must not fall back to another device identity. */ }
+  throw new Error("Thông tin thiết bị không hợp lệ. Vui lòng liên hệ quản lý.");
+}
+
+function readLocal(key: string) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
 function persistDeviceCookie(deviceId: string) {
-  document.cookie = `${deviceIdKey}=${encodeURIComponent(deviceId)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${deviceIdKey}=${encodeURIComponent(deviceId)}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+  if (readDeviceCookie() !== deviceId) throw new Error("Trình duyệt chưa lưu được thông tin thiết bị. Vui lòng cho phép cookie để tiếp tục.");
 }
 
 export function getStaffDeviceId() {
-  const existing = localStorage.getItem(deviceIdKey);
-  if (existing) {
+  // iOS copies cookies at installation, not localStorage. Never replace a copied
+  // device cookie with an empty or stale local cache, including revoked IDs.
+  const cookie = readDeviceCookie();
+  if (cookie) return cookie;
+  const existing = readLocal(deviceIdKey);
+  if (validDeviceId(existing)) {
     persistDeviceCookie(existing);
     return existing;
   }
 
   const deviceId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  localStorage.setItem(deviceIdKey, deviceId);
   persistDeviceCookie(deviceId);
   return deviceId;
 }
@@ -27,10 +50,10 @@ export function getStaffDeviceName() {
 }
 
 export function isDeviceOnShift(slug: string) {
-  return localStorage.getItem(`staffOnShift:${slug}`) !== "false";
+  return readLocal(`staffOnShift:${slug}`) !== "false";
 }
 
 export function setDeviceOnShift(slug: string, onShift: boolean) {
-  localStorage.setItem(`staffOnShift:${slug}`, onShift ? "true" : "false");
+  try { localStorage.setItem(`staffOnShift:${slug}`, onShift ? "true" : "false"); } catch { /* Server shift state remains authoritative. */ }
   window.dispatchEvent(new CustomEvent("staff-shift-changed", { detail: { slug, onShift } }));
 }

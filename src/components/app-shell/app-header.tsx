@@ -3,6 +3,7 @@ import { SignOutButton } from "@/components/app-shell/sign-out-button";
 import { NotificationAudioUnlocker } from "@/components/app-shell/notification-audio-unlocker";
 import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
 import { StaffShiftControls } from "@/components/app-shell/staff-shift-controls";
+import { InstallAppButton } from "@/components/app-shell/install-app-button";
 
 export function AppHeader({
   title,
@@ -27,6 +28,7 @@ export function AppHeader({
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {enableShiftControls ? <StaffShiftControls slug={notificationSlug} /> : <NotificationEnableButton slug={notificationSlug} />}
+          {notificationSlug ? <InstallAppButton compact /> : null}
           {actions}
           <SignOutButton />
         </div>

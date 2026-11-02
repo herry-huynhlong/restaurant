@@ -22,7 +22,11 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
   }
 
   const now = new Date();
+  try {
   const session = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "StaffDeviceSession" WHERE "restaurantId"=${access.restaurant.id} AND "userId"=${access.user.id} AND "deviceId"=${parsed.data.deviceId} FOR UPDATE`;
+    const current = await tx.staffDeviceSession.findUnique({ where: { restaurantId_userId_deviceId: { restaurantId: access.restaurant.id, userId: access.user.id, deviceId: parsed.data.deviceId } }, select: { isActive: true, revokedAt: true } });
+    if (current && (!current.isActive || current.revokedAt)) throw new Error("DEVICE_REVOKED");
     const deviceSession = await tx.staffDeviceSession.upsert({
       where: {
         restaurantId_userId_deviceId: {
@@ -36,9 +40,6 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
         deviceName: parsed.data.deviceName,
         operatorName: parsed.data.operatorName,
         onShift: true,
-        isActive: true,
-        revokedAt: null,
-        revokedByUserId: null,
         startedAt: now,
         endedAt: null,
         lastSeenAt: now
@@ -56,6 +57,8 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
         lastSeenAt: now
       }
     });
+    // Also fail closed if a concurrent change made the existing record revoked.
+    if (!deviceSession.isActive || deviceSession.revokedAt) throw new Error("DEVICE_REVOKED");
 
     await tx.pushSubscription.updateMany({
       where: {
@@ -97,4 +100,8 @@ export async function POST(request: Request, { params }: { params: { rSlug: stri
     operatorName: session.operatorName,
     onShift: session.onShift
   });
+  } catch (error) {
+    if (error instanceof Error && error.message === "DEVICE_REVOKED") return NextResponse.json({ ok: false, code: "DEVICE_REVOKED", error: "Thiết bị này đã bị quản lý khóa." }, { status: 403 });
+    throw error;
+  }
 }

@@ -34,8 +34,10 @@ export function StaffDeviceSetupForm({ slug, defaultNext }: { slug: string; defa
         throw new Error(data.error || "Không bắt đầu được ca làm việc.");
       }
       setDeviceOnShift(slug, true);
-      localStorage.setItem("notificationEnabled", "true");
-      localStorage.setItem("notificationSoundEnabled", "true");
+      try {
+        localStorage.setItem("notificationEnabled", "true");
+        localStorage.setItem("notificationSoundEnabled", "true");
+      } catch { /* Storage preferences are optional; the cookie/server session is not. */ }
       router.replace(next);
       router.refresh();
     } catch (err) {

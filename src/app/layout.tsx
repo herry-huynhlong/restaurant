@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getServerSession } from "next-auth";
 import { SessionProvider } from "@/components/app-shell/session-provider";
 import { RegisterServiceWorker } from "@/components/app-shell/register-service-worker";
+import { PwaInstallProvider } from "@/components/app-shell/pwa-install-provider";
 import { authOptions } from "@/lib/auth/options";
 import { productBrand } from "@/lib/brand";
 import { getMaintenanceState } from "@/lib/maintenance-mode";
@@ -50,8 +51,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="vi">
       <body>
         <SessionProvider session={session}>
+          <PwaInstallProvider>
           <RegisterServiceWorker />
           {children}
+          </PwaInstallProvider>
         </SessionProvider>
       </body>
     </html>

@@ -5,6 +5,7 @@ import { Bell, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Notification, NotificationType } from "@prisma/client";
 import { getStaffDeviceId, isDeviceOnShift } from "@/lib/staff-device";
+import { recoverStaffAccess } from "@/lib/staff-access-recovery";
 import { playNotificationSound } from "@/lib/client-notification-sound";
 import { restaurantRoutes } from "@/lib/routes";
 
@@ -162,10 +163,7 @@ export function NotificationBell({
     async function fetchNotifications() {
       try {
         const response = await fetch(`/api/restaurants/${slug}/notifications?deviceId=${encodeURIComponent(getStaffDeviceId())}`, { cache: "no-store" });
-        if (response.status === 403) {
-          window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
-          return;
-        }
+        if (await recoverStaffAccess(slug, response)) return;
         if (!response.ok) throw new Error("notifications_failed");
         const data = (await response.json()) as NotificationResponse;
         if (cancelled) return;

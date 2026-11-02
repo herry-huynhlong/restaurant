@@ -147,6 +147,10 @@ jobs:
           docker exec ${{ job.services.postgres.id }} createdb -U postgres staff_pwa_test
           pnpm exec prisma migrate deploy
           pnpm exec tsx scripts/staff-pwa-checks.ts
+          pnpm exec tsx scripts/staff-pwa-session-checks.ts
+          pnpm exec tsx scripts/staff-pwa-install-ui-checks.ts
+          pnpm exec tsx scripts/install-help-checks.ts
+          pnpm exec tsx scripts/pwa-icon-checks.ts
           pnpm test:staff-device-name
           pnpm test:staff-soft-delete
           pnpm test:form-ux

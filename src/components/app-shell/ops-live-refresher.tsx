@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getStaffDeviceId, isDeviceOnShift } from "@/lib/staff-device";
+import { recoverStaffAccess } from "@/lib/staff-access-recovery";
 
 type NotificationState = {
   unreadCount: number;
@@ -48,10 +49,7 @@ export function OpsLiveRefresher({ slug }: { slug: string }) {
     async function tick() {
       try {
         const response = await fetch(`/api/restaurants/${slug}/notifications/state?deviceId=${encodeURIComponent(getStaffDeviceId())}`, { cache: "no-store" });
-        if (response.status === 403) {
-          window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
-          return;
-        }
+        if (await recoverStaffAccess(slug, response)) { setStatus("reconnecting"); return; }
         if (!response.ok) throw new Error("state_failed");
         const data = (await response.json()) as NotificationState;
         setStatus("live");

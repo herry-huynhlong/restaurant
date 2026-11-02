@@ -4,25 +4,25 @@ import { LogIn, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getStaffDeviceId, isDeviceOnShift, setDeviceOnShift } from "@/lib/staff-device";
 import { NotificationEnableButton } from "@/components/app-shell/notification-enable-button";
+import { recoverStaffAccess } from "@/lib/staff-access-recovery";
 
 export function StaffShiftControls({ slug }: { slug?: string }) {
   const [onShift, setOnShift] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     const activeSlug = slug;
-    const deviceId = getStaffDeviceId();
+    let deviceId: string;
+    try { deviceId = getStaffDeviceId(); }
+    catch { setError("Không đọc được thông tin thiết bị. Vui lòng kiểm tra quyền lưu cookie hoặc liên hệ quản lý."); return; }
     setOnShift(isDeviceOnShift(activeSlug));
 
     let cancelled = false;
     async function syncShiftState() {
       const response = await fetch(`/api/restaurants/${activeSlug}/shift?deviceId=${encodeURIComponent(deviceId)}`, { cache: "no-store" });
-      if (response.status === 403) {
-        localStorage.removeItem(`staffOnShift:${activeSlug}`);
-        window.location.href = `/${activeSlug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
-        return;
-      }
+      if (await recoverStaffAccess(activeSlug, response)) return;
       if (!response.ok) return;
       const data = (await response.json()) as { onShift?: boolean };
       if (cancelled || typeof data.onShift !== "boolean") return;
@@ -30,7 +30,7 @@ export function StaffShiftControls({ slug }: { slug?: string }) {
       setDeviceOnShift(activeSlug, data.onShift);
     }
 
-    void syncShiftState();
+    void syncShiftState().catch(() => setError("Chưa kết nối được trạng thái ca. Vui lòng thử lại."));
     return () => {
       cancelled = true;
     };
@@ -41,6 +41,7 @@ export function StaffShiftControls({ slug }: { slug?: string }) {
     if (!nextOnShift && !window.confirm("Xác nhận tan ca trên thiết bị này?")) return;
 
     setSaving(true);
+    setError(null);
     try {
       const response = await fetch(`/api/restaurants/${slug}/shift`, {
         method: "POST",
@@ -50,18 +51,18 @@ export function StaffShiftControls({ slug }: { slug?: string }) {
           action: nextOnShift ? "START" : "END"
         })
       });
-      if (response.status === 403) {
-        localStorage.removeItem(`staffOnShift:${slug}`);
-        window.location.href = `/${slug}/login?error=${encodeURIComponent("Thiết bị này đã bị quản lý khóa.")}`;
-        return;
-      }
+      if (await recoverStaffAccess(slug, response)) return;
       if (!response.ok) throw new Error("shift_failed");
 
       setOnShift(nextOnShift);
       setDeviceOnShift(slug, nextOnShift);
-      localStorage.setItem("notificationEnabled", nextOnShift ? "true" : "false");
-      localStorage.setItem("notificationSoundEnabled", nextOnShift ? "true" : "false");
+      try {
+        localStorage.setItem("notificationEnabled", nextOnShift ? "true" : "false");
+        localStorage.setItem("notificationSoundEnabled", nextOnShift ? "true" : "false");
+      } catch { /* Optional notification preferences are not authentication. */ }
       window.dispatchEvent(new Event("notification-sound-enabled"));
+    } catch {
+      setError("Chưa cập nhật được ca. Vui lòng thử lại.");
     } finally {
       setSaving(false);
     }
@@ -72,6 +73,7 @@ export function StaffShiftControls({ slug }: { slug?: string }) {
   if (!onShift) {
     return (
       <>
+        {error ? <span role="alert" className="text-sm text-amber-800">{error}</span> : null}
         <span className="inline-flex h-10 items-center rounded-md border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-800">
           Ngoài ca
         </span>
@@ -90,6 +92,7 @@ export function StaffShiftControls({ slug }: { slug?: string }) {
 
   return (
     <>
+      {error ? <span role="alert" className="text-sm text-amber-800">{error}</span> : null}
       <NotificationEnableButton slug={slug} />
       <span className="inline-flex h-10 items-center rounded-md border border-teal-200 bg-teal-50 px-3 text-sm font-semibold text-teal-800">
         Trong ca

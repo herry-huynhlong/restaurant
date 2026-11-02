@@ -1,0 +1,114 @@
+{
+  "baseSource": "6429de72ec1959371c40506d0e4eabb726d262ad",
+  "scope": "dual-flow candidate with login UI review; excludes report filters",
+  "files": [
+    {
+      "path": "src/lib/staff-device.ts",
+      "sha256": "6c89d513501d2cf23a01556d57d2aad712a76b72430549a8f7f3732e2acdd23b"
+    },
+    {
+      "path": "src/lib/staff-pwa-startup.ts",
+      "sha256": "cc865707d8fa7ac8af91c33b486eafa3a39f6c731b1e705e412122b2bb8fba50"
+    },
+    {
+      "path": "src/lib/staff-access-recovery.ts",
+      "sha256": "694300535a8a823e31adfe522a5be796ec37ebefbb112eb1077e05e808ce5840"
+    },
+    {
+      "path": "src/lib/pwa-install-controller.ts",
+      "sha256": "30dbd77cbd258ff35a19bc5e0924bd03cafc89edaf38d16ac9bbab3bdc7b36ec"
+    },
+    {
+      "path": "src/lib/install-help.ts",
+      "sha256": "d7a673758b1833b4dc0f13dc68cbdab1f7e479e5edc059050a03f13e999de7f7"
+    },
+    {
+      "path": "src/lib/pwa-icon.ts",
+      "sha256": "862dca14ad8ed58af3bd7206c07ddafc53b2ee368ea59d9f4887a110fa459b97"
+    },
+    {
+      "path": "src/server/services/staff-pwa-startup-service.ts",
+      "sha256": "a68eb3b556b68d615edb251411f9d072b3325e04d729a8319f8c3d24fb9e654f"
+    },
+    {
+      "path": "src/app/api/restaurants/[rSlug]/pwa/status/route.ts",
+      "sha256": "3ca1f2c8613860b8d83961a636527d0ec589d6dbc75334f0cbb4701b4eaf9946"
+    },
+    {
+      "path": "src/app/api/restaurants/[rSlug]/device-session/route.ts",
+      "sha256": "d64677bf75dcedf732426d3ee48e5d2a07bb67f0220e0bb2441dc3b1b739d4df"
+    },
+    {
+      "path": "src/app/[rSlug]/login/page.tsx",
+      "sha256": "33cb8d25b3607ddced13e76030bc1455091c2c3d56dde83e3b463f1bce0d8045"
+    },
+    {
+      "path": "src/app/[rSlug]/device-setup/page.tsx",
+      "sha256": "4383e4006fe5e068de51788e3598d7f2d9b98a3ac7012a74f213bbae8c7b2311"
+    },
+    {
+      "path": "src/app/[rSlug]/icons/[icon]/route.ts",
+      "sha256": "c08847d00f3711f7a2346797173ea3785d7e5f513f41511047b058bc4aa4e2ba"
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "sha256": "c935e3202e63b70afc37a51a3f62af4e43b96db7e19cc503ccafa44659313602"
+    },
+    {
+      "path": "src/components/app-shell/pwa-install-provider.tsx",
+      "sha256": "2f4bf1828d82855655f3d32db8cc23589c90c9d7b1e3821ff9a63d6fc93ea9b9"
+    },
+    {
+      "path": "src/components/app-shell/install-app-button.tsx",
+      "sha256": "36b6b320657101da6065cfe082d8c4dbbfd4ba743cc96a2c8eed0a022e27b3c7"
+    },
+    {
+      "path": "src/components/app-shell/app-header.tsx",
+      "sha256": "9b58633c7b7917eae4bed5715d38589eea368c74426dd0d9b7cc74f1aecbfe00"
+    },
+    {
+      "path": "src/components/app-shell/staff-shift-controls.tsx",
+      "sha256": "dea5246b718f36d9cedacfdbf6867f8ba7ccd2c209f3bddabab25def344ab1dc"
+    },
+    {
+      "path": "src/components/app-shell/staff-device-setup-form.tsx",
+      "sha256": "b383d2c17edc882dbb42b763445d32620812be2632497c844ad3d59ea5b84908"
+    },
+    {
+      "path": "src/components/app-shell/ops-live-refresher.tsx",
+      "sha256": "ddf6dca7f113ef9b97eead5e6a11f13f383c9e5f27c083e31cb8b2c803996dc4"
+    },
+    {
+      "path": "src/components/app-shell/notification-bell.tsx",
+      "sha256": "4e10da1c865861d91b54f44310cdeb3f1873886e7c1b696b7ea6b1a83982f283"
+    },
+    {
+      "path": "scripts/helpers/staff-device-browser.ts",
+      "sha256": "2321fe2a39851a43c9b011408409645b1b92a4210f4788cf549847487c8dfab8"
+    },
+    {
+      "path": "scripts/staff-pwa-session-checks.ts",
+      "sha256": "3cad0981eedbabe1e5e0c6b29aec1aeacf9f5f2084a8fdcc553122a0882cf573"
+    },
+    {
+      "path": "scripts/staff-pwa-http-checks.ts",
+      "sha256": "435c61d7ddef5d56af966555c93a27078529bdb7640e85f48f190c53e3f861b4"
+    },
+    {
+      "path": "scripts/install-help-checks.ts",
+      "sha256": "b3fbd07ff39a645b370547393aacec2ef3de107fd575ec9a0d5ba49c74910421"
+    },
+    {
+      "path": "scripts/pwa-icon-checks.ts",
+      "sha256": "fa4bd31100a0ca3465cefcd263ff8a0f556a4c9bbc80140511e42568454c61cf"
+    },
+    {
+      "path": ".github/workflows/quanpilot-release.yml",
+      "sha256": "570b7a24b96d68ef7e0cc0393ad5a4b0379f266bb443f1875aceddd4c3882d7d"
+    },
+    {
+      "path": "scripts/staff-pwa-install-ui-checks.ts",
+      "sha256": "1b661f581c5ec157fedd35c1db172378ef0e7e1188a139b3dd4948a293daf6fc"
+    }
+  ]
+}
