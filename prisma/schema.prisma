@@ -1009,13 +1009,14 @@ model RestaurantSubscriptionEvent {
   @@index([action])
 }
 
-// Only QuánPilot stores self-registration and email-verification state.
+// QuánPilot stores self-registration state. Historical Google-verification
+// values remain nullable so existing registrations are never rewritten.
 model TrialRegistration {
   id String @id @default(cuid())
   keyHash String @unique
   requestHash String
-  challengeId String @unique
-  googleSubject String @unique
+  challengeId String? @unique
+  googleSubject String? @unique
   restaurantId String @unique
   ownerUserId String @unique
   result Json

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { randomUUID, randomBytes } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { prisma } from "@/lib/db/prisma";
@@ -53,42 +52,10 @@ function counts() {
 }
 async function main() {
   const before = counts();
-  const start = await post("/api/trial/google/start", { website: "" });
-  assert.equal(start.status, 200);
-  const { url } = await start.json();
-  assert.equal(new URL(url).hostname, "accounts.google.com");
-  assert.match(start.headers.getSetCookie().join(";"), /HttpOnly/);
-  assert.ok(!url.includes(process.env.QUANPILOT_TRIAL_GOOGLE_CLIENT_SECRET!));
-  await writeFile(
-    ".trial-runtime/identity-input.json",
-    JSON.stringify({
-      state: new URL(url).searchParams.get("state"),
-      email,
-      subject: prefix,
-    }),
-    { mode: 0o600 },
-  );
-  const fixture = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "scripts/trial-google-fixture.ts"],
-    { encoding: "utf8", windowsHide: true },
-  );
-  assert.equal(fixture.status, 0);
-  const verified = JSON.parse(
-    await readFile(".trial-runtime/identity-result.json", "utf8"),
-  );
-  const callback = await fetch(verified.callback, {
-    headers: { cookie: cookie() },
-    redirect: "manual",
-  });
-  assert.equal(callback.status, 303);
-  accept(callback);
-  assert.equal(callback.headers.get("location"), q + "/trial");
   const session = await (
     await fetch(q + "/api/trial/session", { headers: { cookie: cookie() } })
   ).json();
-  assert.equal(session.identity.email, email);
-  assert.ok(!JSON.stringify(session).includes("verificationToken"));
+  assert.equal(session.enabled, true);
   const input = {
       restaurantName: "HTTP QA Restaurant",
       slug: prefix,
@@ -96,9 +63,6 @@ async function main() {
       email,
       password,
       confirmPassword: password,
-      timezone: "Asia/Ho_Chi_Minh",
-      language: "vi",
-      currency: "VND",
       website: "",
       startedAt: Date.now() - 5000,
     },
@@ -226,8 +190,7 @@ async function main() {
   console.log(
     JSON.stringify({
       suite: "QAVIO to QuánPilot HTTP E2E",
-      google: "mocked identity exchange; real app callbacks",
-      googleFlowBinding: true,
+      directRegistration: true,
       idempotency: true,
       networkAbortRetry: true,
       oneRestaurantOneOwner: true,
@@ -266,9 +229,6 @@ main()
       where: { id: { in: rows.map((r) => r.id) } },
     });
     await prisma.user.deleteMany({ where: { email } });
-    await prisma.trialIdentityChallenge.deleteMany({
-      where: { googleSubject: prefix },
-    });
     await prisma.$disconnect();
     const cleanup = spawnSync(
       process.execPath,

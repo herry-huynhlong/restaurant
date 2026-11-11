@@ -29,6 +29,25 @@ export function assertTrialEnabled() {
   if (!trialEnabled()) throw new TrialError(503, "TRIAL_DISABLED");
   trialSecret();
 }
+export function trialQuanpilotOrigin() {
+  const raw = process.env.QUANPILOT_TRIAL_PUBLIC_ORIGIN;
+  if (!raw) throw new TrialError(503, "TRIAL_NOT_CONFIGURED");
+  const origin = new URL(raw);
+  if (
+    origin.username ||
+    origin.password ||
+    origin.search ||
+    origin.hash ||
+    origin.pathname !== "/" ||
+    !(
+      origin.protocol === "https:" ||
+      (origin.protocol === "http:" &&
+        ["localhost", "127.0.0.1"].includes(origin.hostname))
+    )
+  )
+    throw new TrialError(503, "TRIAL_NOT_CONFIGURED");
+  return origin.origin;
+}
 export async function consumeTrialRate(
   key: string,
   max: number,

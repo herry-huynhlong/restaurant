@@ -13,13 +13,13 @@ import {
 } from "@/lib/trial-contract";
 import { createRestaurantRecords } from "./restaurant-provision-service";
 import { saveOptimizedUploadImage } from "./image-upload-service";
-import { trialProof, trialQuanpilotOrigin } from "./trial-google-service";
 import {
   TrialError,
   assertTrialEnabled,
   trialHash,
   safeEqual,
   consumeTrialRate,
+  trialQuanpilotOrigin,
 } from "./trial-security";
 // Preserve the local time in Vietnam and clamp the day at the destination month's end.
 export function addVietnamTrialMonth(now: Date) {
@@ -104,9 +104,7 @@ export async function registerTrial(
     throw new TrialError(400, "IDEMPOTENCY_KEY_REQUIRED");
   const input = parsed.data,
     keyHash = trialHash("registration:" + key),
-    requestHash = trialHash(
-      JSON.stringify({ ...input, verificationToken: undefined }),
-    );
+    requestHash = trialHash(JSON.stringify(input));
   let logoUrl: string | undefined;
   await consumeTrialRate("register:" + bucket, 15, 900000);
   const passwordHash = await bcrypt.hash(input.password, 12);
@@ -122,31 +120,7 @@ export async function registerTrial(
             throw new TrialError(409, "IDEMPOTENCY_CONFLICT");
           return old.result as unknown as TrialResult;
         }
-        const id = input.verificationToken.split(".")[0],
-          proof = await tx.trialIdentityChallenge.findUnique({ where: { id } });
-        if (
-          !proof ||
-          !proof.verifiedAt ||
-          proof.expiresAt <= new Date() ||
-          proof.email !== input.email ||
-          !proof.googleSubject ||
-          !safeEqual(trialProof(proof), input.verificationToken)
-        )
-          throw new TrialError(403, "EMAIL_VERIFICATION_REQUIRED");
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('qavio:trial:quota',0))`;
-        const priorIdentityTrial = await tx.trialRegistration.findFirst({
-          where: {
-            OR: [
-              { challengeId: proof.id },
-              { googleSubject: proof.googleSubject },
-            ],
-          },
-        });
-        if (priorIdentityTrial) {
-          if (safeEqual(priorIdentityTrial.requestHash, requestHash))
-            return priorIdentityTrial.result as unknown as TrialResult;
-          throw new TrialError(409, "TRIAL_ALREADY_USED");
-        }
         const max = Number(process.env.QUANPILOT_TRIAL_MAX_TOTAL);
         if (!Number.isSafeInteger(max) || max < 1)
           throw new TrialError(503, "TRIAL_QUOTA_NOT_CONFIGURED");
@@ -177,9 +151,9 @@ export async function registerTrial(
             logoUrl,
             ownerName: input.ownerName,
             ownerEmail: input.email,
-            timezone: input.timezone,
-            primaryLanguage: input.language,
-            currency: input.currency,
+            timezone: "Asia/Ho_Chi_Minh",
+            primaryLanguage: "vi",
+            currency: "VND",
             businessType: "RESTAURANT",
             plan: "TRAIN",
             planEntitlement: "BASIC",
@@ -215,8 +189,6 @@ export async function registerTrial(
             id: registrationId,
             keyHash,
             requestHash,
-            challengeId: proof.id,
-            googleSubject: proof.googleSubject,
             restaurantId: restaurant.id,
             ownerUserId: owner.id,
             result: JSON.parse(JSON.stringify(result)),

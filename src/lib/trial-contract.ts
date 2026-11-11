@@ -77,10 +77,6 @@ export const trialInput = z
         (s) => new TextEncoder().encode(s).length <= 72,
         "Mật khẩu tối đa 72 byte.",
       ),
-    timezone: z.literal("Asia/Ho_Chi_Minh"),
-    language: z.literal("vi"),
-    currency: z.literal("VND"),
-    verificationToken: z.string().min(32).max(200),
     logo: trialLogo.optional(),
   })
   .strict();
